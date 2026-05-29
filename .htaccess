@@ -1,0 +1,69 @@
+Options -Indexes
+Options -MultiViews
+
+# ── Security headers ─────────────────────────────────────────
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set X-XSS-Protection "1; mode=block"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ── Protect config files ─────────────────────────────────────
+<FilesMatch "^(config\.php|install\.sql|\.env)$">
+  Order Allow,Deny
+  Deny from all
+</FilesMatch>
+
+# ── PHP settings ─────────────────────────────────────────────
+<IfModule mod_php.c>
+  php_value upload_max_filesize 32M
+  php_value post_max_size 32M
+  php_value max_execution_time 120
+  php_value memory_limit 256M
+</IfModule>
+
+# ── Rewrite rules ────────────────────────────────────────────
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Route /api/auth/*        → /api/auth.php?action=$1
+  RewriteRule ^api/auth/([^/]+)/?$        api/auth.php?action=$1      [QSA,L]
+
+  # Route /api/brands        → /api/brands.php
+  RewriteRule ^api/brands/?$              api/brands.php              [QSA,L]
+  RewriteRule ^api/brands/([^/]+)/?$      api/brands.php?id=$1        [QSA,L]
+
+  # Route /api/admin/*       → /api/admin.php?action=$1
+  RewriteRule ^api/admin/?$               api/admin.php               [QSA,L]
+  RewriteRule ^api/admin/([^/]+)/?$       api/admin.php?action=$1     [QSA,L]
+  RewriteRule ^api/admin/([^/]+)/([^/]+)/?$ api/admin.php?action=$1&id=$2 [QSA,L]
+
+  # Route /api/settings      → /api/admin.php?action=settings
+  RewriteRule ^api/settings/?$            api/admin.php?action=settings [QSA,L]
+
+  # Route /api/pricing/:brand/* → /api/pricing.php?brand=$1&action=$2
+  RewriteRule ^api/pricing/([^/]+)/([^/]+)/?$ api/pricing.php?brand=$1&action=$2 [QSA,L]
+
+  # Route /api/strategy/:brand/* → /api/strategy.php?brand=$1&action=$2
+  RewriteRule ^api/strategy/([^/]+)/ai/([^/]+)/?$ api/strategy.php?brand=$1&action=ai-$2 [QSA,L]
+  RewriteRule ^api/strategy/([^/]+)/([^/]+)/?$    api/strategy.php?brand=$1&action=$2    [QSA,L]
+  RewriteRule ^api/strategy/([^/]+)/download/([^/]+)/?$ api/strategy.php?brand=$1&action=download&genId=$2 [QSA,L]
+
+  # Route /api/budget/* → /api/budget.php
+  RewriteRule ^api/budget/dashboard/?$                             api/budget.php?action=dashboard            [QSA,L]
+  RewriteRule ^api/budget/brands/?$                                api/budget.php?action=brands               [QSA,L]
+  RewriteRule ^api/budget/brands/([^/]+)/months/?$                 api/budget.php?action=months&brand=$1      [QSA,L]
+  RewriteRule ^api/budget/months/([^/]+)/?$                        api/budget.php?action=month&month=$1       [QSA,L]
+  RewriteRule ^api/budget/months/([^/]+)/days/([0-9]+)/?$          api/budget.php?action=day&month=$1&day=$2  [QSA,L]
+  RewriteRule ^api/budget/months/([^/]+)/channels/?$               api/budget.php?action=channels&month=$1   [QSA,L]
+  RewriteRule ^api/budget/months/([^/]+)/settings/?$               api/budget.php?action=settings&month=$1   [QSA,L]
+  RewriteRule ^api/budget/compare/?$                               api/budget.php?action=compare              [QSA,L]
+
+  # SPA fallback — serve app.html for non-file, non-api routes
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_URI} !^/api/
+  RewriteRule ^(?!index\.html|app\.html).*$ /app.html [L]
+</IfModule>

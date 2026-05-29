@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Digifyce Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+@media(max-width:1024px){ #sb-toggle{display:inline-flex!important} }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="sb">
+    <div class="sb-top">
+      <div class="sb-logo"><div class="sb-logo-icon">◈</div><div class="sb-logo-text">DIGI<em>FYCE</em></div></div>
+      <div class="sb-tagline">Internal Platform</div>
+      <div class="sb-brand-sel" onclick="openBrandPicker()">
+        <div class="sb-brand-dot" id="sb-dot"></div>
+        <span class="sb-brand-name" id="sb-brand-name" style="display:none"></span>
+        <span class="sb-brand-empty" id="sb-brand-empty">Select brand →</span>
+        <span class="sb-brand-caret">▼</span>
+      </div>
+      <div class="sb-prog-wrap"><div class="sb-prog-fill" id="sb-prog" style="width:0%"></div></div>
+    </div>
+    <div class="sb-nav" id="sb-nav"></div>
+    <div class="sb-bot">
+      <div class="sb-user">
+        <div class="sb-av" id="sb-av">?</div>
+        <div class="sb-uinfo"><div class="sb-uname" id="sb-uname">—</div><div class="sb-urole" id="sb-urole">—</div></div>
+        <button class="sb-logout" title="Sign out" onclick="doLogout()">⏻</button>
+      </div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div class="tb-left">
+        <button class="btn icon sm" id="sb-toggle" onclick="toggleSidebar()" style="display:none;margin-right:8px">☰</button>
+        <div class="tb-bc">Digifyce <span class="tb-sep">/</span> <span id="tb-page-name">Dashboard</span></div>
+        <div class="chip brand" id="tb-brand-chip" style="display:none"></div>
+      </div>
+      <div class="tb-right" id="tb-right"></div>
+    </div>
+    <div class="page" id="page-dashboard">
+      <div class="dash-hero">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <div class="dash-hero-title">
+              <span id="dash-greeting">Loading…</span>
+              <span class="role-chip" id="dash-role-chip" style="display:none;">Role</span>
+            </div>
+            <div class="dash-hero-sub" id="dash-sub">Loading dashboard data...</div>
+          </div>
+          <div class="quick-action-strip" id="dash-quick-actions"></div>
+        </div>
+        <div class="cmd-stat-grid" id="dash-kpi-grid"></div>
+      </div>
+
+      <div class="dash-layout">
+        <!-- Main Content Area: Brands & Alerts -->
+        <div class="dash-main-col">
+          <!-- Alerts Panel -->
+          <div class="dash-alerts-panel" id="dash-alerts-panel" style="display:none;">
+            <div class="sec-hd" style="margin-bottom:12px;">
+              <div class="sec-title" style="color:var(--dark); font-size:14px;">Today's Active Alerts</div>
+              <div class="alert-badge" id="dash-alert-count">0</div>
+            </div>
+            <div class="alert-feed" id="dash-alerts-feed"></div>
+          </div>
+
+          <!-- Brands Grid -->
+          <div class="sec-hd">
+            <div>
+              <div class="sec-title" id="dash-brands-title">Brand Performance</div>
+              <div class="sec-sub">Current month tracking</div>
+            </div>
+          </div>
+          <div class="brand-perf-grid" id="dash-brand-grid"></div>
+        </div>
+
+        <!-- Dashboard activity panel removed to dedicated admin timeline page -->
+      </div>
+    </div>
+    <div class="page hidden" id="page-strategy" style="padding:0;overflow:hidden">
+      <div class="phase-strip" id="phase-strip"></div>
+      <div class="strat-inner">
+        <div class="strat-steps" id="strat-steps"></div>
+        <div class="strat-content" id="strat-content"></div>
+      </div>
+      <div class="strat-actions">
+        <div style="display:flex;gap:8px">
+          <button class="btn" id="s-prev" onclick="stratPrev()">← Previous</button>
+          <button class="btn" onclick="bgtOpenHistory()" title="Load or download past strategy drafts and PPTX runs"><span style="margin-right:2px">📜</span> Past Strategy Runs</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="save-indicator" id="strat-save-ind" style="display:none"></div>
+          <button class="btn amr" id="s-gen" onclick="genPPTX()" style="display:none">✦ Generate PPTX</button>
+          <button class="btn primary" id="s-next" onclick="stratNext()">Next Step →</button>
+        </div>
+      </div>
+    </div>
+    <div class="page hidden" id="page-pricing">
+      <div id="pricing-brands-view">
+        <div class="sec-hd">
+          <div><div class="sec-title">Brands</div><div class="sec-sub">Select a brand to open the pricing calculator</div></div>
+          <button class="btn primary" id="new-brand-btn" onclick="openNewBrand()" style="display:none">+ New Brand</button>
+        </div>
+        <div class="brand-grid" id="brand-grid"></div>
+      </div>
+      <div id="pricing-calc-view" style="display:none">
+        <div class="calc-hd" style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
+          <button class="calc-back" onclick="backToBrands()">← Brands</button>
+          <div><div class="calc-brand-name" id="calc-brand-name">—</div><div style="font-size:11px;color:var(--mid)" id="calc-brand-meta">—</div></div>
+          
+          <!-- Segmented View Mode Toggle -->
+          <div class="view-mode-toggle" id="calc-view-toggle-container" style="margin-left:24px;display:flex;background:var(--off);border:1px solid var(--border);border-radius:20px;padding:2px;gap:2px">
+            <button class="toggle-btn active" id="mode-std" onclick="setPricingViewMode('std')" style="border:none;border-radius:18px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;background:var(--bg);box-shadow:0 2px 4px rgba(0,0,0,0.05);color:var(--fg);transition:all 0.2s">👁 Standard</button>
+            <button class="toggle-btn" id="mode-adv" onclick="setPricingViewMode('adv')" style="border:none;border-radius:18px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:var(--mid);transition:all 0.2s">⚙ Manager</button>
+          </div>
+          
+          <div class="chip save" id="save-chip" style="display:none;margin-left:auto">✓ Saved</div>
+        </div>
+        <div class="sum-bar">
+          <div class="sum-item"><div class="sum-val" id="sum-prods">0</div><div class="sum-lbl">Products</div></div>
+          <div class="sum-item"><div class="sum-val" id="sum-vars">0</div><div class="sum-lbl">Variants</div></div>
+          <div class="sum-item"><div class="sum-val" id="sum-margin">0%</div><div class="sum-lbl">Avg Margin</div></div>
+          <div class="sum-item"><div class="sum-val" id="sum-roas">0x</div><div class="sum-lbl">Est. ROAS</div></div>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <button class="btn sm" onclick="exportExcel()">↓ Export Excel</button>
+            <button class="btn sm primary" id="add-prod-btn" onclick="addProduct()" style="display:none">+ Add Product</button>
+          </div>
+        </div>
+        <div class="globals-card">
+          <div class="globals-hd" onclick="toggleGlobals()">
+            <span class="globals-hd-title">⚙ Global Cost Assumptions</span>
+            <span class="globals-hd-note">Applied to all products · click to expand</span>
+            <span id="g-arrow" style="color:var(--mid);font-size:11px;margin-left:8px">▶</span>
+          </div>
+          <div class="globals-body" id="globals-body">
+            <div class="field"><label>Branding (₹)</label><input type="text" inputmode="decimal" id="g-brand" value="30" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field"><label>Photography (₹)</label><input type="text" inputmode="decimal" id="g-photo" value="15" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field"><label>Shipping (₹)</label><input type="text" inputmode="decimal" id="g-ship" value="70" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field"><label>Operations (₹)</label><input type="text" inputmode="decimal" id="g-ops" value="25" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field"><label>Gift Wrap (₹)</label><input type="text" inputmode="decimal" id="g-gw" value="0" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field"><label>RTO Rate (%)</label><input type="text" inputmode="decimal" id="g-rto" value="5" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field"><label>Target ROAS</label><input type="text" inputmode="decimal" id="g-roas" value="3" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field">
+              <label>Discount Type</label>
+              <select id="g-disc-type" onchange="deferSaveAndRender()" style="width:100%;height:32px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:0 8px;outline:none;background:#fff;color:var(--fg)">
+                <option value="pct" selected>Percentage (%)</option>
+                <option value="flat">Flat ₹</option>
+              </select>
+            </div>
+            <div class="field"><label>Discount Value</label><input type="text" inputmode="decimal" id="g-disc" value="0" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+          </div>
+        </div>
+        <div id="products-container"></div>
+      </div>
+    </div>
+    
+    <!-- PRODUCT PRICE CATALOG LOOKUP -->
+    <div class="page hidden" id="page-catalog">
+      <div id="catalog-brands-view">
+        <div class="sec-hd">
+          <div><div class="sec-title">Price Catalog Lookup</div><div class="sec-sub">Select a brand to lookup product and variant pricing</div></div>
+        </div>
+        <div class="brand-grid" id="catalog-brand-grid"></div>
+      </div>
+      
+      <div id="catalog-view-panel" style="display:none">
+        <div class="calc-hd" style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
+          <button class="calc-back" onclick="backToCatalogBrands()">← Brands</button>
+          <div><div class="calc-brand-name" id="catalog-brand-name">—</div><div style="font-size:11px;color:var(--mid)" id="catalog-brand-meta">—</div></div>
+          
+          <!-- Search box in header -->
+          <div style="margin-left:auto;position:relative;display:flex;align-items:center;min-width:280px">
+            <span style="position:absolute;left:12px;color:var(--mid);font-size:12px">🔍</span>
+            <input type="text" id="catalog-search" oninput="filterCatalog()" placeholder="Search product or variant name..." style="width:100%;padding:8px 12px 8px 32px;border:1px solid var(--border);border-radius:20px;font-size:12px;outline:none">
+          </div>
+        </div>
+        
+        <div class="catalog-summary-strip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0">
+          <div class="card" style="padding:12px;display:flex;align-items:center;gap:12px;margin-bottom:0">
+            <div style="width:36px;height:36px;background:rgba(16,185,129,0.1);color:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">📦</div>
+            <div><div style="font-size:18px;font-weight:700;color:var(--fg)" id="cat-sum-prods">0</div><div style="font-size:11px;color:var(--mid)">Total Products</div></div>
+          </div>
+          <div class="card" style="padding:12px;display:flex;align-items:center;gap:12px;margin-bottom:0">
+            <div style="width:36px;height:36px;background:rgba(43,78,255,0.1);color:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">🧩</div>
+            <div><div style="font-size:18px;font-weight:700;color:var(--fg)" id="cat-sum-vars">0</div><div style="font-size:11px;color:var(--mid)">Total Variants</div></div>
+          </div>
+          <div class="card" style="padding:12px;display:flex;align-items:center;gap:12px;margin-bottom:0">
+            <div style="width:36px;height:36px;background:rgba(245,158,11,0.1);color:var(--amber);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">💰</div>
+            <div><div style="font-size:18px;font-weight:700;color:var(--fg)" id="cat-sum-margin">0%</div><div style="font-size:11px;color:var(--mid)">Average Gross Margin</div></div>
+          </div>
+        </div>
+        
+        <div id="catalog-products-grid" class="catalog-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-top:8px"></div>
+      </div>
+    </div>
+
+    <!-- BUDGET TRACKER -->
+    <div class="page hidden" id="page-budget">
+      <div id="bgt-dashboard-view">
+        <div class="sec-hd" style="margin-bottom:18px">
+          <div><div class="sec-title">Budget Tracker</div><div class="sec-sub">Monthly performance across all brands</div></div>
+          <div style="display:flex;gap:8px"><button class="btn sm" id="bgt-new-brand-btn" onclick="bgtOpenNewBrand()" style="display:none">+ New Brand</button></div>
+        </div>
+        <div id="bgt-agency-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px"></div>
+      </div>
+      <div id="bgt-months-view" style="display:none">
+        <div class="calc-hd">
+          <button class="calc-back" onclick="bgtBackToDashboard()">← Dashboard</button>
+          <div><div class="calc-brand-name" id="bgt-brand-name">—</div><div style="font-size:11px;color:var(--mid)" id="bgt-brand-sub">—</div></div>
+          <div style="margin-left:auto;display:flex;gap:8px"><button class="btn sm primary" id="bgt-new-month-btn" onclick="bgtOpenNewMonth()">+ New Month</button></div>
+        </div>
+        <div id="bgt-months-list" style="display:flex;flex-direction:column;gap:10px;margin-top:16px"></div>
+      </div>
+      <div id="bgt-month-view" style="display:none">
+        <div class="calc-hd">
+          <button class="calc-back" onclick="bgtBackToMonths()">← Months</button>
+          <div><div class="calc-brand-name" id="bgt-month-title">—</div><div style="font-size:11px;color:var(--mid)" id="bgt-month-sub">—</div></div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn sm" onclick="bgtOpenEditMonth()" id="bgt-edit-btn">⚙ Edit Settings</button>
+            <button class="btn sm" onclick="bgtOpenCompare()" id="bgt-compare-btn">⇄ Compare</button>
+          </div>
+        </div>
+        <div class="bgt-summary-row" id="bgt-summary-row"></div>
+        <div id="bgt-flags-panel" style="display:none;margin-bottom:14px"></div>
+        <div class="bgt-tabs" id="bgt-tabs">
+          <button class="bgt-tab active" onclick="bgtSetTab('overview')">📊 Overview</button>
+          <button class="bgt-tab" onclick="bgtSetTab('push')">📣 Push (Meta)</button>
+          <button class="bgt-tab" onclick="bgtSetTab('pull')">🎯 Pull (Google)</button>
+          <button class="bgt-tab" onclick="bgtSetTab('retention')">💌 Retention (WhatsApp/Mail)</button>
+          <button class="bgt-tab" onclick="bgtSetTab('marketplace')">🛒 Push Marketplace</button>
+          <button class="bgt-tab" onclick="bgtSetTab('social')">📱 Social</button>
+        </div>
+        <div class="card" style="margin-bottom:14px;padding:14px"><canvas id="bgt-chart" height="120"></canvas></div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
+            <div style="font-size:13px;font-weight:600;color:var(--fg)">Daily Tracker</div>
+            <div style="font-size:11px;color:var(--mid)">Click any row to enter data</div>
+          </div>
+          <div style="overflow-x:auto"><table class="bgt-table" id="bgt-day-table"><thead id="bgt-day-thead"></thead><tbody id="bgt-day-tbody"></tbody></table></div>
+        </div>
+      </div>
+      <div id="bgt-compare-view" style="display:none">
+        <div class="calc-hd">
+          <button class="calc-back" onclick="bgtBackToMonth()">← Back</button>
+          <div><div class="calc-brand-name">Period Comparison</div></div>
+        </div>
+        <div id="bgt-compare-content" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px"></div>
+      </div>
+    </div>
+
+    <div class="page hidden" id="page-activity">
+      <div class="sec-hd" style="margin-bottom:20px">
+        <div><div class="sec-title">Activity Logs</div><div class="sec-sub">Complete database-side operations timeline for all team members</div></div>
+      </div>
+      
+      <div class="card" style="padding:16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div class="bgt-tabs" style="margin-bottom:0;border:none;padding:0;display:flex;gap:4px">
+          <button class="bgt-tab active" id="act-tab-today" onclick="filterActivityRange('today')">Today</button>
+          <button class="bgt-tab" id="act-tab-week" onclick="filterActivityRange('week')">This Week</button>
+          <button class="bgt-tab" id="act-tab-all" onclick="filterActivityRange('all')">All Time</button>
+          <button class="bgt-tab" id="act-tab-custom" onclick="filterActivityRange('custom')">Custom Range</button>
+        </div>
+        
+        <div id="act-custom-date-inputs" style="display:none;align-items:center;gap:12px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <label style="font-size:11px;color:var(--mid);font-weight:600">Start Date</label>
+            <input type="date" id="act-start-date" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none" onchange="applyCustomActivityFilter()">
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <label style="font-size:11px;color:var(--mid);font-weight:600">End Date</label>
+            <input type="date" id="act-end-date" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none" onchange="applyCustomActivityFilter()">
+          </div>
+        </div>
+      </div>
+
+      <div id="activity-logs-container"></div>
+    </div>
+
+    <div class="page hidden" id="page-admin">
+      <div class="sec-hd" style="margin-bottom:20px">
+        <div><div class="sec-title">Admin Console</div><div class="sec-sub">Manage platform settings and user access</div></div>
+      </div>
+      
+      <div class="bgt-tabs" style="margin-bottom:20px">
+        <button class="bgt-tab active" id="tab-admin-users" onclick="setAdminTab('users')">Users</button>
+        <button class="bgt-tab" id="tab-admin-settings" onclick="setAdminTab('settings')">AI Configuration</button>
+      </div>
+
+      <div id="admin-sec-users">
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
+            <div style="font-weight:600">Team Members</div>
+            <button class="btn primary sm" onclick="openAddUser()">+ Add User</button>
+          </div>
+          <table class="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Pages</th><th>Brands</th><th>Actions</th></tr></thead><tbody id="users-tbody"></tbody></table>
+        </div>
+      </div>
+
+      <div id="admin-sec-settings" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr;gap:20px">
+          
+          <!-- Top Info & Selection Bar -->
+          <div class="card" style="padding:20px;border-radius:12px;background:#fff;box-shadow:var(--sh);margin-bottom:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+              <div>
+                <div class="card-title" style="margin-bottom:4px;font-size:15px"><div class="ct-num" style="background:var(--blue)">⚡</div>AI Configuration Hub</div>
+                <p style="font-size:12px;color:var(--mid)">Choose your primary intelligence engine and define fallback parameters for real-time strategy generation.</p>
+              </div>
+              
+              <!-- Premium Segment Selector -->
+              <div class="field" style="min-width:240px">
+                <label style="margin-bottom:6px">Active AI Engine</label>
+                <div class="ai-provider-switcher" style="display:flex;background:var(--off);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px">
+                  <button type="button" class="ai-provider-btn active" id="prov-btn-anthropic" onclick="selectPrimaryProvider('anthropic')" style="flex:1;padding:8px 12px;border:none;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;transition:all 0.2s">
+                    Anthropic (Claude)
+                  </button>
+                  <button type="button" class="ai-provider-btn" id="prov-btn-openai" onclick="selectPrimaryProvider('openai')" style="flex:1;padding:8px 12px;border:none;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;transition:all 0.2s">
+                    OpenAI (GPT-4)
+                  </button>
+                </div>
+                <input type="hidden" id="ai-provider-sel" value="anthropic">
+              </div>
+            </div>
+          </div>
+
+          <!-- Provider Config Cards Grid -->
+          <div class="g2">
+            
+            <!-- Anthropic Card -->
+            <div class="card ai-config-card" id="card-anthropic" style="padding:22px;border-radius:12px;transition:all 0.3s;position:relative;border-width:2px;margin-bottom:0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:36px;height:36px;background:rgba(217,119,6,0.1);color:#d97706;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">A</div>
+                  <div>
+                    <h4 style="font-size:13.5px;font-weight:700;color:var(--dark)">Anthropic Claude</h4>
+                    <span class="active-badge" id="badge-anthropic" style="font-size:9px;margin-top:2px">PRIMARY ENGINE</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="field" style="margin-bottom:14px">
+                <label>Intelligence Model</label>
+                <select id="ai-ant-model" onchange="saveAISettings()" style="width:100%">
+                  <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (Recommended)</option>
+                  <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet v2</option>
+                  <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet v1</option>
+                  <option value="claude-3-opus-latest">Claude 3 Opus (High Power)</option>
+                  <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku (Fast)</option>
+                </select>
+              </div>
+              
+              <div class="field" style="margin-bottom:18px;position:relative">
+                <label>API Connection Key</label>
+                <div style="position:relative;display:flex;align-items:center">
+                  <input type="password" id="ai-ant-key" placeholder="sk-ant-..." oninput="saveAISettings()" style="width:100%;padding-right:40px">
+                  <button type="button" class="btn-pwd-toggle" onclick="togglePasswordVisibility('ai-ant-key', this)" style="position:absolute;right:8px;background:none;border:none;color:var(--mid);cursor:pointer;padding:4px;font-size:14px;outline:none">👁️</button>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <button class="btn sm primary" id="btn-test-anthropic" onclick="testKeyDirect('anthropic', this)" style="border-radius:6px;font-size:11px">
+                  ⚡ Test Connection
+                </button>
+                <div class="key-status-text" id="status-anthropic" style="font-size:11px;font-weight:600;color:var(--mid)">Not checked</div>
+              </div>
+            </div>
+
+            <!-- OpenAI Card -->
+            <div class="card ai-config-card" id="card-openai" style="padding:22px;border-radius:12px;transition:all 0.3s;position:relative;border-width:2px;margin-bottom:0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:36px;height:36px;background:rgba(16,185,129,0.1);color:#10b981;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">O</div>
+                  <div>
+                    <h4 style="font-size:13.5px;font-weight:700;color:var(--dark)">OpenAI ChatGPT</h4>
+                    <span class="active-badge" id="badge-openai" style="font-size:9px;margin-top:2px">BACKUP ENGINE</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="field" style="margin-bottom:14px">
+                <label>Intelligence Model</label>
+                <select id="ai-oai-model" onchange="saveAISettings()" style="width:100%">
+                  <option value="gpt-4o">GPT-4o (Recommended)</option>
+                  <option value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</option>
+                  <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                  <option value="o1-mini">o1 Mini (Reasoning)</option>
+                  <option value="o1-preview">o1 Preview (Reasoning)</option>
+                </select>
+              </div>
+              
+              <div class="field" style="margin-bottom:18px;position:relative">
+                <label>API Connection Key</label>
+                <div style="position:relative;display:flex;align-items:center">
+                  <input type="password" id="ai-oai-key" placeholder="sk-..." oninput="saveAISettings()" style="width:100%;padding-right:40px">
+                  <button type="button" class="btn-pwd-toggle" onclick="togglePasswordVisibility('ai-oai-key', this)" style="position:absolute;right:8px;background:none;border:none;color:var(--mid);cursor:pointer;padding:4px;font-size:14px;outline:none">👁️</button>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <button class="btn sm primary" id="btn-test-openai" onclick="testKeyDirect('openai', this)" style="border-radius:6px;font-size:11px">
+                  ⚡ Test Connection
+                </button>
+                <div class="key-status-text" id="status-openai" style="font-size:11px;font-weight:600;color:var(--mid)">Not checked</div>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="mo-brand" style="display:none"><div class="modal">
+  <div class="modal-title">Select Brand</div>
+  <div id="brand-picker-list" style="display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto"></div>
+  <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn primary sm" id="mo-new-brand-btn" onclick="openNewBrand()" style="display:none">+ New Brand</button>
+    <button class="btn" onclick="closeMo('mo-brand')">Close</button>
+  </div>
+</div></div>
+
+<div class="modal-overlay" id="mo-add-user" style="display:none"><div class="modal">
+  <div class="modal-title">Add New User</div>
+  <div style="display:flex;flex-direction:column;gap:11px">
+    <div class="field"><label>Full Name</label><input id="nu-name" placeholder="e.g. Arjun Sharma"></div>
+    <div class="field"><label>Email</label><input type="email" id="nu-email" placeholder="arjun@digifyce.in"></div>
+    <div class="field"><label>Password</label><input type="password" id="nu-pw" placeholder="Minimum 6 characters"></div>
+    <div class="field"><label>Role</label><select id="nu-role"><option value="user">User (read-only)</option><option value="manager">Manager (edit + generate)</option><option value="superadmin">Superadmin (full access)</option></select></div>
+    <div class="field"><label>Page Access</label>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:5px">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" id="pg-dashboard" checked> Dashboard</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" id="pg-strategy"> Strategy Builder</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" id="pg-pricing"> Pricing Calculator</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" id="pg-budget"> Budget Tracker</label>
+      </div>
+    </div>
+    <div class="field"><label>Brand Access</label><select id="nu-brands"><option value="*">All Brands</option></select></div>
+  </div>
+  <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn" onclick="closeMo('mo-add-user')">Cancel</button>
+    <button class="btn primary" onclick="submitAddUser()">Create User</button>
+  </div>
+</div></div>
+
+<div class="modal-overlay" id="mo-new-brand" style="display:none"><div class="modal">
+  <div class="modal-title">New Brand</div>
+  <div style="display:flex;flex-direction:column;gap:11px">
+    <div class="field"><label>Brand Name</label><input id="nb-name" placeholder="e.g. Blackape"></div>
+    <div class="field"><label>Industry / Niche</label><input id="nb-industry" placeholder="e.g. D2C Gymwear"></div>
+    <div class="field"><label>Platform</label><input id="nb-platform" placeholder="e.g. Shopify"></div>
+  </div>
+  <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn" onclick="closeMo('mo-new-brand')">Cancel</button>
+    <button class="btn primary" onclick="submitNewBrand()">Create Brand</button>
+  </div>
+</div></div>
+
+<div class="modal-overlay" id="mo-gen" style="display:none"><div class="modal" style="text-align:center">
+  <div style="font-size:32px;margin-bottom:12px">✦</div>
+  <div class="modal-title" style="text-align:center">Generating Strategy Deck</div>
+  <div id="gen-status" style="font-size:13px;color:var(--mid);margin-bottom:16px">Connecting to AI…</div>
+  <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:16px"><div id="gen-prog" style="height:100%;background:var(--blue);border-radius:2px;width:0%;transition:width .5s"></div></div>
+  <div id="gen-done" style="display:none">
+    <div style="color:var(--green);font-weight:700;margin-bottom:12px">✓ Strategy deck ready!</div>
+    <div style="display:flex;gap:8px;justify-content:center">
+      <a id="gen-download-link" class="btn primary" href="#" download>↓ Download PPTX</a>
+      <button class="btn" onclick="closeMo('mo-gen')">Close</button>
+    </div>
+  </div>
+  <div id="gen-error" style="display:none;color:var(--red);font-size:12px"></div>
+</div></div>
+
+<!-- BUDGET MODALS -->
+<div class="modal-overlay" id="mo-bgt-brand" style="display:none"><div class="modal">
+  <div class="modal-title">New Brand</div>
+  <div style="display:flex;flex-direction:column;gap:11px">
+    <div class="field"><label>Brand Name</label><input id="bgtb-name" placeholder="e.g. Bawsebaby"></div>
+    <div class="field"><label>Industry / Niche</label><input id="bgtb-industry" placeholder="e.g. D2C Kids"></div>
+  </div>
+  <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn" onclick="closeMo('mo-bgt-brand')">Cancel</button>
+    <button class="btn primary" onclick="bgtSubmitNewBrand()">Create Brand</button>
+  </div>
+</div></div>
+
+<div class="modal-overlay" id="mo-bgt-month" style="display:none"><div class="modal" style="min-width:420px">
+  <div class="modal-title">New Month Setup</div>
+  <div style="display:flex;flex-direction:column;gap:11px">
+    <div class="g2">
+      <div class="field"><label>Month</label><select id="bgtm-month"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4" selected>April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
+      <div class="field"><label>Year</label><input type="number" id="bgtm-year" value="2026" min="2024" max="2030"></div>
+    </div>
+    <div class="field"><label>Revenue Target (₹)</label><input type="number" id="bgtm-target" placeholder="e.g. 2500000"></div>
+    <div class="field"><label>Overall Target ROAS</label><input type="number" id="bgtm-roas" value="5" step="0.1"></div>
+    <div style="font-size:12px;font-weight:600;color:var(--fg);margin-top:4px">Channel Setup</div>
+    <div id="bgt-new-month-channels" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:220px;overflow-y:auto;padding-right:4px"></div>
+    <button class="btn sm" onclick="bgtAddCustomChannel()" style="margin-top:8px">+ Add Custom Channel</button>
+  </div>
+  <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn" onclick="closeMo('mo-bgt-month')">Cancel</button>
+    <button class="btn primary" onclick="bgtSubmitNewMonth()">Create Month</button>
+  </div>
+</div></div>
+
+<div class="modal-overlay" id="mo-bgt-day" style="display:none"><div class="modal" style="min-width:400px">
+  <div class="modal-title" id="bgt-day-modal-title">Enter Day Data</div>
+  <div style="display:flex;flex-direction:column;gap:10px" id="bgt-day-modal-fields"></div>
+  <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn" onclick="closeMo('mo-bgt-day')">Cancel</button>
+    <button class="btn primary" onclick="bgtSaveDay()">Save</button>
+  </div>
+</div></div>
+
+<div class="modal-overlay" id="mo-bgt-compare" style="display:none"><div class="modal" style="min-width:400px">
+  <div class="modal-title">Period Comparison Center</div>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <!-- Comparison type selector -->
+    <div class="field">
+      <label>Comparison Level</label>
+      <select id="bgt-cmp-type" onchange="bgtChangeCompareType()" style="width:100%">
+        <option value="month">📅 Month-over-Month (MoM)</option>
+        <option value="quarter">📊 Quarter-over-Quarter (QoQ)</option>
+        <option value="year">⏳ Year-over-Year (YoY)</option>
+      </select>
+    </div>
+    
+    <!-- Month-over-Month inputs -->
+    <div id="bgt-cmp-inputs-mom" style="display:flex;flex-direction:column;gap:11px">
+      <div class="field"><label>Period 1 (Base Month)</label><select id="bgt-cmp-m1" style="width:100%"></select></div>
+      <div class="field"><label>Period 2 (Comparison Month)</label><select id="bgt-cmp-m2" style="width:100%"></select></div>
+    </div>
+    
+    <!-- Quarter-over-Quarter inputs -->
+    <div id="bgt-cmp-inputs-qoq" style="display:none;flex-direction:column;gap:11px">
+      <div class="field">
+        <label>Period 1 Quarter</label>
+        <select id="bgt-cmp-q1" style="width:100%">
+          <option value="2026-Q1">2026 Q1 (Jan - Mar)</option>
+          <option value="2026-Q2">2026 Q2 (Apr - Jun)</option>
+          <option value="2026-Q3">2026 Q3 (Jul - Sep)</option>
+          <option value="2026-Q4">2026 Q4 (Oct - Dec)</option>
+          <option value="2025-Q1">2025 Q1 (Jan - Mar)</option>
+          <option value="2025-Q2">2025 Q2 (Apr - Jun)</option>
+          <option value="2025-Q3">2025 Q3 (Jul - Sep)</option>
+          <option value="2025-Q4">2025 Q4 (Oct - Dec)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Period 2 Quarter</label>
+        <select id="bgt-cmp-q2" style="width:100%">
+          <option value="2026-Q1">2026 Q1 (Jan - Mar)</option>
+          <option value="2026-Q2" selected>2026 Q2 (Apr - Jun)</option>
+          <option value="2026-Q3">2026 Q3 (Jul - Sep)</option>
+          <option value="2026-Q4">2026 Q4 (Oct - Dec)</option>
+          <option value="2025-Q1">2025 Q1 (Jan - Mar)</option>
+          <option value="2025-Q2">2025 Q2 (Apr - Jun)</option>
+          <option value="2025-Q3">2025 Q3 (Jul - Sep)</option>
+          <option value="2025-Q4">2025 Q4 (Oct - Dec)</option>
+        </select>
+      </div>
+    </div>
+    
+    <!-- Year-over-Year inputs -->
+    <div id="bgt-cmp-inputs-yoy" style="display:none;flex-direction:column;gap:11px">
+      <div class="field">
+        <label>Period 1 Year</label>
+        <select id="bgt-cmp-y1" style="width:100%">
+          <option value="2025">2025</option>
+          <option value="2026">2026</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Period 2 Year</label>
+        <select id="bgt-cmp-y2" style="width:100%">
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:20px;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn" onclick="closeMo('mo-bgt-compare')">Cancel</button>
+    <button class="btn primary" onclick="bgtRunCompare()">Compare Periods</button>
+  </div>
+</div></div>
+
+
+<div class="modal-overlay" id="mo-bgt-edit" style="display:none"><div class="modal" style="min-width:420px">
+  <div class="modal-title">Edit Month Settings</div>
+  <div style="display:flex;flex-direction:column;gap:11px">
+    <div class="field"><label>Revenue Target (₹)</label><input type="number" id="bgte-target" placeholder="e.g. 2500000"></div>
+    <div class="field"><label>Overall Target ROAS</label><input type="number" id="bgte-roas" value="5" step="0.1"></div>
+    <div style="font-size:12px;font-weight:600;color:var(--fg);margin-top:4px">Channel Setup</div>
+    <div id="bgte-edit-channels-container" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:220px;overflow-y:auto;padding-right:4px"></div>
+    <button class="btn sm" onclick="bgtAddEditCustomChannel()" style="margin-top:8px">+ Add Custom Channel</button>
+  </div>
+  <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn" onclick="closeMo('mo-bgt-edit')">Cancel</button>
+    <button class="btn primary" onclick="bgtSubmitEditMonth()">Save Changes</button>
+  </div>
+</div></div>
+
+<div class="modal-overlay" id="mo-bgt-history" style="display:none"><div class="modal" style="min-width:500px">
+  <div class="modal-title">Strategy Generation History</div>
+  <div id="hist-list" style="max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:8px"></div>
+  <div style="margin-top:18px;display:flex;justify-content:flex-end">
+    <button class="btn" onclick="closeMo('mo-bgt-history')">Close</button>
+  </div>
+</div></div>
+
+<!-- PRICE HISTORY TIMELINE DRAWER -->
+<div class="history-drawer-overlay" id="history-drawer-overlay" onclick="closeHistoryDrawer()" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.35);z-index:9999;backdrop-filter:blur(3px);transition:all 0.3s ease">
+  <div class="history-drawer" id="history-drawer" onclick="event.stopPropagation()" style="position:fixed;top:0;right:-450px;width:420px;max-width:100%;height:100vh;background:#ffffff;box-shadow:-5px 0 25px rgba(0,0,0,0.15);display:flex;flex-direction:column;z-index:10000;transition:right 0.3s cubic-bezier(0.16, 1, 0.3, 1)">
+    <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--off)">
+      <div>
+        <div style="font-size:15px;font-weight:800;color:var(--dark)">Price Adjustment Timeline</div>
+        <div style="font-size:11px;color:var(--mid);margin-top:2px" id="hist-drawer-subtitle">Product pricing history</div>
+      </div>
+      <button onclick="closeHistoryDrawer()" style="background:none;border:none;font-size:22px;color:var(--mid);cursor:pointer;line-height:1;outline:none;padding:4px">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:24px" id="hist-drawer-content">
+      <div class="timeline" id="history-timeline"></div>
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid var(--border);background:var(--off);display:flex;justify-content:flex-end">
+      <button class="btn sm" onclick="closeHistoryDrawer()">Close History</button>
+    </div>
+  </div>
+</div>
+
+<script src="/api/config_js.php"></script>
+<script src="/assets/app.js?v=7"></script>
+</body>
+</html>
+
+
+
+

@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # The Web Server & PHP Virtual Environment
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_NAME=digifyce
+      - DB_USER=digifyce_user
+      - DB_PASS=digifyce_pass
+
+  # The MySQL Database Virtual Environment
+  db:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=digifyce
+      - MYSQL_USER=digifyce_user
+      - MYSQL_PASSWORD=digifyce_pass
+    volumes:
+      - db_data:/var/lib/mysql
+      # Automatically run the install.sql script to setup the tables when the DB is created
+      - ./install.sql:/docker-entrypoint-initdb.d/install.sql
+
+  # phpMyAdmin (Optional, but gives you a UI to view the database)
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    ports:
+      - "8080:80"
+    environment:
+      - PMA_HOST=db
+      - PMA_USER=root
+      - PMA_PASSWORD=root
+    depends_on:
+      - db
+
+volumes:
+  db_data:
