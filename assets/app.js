@@ -3740,7 +3740,7 @@ function renderCatalogProducts() {
           <div class="catalog-variant-top">
             <span class="catalog-variant-name" style="font-weight:700">${v.name}</span>
             <div style="display:flex;gap:4px">
-              <button class="btn-copy" onclick="copyVariantDetails('${btoa(copyText)}', this)" title="Copy details">📋</button>
+              <button class="btn-copy" onclick="copyVariantDetails('${encodeURIComponent(copyText).replace(/'/g, "%27")}', this)" title="Copy details">📋</button>
               <button class="btn-history" onclick="openVariantHistory('${catalogActiveBrand.id}','${p.id}','${v.id}','${p.name} - ${v.name}')" title="Price history">📜</button>
             </div>
           </div>
@@ -3781,8 +3781,8 @@ function filterCatalog() {
   renderCatalogProducts();
 }
 
-function copyVariantDetails(base64Text, btn) {
-  const text = atob(base64Text);
+function copyVariantDetails(encodedText, btn) {
+  const text = decodeURIComponent(encodedText);
   navigator.clipboard.writeText(text).then(() => {
     const old = btn.textContent;
     btn.textContent = '✓';
