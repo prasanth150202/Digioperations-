@@ -45,14 +45,20 @@ CREATE TABLE IF NOT EXISTS `pricing_products` (
   CONSTRAINT `fk_pp_brand` FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS `pricing_history` (
-  `id`         VARCHAR(36)  NOT NULL PRIMARY KEY,
-  `brand_id`   VARCHAR(36)  NOT NULL,
-  `saved_by`   VARCHAR(255) NOT NULL DEFAULT '',
-  `snapshot`   MEDIUMTEXT   NOT NULL,
-  `created_at` DATETIME     NOT NULL DEFAULT NOW(),
-  KEY `idx_ph_brand` (`brand_id`),
-  CONSTRAINT `fk_ph_brand` FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON DELETE CASCADE
+CREATE TABLE IF NOT EXISTS `pricing_logs` (
+  `id`            VARCHAR(36)  NOT NULL PRIMARY KEY,
+  `brand_id`      VARCHAR(36)  NOT NULL,
+  `product_id`    VARCHAR(36)  NOT NULL,
+  `product_name`  VARCHAR(255) NOT NULL,
+  `variant_id`    VARCHAR(36)  NOT NULL,
+  `variant_name`  VARCHAR(255) NOT NULL,
+  `field_changed` VARCHAR(100) NOT NULL,
+  `old_value`     VARCHAR(255) DEFAULT NULL,
+  `new_value`     VARCHAR(255) NOT NULL,
+  `user_name`     VARCHAR(255) NOT NULL DEFAULT '',
+  `created_at`    DATETIME     NOT NULL DEFAULT NOW(),
+  KEY `idx_pl_brand` (`brand_id`),
+  CONSTRAINT `fk_pl_brand` FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `strategy_generations` (
