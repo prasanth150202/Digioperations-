@@ -3984,7 +3984,7 @@ async function openVariantHistory(brandId, productId, variantId, variantName) {
   if (!bSlug) return;
 
   try {
-    const r = await api(`/api/pricing/${bSlug}/products?action=variant_history&variant_id=${variantId}`);
+    const r = await api(`/api/pricing/${bSlug}/variant_history?variant_id=${variantId}`);
     if (!r || !r.history || !r.history.length) {
       timelineEl.innerHTML = `
         <div class="empty" style="border:none;background:none;padding:24px 0;text-align:center">
