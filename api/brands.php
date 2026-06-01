@@ -7,7 +7,10 @@ $id     = $_GET['id'] ?? '';
 // GET /api/brands.php — list all brands
 if ($method === 'GET' && !$id) {
     requirePage($user, 'dashboard');
-    $brands = dbAll('SELECT id,slug,name,industry,platform FROM brands ORDER BY name');
+    $brands = dbAll('SELECT b.id, b.slug, b.name, b.industry, b.platform,
+        (SELECT COUNT(*) FROM pricing_products WHERE brand_id = b.id) AS product_count,
+        (SELECT COUNT(*) FROM strategy_generations WHERE brand_id = b.id) AS generation_count
+        FROM brands b ORDER BY b.name');
     if ($user['role'] !== 'superadmin' && $user['brands'] !== '*') {
         $allowed = is_array($user['brands']) ? $user['brands'] : [];
         $brands  = array_values(array_filter($brands, fn($b) => in_array($b['slug'], $allowed)));
