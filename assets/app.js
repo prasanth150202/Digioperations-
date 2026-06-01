@@ -55,7 +55,7 @@ let curPage = 'dashboard';
 let stratStep = 0, stratForm = {}, stratDone = new Set(), stratSaveTimer = null;
 
 // Pricing state
-let prods = [], pricingSaveTimer = null, globalsOpen = false;
+let prods = [], pricingSaveTimer = null, globalsOpen = false, globalExtras = [];
 let pricingViewMode = 'std';
 let catalogProds = [], catalogActiveBrand = null;
 
@@ -1743,19 +1743,23 @@ function cleanPrice(r) {
 }
 
 function calcVariant(v, p, globals) {
-  const { brand=30, photo=15, ship=70, ops=25, gw=0, rto=5, roas=3, discType='pct', disc=0, addlType='flat', addl=0 } = globals;
+  const { brand=30, photo=15, ship=70, ops=25, gw=0, rto=5, roas=3, discType='pct', disc=0 } = globals;
   const mfgPc = (v.mfgO != null) ? v.mfgO : p.mfg_per_pc;
   const qty   = p.variant_type === 'bundle' ? (v.qty || 1) : 1;
   const extras = (p.extras || []).reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
   
   let base  = mfgPc * qty + brand + photo + ship + ops + extras;
   
-  // Apply additional global charges
-  if (addlType === 'pct') {
-    base = base * (1 + (addl / 100));
-  } else {
-    base = base + addl;
-  }
+  // Apply all dynamic global extra charges
+  const extraCharges = Array.isArray(globals.extra_charges) ? globals.extra_charges : [];
+  extraCharges.forEach(charge => {
+    const amt = parseFloat(charge.amount) || 0;
+    if (charge.type === 'pct') {
+      base = base * (1 + (amt / 100));
+    } else {
+      base = base + amt;
+    }
+  });
   
   const mult  = rto > 0 ? 1 / (1 - rto / 100) : 1;
   const adjC  = base * mult;
@@ -1786,8 +1790,7 @@ function getGlobals() {
            gw:gv('g-gw'), rto:gv('g-rto'), roas:gv('g-roas'),
            discType: document.getElementById('g-disc-type')?.value || 'pct',
            disc:gv('g-disc'),
-           addlType: document.getElementById('g-addl-type')?.value || 'flat',
-           addl:gv('g-addl') };
+           extra_charges: globalExtras };
 }
 
 function renderPricingBrands() {
@@ -1832,9 +1835,8 @@ async function loadBrandProducts() {
     ...p,
     variants: Array.isArray(p.variants_json) ? p.variants_json.map(v => ({
       ...v,
-      // Map saved selling back to sellingO if sellingO is missing — ensures prices survive round-trips
-      sellingO: v.sellingO != null ? v.sellingO : (v.selling != null ? v.selling : null),
-      compO: v.compO != null ? v.compO : (v.comp != null ? v.comp : null)
+      sellingO: v.sellingO !== undefined ? v.sellingO : null,
+      compO: v.compO !== undefined ? v.compO : null
     })) : [],
     extras:   Array.isArray(p.extras_json)   ? p.extras_json   : [],
   }));
@@ -1847,6 +1849,18 @@ async function loadBrandProducts() {
   if (document.getElementById('g-disc-type') && g.discType != null) {
     document.getElementById('g-disc-type').value = g.discType;
   }
+  
+  // Load and migrate global extra charges
+  globalExtras = Array.isArray(g.extra_charges) ? g.extra_charges : [];
+  if (globalExtras.length === 0 && g.addl && parseFloat(g.addl) > 0) {
+    globalExtras.push({
+      id: 'ge_' + Date.now(),
+      label: 'Extra Charge',
+      type: g.addlType || 'flat',
+      amount: parseFloat(g.addl)
+    });
+  }
+  renderGlobalExtrasList();
   renderAll();
 }
 
@@ -1981,6 +1995,77 @@ function toggleGlobals() {
   document.getElementById('g-arrow').textContent = globalsOpen ? '▼' : '▶';
 }
 
+function renderGlobalExtrasList() {
+  const container = document.getElementById('global-extras-list');
+  if (!container) return;
+  const canEdit = CU.role !== 'user';
+  
+  if (globalExtras.length === 0) {
+    container.innerHTML = `<div style="font-size:12px;color:var(--mid);padding:4px 0">No global extra charges added yet.</div>`;
+    return;
+  }
+  
+  container.innerHTML = globalExtras.map((ge, idx) => {
+    return `<div style="display:flex;gap:8px;align-items:center;background:var(--off);padding:8px;border-radius:6px;border:1px solid var(--border);margin-bottom:6px">
+      <div style="flex:2;min-width:120px">
+        ${canEdit ? `<input type="text" class="form-control" value="${ge.label}" placeholder="e.g. Payment Gateway Fee" onchange="updateGlobalExtra('${ge.id}', 'label', this.value)" style="width:100%;height:32px;font-size:12px;padding:0 8px;border:1px solid var(--border);border-radius:6px;outline:none">` : `<span style="font-weight:600;font-size:12px">${ge.label}</span>`}
+      </div>
+      <div style="flex:1;min-width:80px">
+        ${canEdit ? `
+        <select onchange="updateGlobalExtra('${ge.id}', 'type', this.value)" style="width:100%;height:32px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:0 4px;outline:none;background:#fff;color:var(--fg)">
+          <option value="flat" ${ge.type === 'flat' ? 'selected' : ''}>Flat (₹)</option>
+          <option value="pct" ${ge.type === 'pct' ? 'selected' : ''}>Percentage (%)</option>
+        </select>` : `<span style="font-size:12px;color:var(--mid)">${ge.type === 'flat' ? 'Flat (₹)' : 'Percentage (%)'}</span>`}
+      </div>
+      <div style="flex:1;min-width:60px">
+        ${canEdit ? `<input type="text" class="form-control" inputmode="decimal" value="${ge.amount}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateGlobalExtra('${ge.id}', 'amount', this.value)" style="width:100%;height:32px;font-size:12px;padding:0 8px;border:1px solid var(--border);border-radius:6px;outline:none">` : `<span style="font-weight:600;font-size:12px">${ge.type === 'flat' ? '₹' : ''}${ge.amount}${ge.type === 'pct' ? '%' : ''}</span>`}
+      </div>
+      ${canEdit ? `<button class="btn sm danger" onclick="removeGlobalExtra('${ge.id}')" style="height:32px;width:32px;padding:0;display:flex;align-items:center;justify-content:center;font-size:14px;border-radius:6px">✕</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function addGlobalExtra() {
+  globalExtras.push({
+    id: 'ge_' + Date.now() + Math.random().toString(36).substr(2, 5),
+    label: 'New Extra Charge',
+    type: 'flat',
+    amount: 0
+  });
+  renderGlobalExtrasList();
+  deferSaveAndRender();
+}
+
+function updateGlobalExtra(id, field, val) {
+  const ge = globalExtras.find(x => x.id === id);
+  if (!ge) return;
+  if (field === 'amount') {
+    ge[field] = parseFloat(val) || 0;
+  } else {
+    ge[field] = val;
+  }
+  deferSaveAndRender();
+}
+
+function removeGlobalExtra(id) {
+  globalExtras = globalExtras.filter(x => x.id !== id);
+  renderGlobalExtrasList();
+  deferSaveAndRender();
+}
+
+function resetAllOverrides() {
+  if (!confirm('Are you sure you want to reset all manual selling price and competitor price overrides? This will automatically calculate all prices based on global assumptions.')) return;
+  prods.forEach(p => {
+    (p.variants || []).forEach(v => {
+      v.sellingO = null;
+      v.compO = null;
+    });
+  });
+  renderAll();
+  deferPricingSave();
+  showToast('All manual price overrides reset to auto-calculate!', 'success');
+}
+
 function deferPricingSave() {
   const chip = document.getElementById('save-chip');
   if (chip) { chip.style.display = 'inline-flex'; chip.textContent = '⟳ Saving…'; chip.className = 'chip saving'; }
@@ -1998,10 +2083,10 @@ async function executePricingSave(chip) {
       return {
         ...v,
         // Persist all display values so the catalogue reads them directly — no recalculation
-        sellingO: calc.selling,
+        sellingO: v.sellingO != null ? parseFloat(v.sellingO) : null,
         selling:  calc.selling,
         comp:     v.compO != null ? parseFloat(v.compO) : calc.comp,
-        compO:    v.compO != null ? parseFloat(v.compO) : calc.comp,
+        compO:    v.compO != null ? parseFloat(v.compO) : null,
         adjC:     calc.adjC,
         margin:   calc.margin,
         profit:   calc.profit,

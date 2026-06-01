@@ -133,6 +133,7 @@
           <div class="sum-item"><div class="sum-val" id="sum-margin">0%</div><div class="sum-lbl">Avg Margin</div></div>
           <div class="sum-item"><div class="sum-val" id="sum-roas">0x</div><div class="sum-lbl">Est. ROAS</div></div>
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <button class="btn sm warn" onclick="resetAllOverrides()" title="Reset all manual price overrides to automatically calculate based on global assumptions">⚡ Reset to Auto-Price</button>
             <button class="btn sm" onclick="exportExcel()">↓ Export Excel</button>
             <button class="btn sm primary" id="add-prod-btn" onclick="addProduct()" style="display:none">+ Add Product</button>
           </div>
@@ -159,14 +160,15 @@
               </select>
             </div>
             <div class="field"><label>Discount Value</label><input type="text" inputmode="decimal" id="g-disc" value="0" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field">
-              <label>Extra Charges Type</label>
-              <select id="g-addl-type" onchange="deferSaveAndRender()" style="width:100%;height:32px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:0 8px;outline:none;background:#fff;color:var(--fg)">
-                <option value="flat" selected>Flat (₹)</option>
-                <option value="pct">Percentage (%)</option>
-              </select>
+            
+            <!-- Global Extra Charges Container -->
+            <div id="global-extras-container" style="grid-column:1/-1;display:flex;flex-direction:column;gap:8px;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-weight:700;font-size:12px;color:var(--dark)">Global Extra Charges</span>
+                <button class="btn sm" onclick="addGlobalExtra()" style="padding:4px 8px;font-size:11px;font-weight:600">+ Add Global Extra</button>
+              </div>
+              <div id="global-extras-list" style="display:flex;flex-direction:column;gap:6px"></div>
             </div>
-            <div class="field"><label>Extra Charges Value</label><input type="text" inputmode="decimal" id="g-addl" value="0" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
           </div>
         </div>
         <div id="products-container"></div>
@@ -666,7 +668,7 @@
 </div>
 
 <script src="/api/config_js.php"></script>
-<script src="/assets/app.js?v=11"></script>
+<script src="/assets/app.js?v=12"></script>
 </body>
 </html>
 
