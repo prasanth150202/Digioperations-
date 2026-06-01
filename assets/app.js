@@ -3294,10 +3294,14 @@ async function bgtSaveDay() {
     posts_real: pos ? pos.value : ''
   };
 
-  const r = await api(`/api/budget/months/${monthId}/days/${dayNum}`, 'PUT', body);
-  if (r && r.ok) {
-    closeMo('mo-bgt-day');
-    await bgtLoadMonth(monthId);
+  try {
+    const r = await api(`/api/budget/months/${monthId}/days/${dayNum}`, 'PUT', body);
+    if (r && r.ok) {
+      closeMo('mo-bgt-day');
+      await bgtLoadMonth(monthId);
+    }
+  } catch (e) {
+    alert("Error saving data: " + e.message);
   }
 }
 

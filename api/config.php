@@ -103,13 +103,31 @@ function db(): PDO {
 }
 
 function dbAll(string $sql, array $p = []): array {
-    $s = db()->prepare($sql); $s->execute($p); return $s->fetchAll();
+    try {
+        $s = db()->prepare($sql);
+        $s->execute($p);
+        return $s->fetchAll();
+    } catch (PDOException $e) {
+        json_err('Database error: ' . $e->getMessage(), 500);
+    }
 }
 function dbGet(string $sql, array $p = []): ?array {
-    $s = db()->prepare($sql); $s->execute($p); $r = $s->fetch(); return $r ?: null;
+    try {
+        $s = db()->prepare($sql);
+        $s->execute($p);
+        $r = $s->fetch();
+        return $r ?: null;
+    } catch (PDOException $e) {
+        json_err('Database error: ' . $e->getMessage(), 500);
+    }
 }
 function dbRun(string $sql, array $p = []): void {
-    $s = db()->prepare($sql); $s->execute($p);
+    try {
+        $s = db()->prepare($sql);
+        $s->execute($p);
+    } catch (PDOException $e) {
+        json_err('Database error: ' . $e->getMessage(), 500);
+    }
 }
 function dbLastId(): string { return db()->lastInsertId(); }
 
