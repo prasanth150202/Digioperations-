@@ -96,6 +96,28 @@ function db(): PDO {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
         } catch (Throwable $migrationErr) {}
 
+        // Self-healing migrations for missing columns in budget tables
+        try {
+            $cols = $pdo->query("SHOW COLUMNS FROM `budget_days` LIKE 'channels_json'")->fetchAll();
+            if (empty($cols)) {
+                $pdo->exec("ALTER TABLE `budget_days` ADD COLUMN `channels_json` TEXT DEFAULT NULL AFTER `posts_real`");
+            }
+        } catch (Throwable $migrationErr) {}
+
+        try {
+            $cols = $pdo->query("SHOW COLUMNS FROM `budget_days` LIKE 'day_date'")->fetchAll();
+            if (empty($cols)) {
+                $pdo->exec("ALTER TABLE `budget_days` ADD COLUMN `day_date` DATE DEFAULT NULL AFTER `day_number`");
+            }
+        } catch (Throwable $migrationErr) {}
+
+        try {
+            $cols = $pdo->query("SHOW COLUMNS FROM `budget_months` LIKE 'channels'")->fetchAll();
+            if (empty($cols)) {
+                $pdo->exec("ALTER TABLE `budget_months` ADD COLUMN `channels` MEDIUMTEXT DEFAULT NULL AFTER `overall_roas`");
+            }
+        } catch (Throwable $migrationErr) {}
+
         return $pdo;
     } catch (PDOException $e) {
         json_err('Database connection failed. Did you import install.sql into phpMyAdmin? ' . $e->getMessage(), 500);
