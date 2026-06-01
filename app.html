@@ -74,7 +74,12 @@
           <div class="sec-hd">
             <div>
               <div class="sec-title" id="dash-brands-title">Brand Performance</div>
-              <div class="sec-sub">Current month tracking</div>
+              <div class="sec-sub" style="display:flex;align-items:center;gap:10px">
+                Performance tracking
+                <select id="dash-month-filter" onchange="loadDashboard(this.value)" style="border:1px solid var(--border);border-radius:4px;font-size:11px;padding:2px 6px;background:transparent;outline:none;cursor:pointer">
+                  <option value="">Latest Month (Default)</option>
+                </select>
+              </div>
             </div>
           </div>
           <div class="brand-perf-grid" id="dash-brand-grid"></div>
@@ -154,6 +159,14 @@
               </select>
             </div>
             <div class="field"><label>Discount Value</label><input type="text" inputmode="decimal" id="g-disc" value="0" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field">
+              <label>Extra Charges Type</label>
+              <select id="g-addl-type" onchange="deferSaveAndRender()" style="width:100%;height:32px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:0 8px;outline:none;background:#fff;color:var(--fg)">
+                <option value="flat" selected>Flat (₹)</option>
+                <option value="pct">Percentage (%)</option>
+              </select>
+            </div>
+            <div class="field"><label>Extra Charges Value</label><input type="text" inputmode="decimal" id="g-addl" value="0" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
           </div>
         </div>
         <div id="products-container"></div>
@@ -220,7 +233,13 @@
       <div id="bgt-month-view" style="display:none">
         <div class="calc-hd">
           <button class="calc-back" onclick="bgtBackToMonths()">← Months</button>
-          <div><div class="calc-brand-name" id="bgt-month-title">—</div><div style="font-size:11px;color:var(--mid)" id="bgt-month-sub">—</div></div>
+          <div>
+            <div class="calc-brand-name" id="bgt-month-title">-</div>
+            <div style="font-size:11px;color:var(--mid);display:flex;align-items:center;gap:6px">
+              <span id="bgt-month-sub">-</span>
+              <select id="bgt-month-nav" onchange="if(this.value && this.value !== bgtState.currentMonth.id) bgtLoadMonth(this.value)" style="border:1px solid var(--border);border-radius:4px;font-size:10px;padding:2px 4px;background:transparent;outline:none;cursor:pointer"></select>
+            </div>
+          </div>
           <div style="margin-left:auto;display:flex;gap:8px">
             <button class="btn sm" onclick="bgtOpenEditMonth()" id="bgt-edit-btn">⚙ Edit Settings</button>
             <button class="btn sm" onclick="bgtOpenCompare()" id="bgt-compare-btn">⇄ Compare</button>
@@ -290,6 +309,7 @@
       <div class="bgt-tabs" style="margin-bottom:20px">
         <button class="bgt-tab active" id="tab-admin-users" onclick="setAdminTab('users')">Users</button>
         <button class="bgt-tab" id="tab-admin-settings" onclick="setAdminTab('settings')">AI Configuration</button>
+        <button class="bgt-tab" id="tab-admin-months" onclick="setAdminTab('months')">Budget Months</button>
       </div>
 
       <div id="admin-sec-users">
@@ -299,6 +319,16 @@
             <button class="btn primary sm" onclick="openAddUser()">+ Add User</button>
           </div>
           <table class="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Pages</th><th>Brands</th><th>Actions</th></tr></thead><tbody id="users-tbody"></tbody></table>
+        </div>
+      </div>
+      
+      <div id="admin-sec-months" style="display:none">
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
+            <div style="font-weight:600">Budget Months Data</div>
+            <div style="font-size:11px;color:var(--mid)">Delete accidentally created months</div>
+          </div>
+          <table class="admin-table"><thead><tr><th>Brand</th><th>Month Label</th><th>Revenue Target</th><th>Actions</th></tr></thead><tbody id="admin-months-tbody"></tbody></table>
         </div>
       </div>
 

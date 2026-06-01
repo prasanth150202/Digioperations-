@@ -95,6 +95,30 @@ if ($method === 'DELETE' && $action === 'users' && $id) {
     json_out(['ok' => true]);
 }
 
+// GET /api/admin.php?action=months
+if ($method === 'GET' && $action === 'months') {
+    $months = dbAll('SELECT bm.*, b.name as brand_name FROM budget_months bm JOIN brands b ON b.id=bm.brand_id ORDER BY bm.year DESC, bm.month DESC, b.name ASC');
+    json_out($months);
+}
+
+// DELETE /api/admin.php?action=months&id=X
+if ($method === 'DELETE' && $action === 'months' && $id) {
+    $month = dbGet('SELECT * FROM budget_months WHERE id=?', [$id]);
+    if (!$month) json_err('Not found', 404);
+    
+    try {
+        dbRun('BEGIN');
+        dbRun('DELETE FROM budget_days WHERE month_id=?', [$id]);
+        dbRun('DELETE FROM budget_months WHERE id=?', [$id]);
+        dbRun('COMMIT');
+        auditLog($user['id'], $user['name'], 'DELETE_BUDGET_MONTH', $month['brand_id'] . ' - ' . $month['label']);
+        json_out(['ok' => true]);
+    } catch (Throwable $e) {
+        dbRun('ROLLBACK');
+        json_err('Failed to delete month');
+    }
+}
+
 // GET /api/admin.php?action=settings
 if ($method === 'GET' && $action === 'settings') {
     $keys = ['ai_provider','anthropic_model','openai_model','anthropic_api_key','openai_api_key'];

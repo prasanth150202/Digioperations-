@@ -314,7 +314,7 @@ html,body{height:100%;font-family:var(--fh);background:var(--off);color:var(--bo
 .bp-btn { flex: 1; padding: 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 11px; font-weight: 700; color: var(--mid); background: #fff; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 4px; }
 .bp-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--off); }
 .bp-btn.active { border-color: var(--green); color: var(--green); }
-.bp-status-tag { position: absolute; top: -8px; right: 12px; padding: 3px 8px; border-radius: 4px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; background: #fff; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.bp-status-tag { position: absolute; top: 3px; right: 12px; padding: 4px 8px; border-radius: 0 0 6px 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; background: #fff; border: 1px solid var(--border); border-top: none; box-shadow: var(--shadow-sm); z-index: 2; }
 .bp-status-tag.done { color: var(--green); border-color: var(--green); }
 .bp-status-tag.todo { color: var(--amber); border-color: var(--amber); }
 .bp-hd { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; }
@@ -329,8 +329,9 @@ html,body{height:100%;font-family:var(--fh);background:var(--off);color:var(--bo
 .bp-bar-fill.good { background:var(--green); box-shadow:0 0 8px rgba(16,185,129,.4); }
 .bp-bar-fill.warn { background:var(--amber); box-shadow:0 0 8px rgba(245,158,11,.4); }
 .bp-bar-fill.bad { background:var(--red); box-shadow:0 0 8px rgba(239,68,68,.4); }
-.bp-stats { display:flex; justify-content:space-between; font-size:11px; color:rgba(255,255,255,.4); border-top:1px solid rgba(255,255,255,.05); padding-top:12px; }
-.bp-stat-v { color:#fff; font-weight:600; font-family:var(--fm); }
+.bp-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px 4px; margin-top:12px; color:var(--mid); font-size:11px; }
+.bp-stats div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bp-stat-v { color:#fff; font-weight:700; font-family:var(--fm); }
 
 .dash-alerts-panel { background:rgba(239,68,68,.03); border:1px solid rgba(239,68,68,.1); border-radius:14px; padding:18px; margin-bottom:24px; }
 .alert-badge { background:var(--red); color:#fff; font-size:10px; font-weight:800; padding:2px 8px; border-radius:10px; }

@@ -259,13 +259,19 @@ function closeMo(id) { document.getElementById(id).style.display = 'none'; }
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 let dashDataCache = null;
 
-async function fetchDashboardData() {
+async function fetchDashboardData(month = '') {
+  const url = month ? `/api/budget/dashboard?month=${month}` : '/api/budget/dashboard';
   const [bgtRes, auditRes] = await Promise.all([
-    api('/api/budget/dashboard'),
+    api(url),
     CU.role === 'superadmin' ? api('/api/admin/audit?limit=20') : Promise.resolve(null)
   ]);
-  dashDataCache = { brands: bgtRes || [], activity: auditRes || [] };
+  dashDataCache = { ...bgtRes, activity: auditRes || [] };
   return dashDataCache;
+}
+
+async function loadDashboard(month) {
+  window.currentDashMonth = month;
+  await renderDashboard();
 }
 
 async function renderDashboard() {
@@ -297,8 +303,19 @@ async function renderDashboard() {
   qaEl.innerHTML = qaHtml;
 
   // Load Data
-  const data = dashDataCache || await fetchDashboardData();
+  const data = await fetchDashboardData(window.currentDashMonth || '');
   const brands = data.brands || [];
+  
+  // Populate Month Filter
+  const filterEl = document.getElementById('dash-month-filter');
+  if (filterEl && data.availableMonths) {
+    let opts = '<option value="">Latest Month (Default)</option>';
+    data.availableMonths.forEach(m => {
+      const val = `${m.year}-${String(m.month).padStart(2, '0')}`;
+      opts += `<option value="${val}" ${window.currentDashMonth === val ? 'selected' : ''}>${m.label}</option>`;
+    });
+    filterEl.innerHTML = opts;
+  }
   
   // KPI Grid (Visible to Admins only)
   const kpiGrid = document.getElementById('dash-kpi-grid');
@@ -405,13 +422,15 @@ function renderBrandPerfCards(brands) {
         <div class="bp-bar-bg">
           <div class="bp-bar-fill ${statusClass}" style="width:0%" data-width="${Math.min(100, pct)}%"></div>
         </div>
-        <div class="bp-stats" style="display:grid; grid-template-columns:1fr 1fr; gap:8px">
+        ${b.month ? `
+        <div class="bp-stats">
           <div>Sales Left: <span class="bp-stat-v">₹${fmt(salesLeft)}</span></div>
           <div>Budget Left: <span class="bp-stat-v">₹${fmt(budgetLeft)}</span></div>
           <div>ROAS: <span class="bp-stat-v">${s.totalROAS || '—'}</span></div>
           <div>Pacing: ${pacingStr}</div>
           ${flagsCount > 0 ? `<div style="grid-column:1/-1; color:var(--amber);font-weight:700; margin-top:4px">⚠ ${flagsCount} Alert${flagsCount>1?'s':''}</div>` : ''}
         </div>
+        ` : '<div class="bp-stats" style="display:block;text-align:center;padding:12px 0">Waiting for budget setup</div>'}
         
         <div class="bp-shortcuts">
           <button class="bp-btn primary" onclick="selectBrand('${b.brand.id}'); showPage('budget'); ${b.month ? `bgtOpenMonth('${b.brand.id}','${b.month.id}')` : ''}" style="width:100%;background:var(--blue);color:#fff;border-color:var(--blue);font-weight:700">🔍 Open Brand Month</button>
@@ -1724,11 +1743,20 @@ function cleanPrice(r) {
 }
 
 function calcVariant(v, p, globals) {
-  const { brand=30, photo=15, ship=70, ops=25, gw=0, rto=5, roas=3, discType='pct', disc=0 } = globals;
+  const { brand=30, photo=15, ship=70, ops=25, gw=0, rto=5, roas=3, discType='pct', disc=0, addlType='flat', addl=0 } = globals;
   const mfgPc = (v.mfgO != null) ? v.mfgO : p.mfg_per_pc;
   const qty   = p.variant_type === 'bundle' ? (v.qty || 1) : 1;
   const extras = (p.extras || []).reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
-  const base  = mfgPc * qty + brand + photo + ship + ops + extras;
+  
+  let base  = mfgPc * qty + brand + photo + ship + ops + extras;
+  
+  // Apply additional global charges
+  if (addlType === 'pct') {
+    base = base * (1 + (addl / 100));
+  } else {
+    base = base + addl;
+  }
+  
   const mult  = rto > 0 ? 1 / (1 - rto / 100) : 1;
   const adjC  = base * mult;
   
@@ -1757,7 +1785,9 @@ function getGlobals() {
   return { brand:gv('g-brand'), photo:gv('g-photo'), ship:gv('g-ship'), ops:gv('g-ops'),
            gw:gv('g-gw'), rto:gv('g-rto'), roas:gv('g-roas'),
            discType: document.getElementById('g-disc-type')?.value || 'pct',
-           disc:gv('g-disc') };
+           disc:gv('g-disc'),
+           addlType: document.getElementById('g-addl-type')?.value || 'flat',
+           addl:gv('g-addl') };
 }
 
 function renderPricingBrands() {
@@ -1850,15 +1880,15 @@ function renderAll() {
       const mColor = r.margin >= 0.35 ? 'var(--green)' : r.margin >= 0.25 ? 'var(--amber)' : 'var(--red)';
       
       const mfgInput = canEdit
-        ? `<input type="text" inputmode="decimal" value="${v.mfgO != null ? v.mfgO : p.mfg_per_pc}" style="width:75px" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','mfgO',this.value)">`
+        ? `<input type="text" inputmode="decimal" value="${v.mfgO != null ? v.mfgO : p.mfg_per_pc}" style="width:75px${v.mfgO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','mfgO',this.value)">`
         : `<span style="font-family:var(--fm)">₹${v.mfgO != null ? v.mfgO : p.mfg_per_pc}</span>`;
 
       const sellingInput = canEdit
-        ? `<input type="text" inputmode="decimal" value="${v.sellingO != null ? v.sellingO : ''}" placeholder="${r.selling}" style="width:75px" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','sellingO',this.value)">`
+        ? `<input type="text" inputmode="decimal" value="${v.sellingO != null ? v.sellingO : r.selling}" style="width:75px${v.sellingO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','sellingO',this.value)">`
         : `<span class="pill ${mc}">₹${r.selling.toLocaleString('en-IN')}</span>`;
 
       const compInput = canEdit
-        ? `<input type="text" inputmode="decimal" value="${v.compO != null ? v.compO : ''}" placeholder="${r.comp.toFixed(0)}" style="width:75px" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','compO',this.value)">`
+        ? `<input type="text" inputmode="decimal" value="${v.compO != null ? v.compO : r.comp.toFixed(0)}" style="width:75px${v.compO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','compO',this.value)">`
         : `<span style="font-family:var(--fm);color:var(--mid)">₹${r.comp.toLocaleString('en-IN')}</span>`;
 
       return isAdv ? `<tr>
@@ -2114,8 +2144,46 @@ async function renderAdmin() {
 function setAdminTab(tab) {
   document.getElementById('admin-sec-users').style.display = tab === 'users' ? 'block' : 'none';
   document.getElementById('admin-sec-settings').style.display = tab === 'settings' ? 'block' : 'none';
+  const secMonths = document.getElementById('admin-sec-months');
+  if (secMonths) secMonths.style.display = tab === 'months' ? 'block' : 'none';
+  
   document.getElementById('tab-admin-users').classList.toggle('active', tab === 'users');
   document.getElementById('tab-admin-settings').classList.toggle('active', tab === 'settings');
+  const tabMonths = document.getElementById('tab-admin-months');
+  if (tabMonths) tabMonths.classList.toggle('active', tab === 'months');
+  
+  if (tab === 'months') {
+    renderAdminMonths();
+  }
+}
+
+async function renderAdminMonths() {
+  const tbody = document.getElementById('admin-months-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4">Loading...</td></tr>';
+  const months = await api('/api/admin/months');
+  if (!months || !months.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--mid);padding:20px">No budget months found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = months.map(m => `
+    <tr>
+      <td style="font-weight:600">${m.brand_name}</td>
+      <td>${m.label}</td>
+      <td>₹${fmt(m.revenue_target)}</td>
+      <td>
+        <button class="btn sm danger" onclick="deleteAdminMonth('${m.id}')" style="padding:4px 8px;font-size:11px">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function deleteAdminMonth(id) {
+  if (!confirm('Are you sure you want to delete this budget month? This will permanently delete all daily data associated with it.')) return;
+  const res = await api(`/api/admin/months/${id}`, 'DELETE');
+  if (res && res.ok) {
+    renderAdminMonths();
+  }
 }
 
 function openAddUser() { document.getElementById('mo-add-user').style.display = 'flex'; }
@@ -3214,6 +3282,14 @@ async function bgtSaveDay() {
   const body = {
     day_date: `${bgtState.currentMonth.year}-${String(bgtState.currentMonth.month).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`,
     channels_data: channelsData,
+    meta_sales: channelsData['meta']?.sales || '',
+    meta_spend: channelsData['meta']?.spend || '',
+    google_sales: channelsData['google']?.sales || '',
+    google_spend: channelsData['google']?.spend || '',
+    mp_sales: channelsData['mp']?.sales || '',
+    mp_spend: channelsData['mp']?.spend || '',
+    ret_sales: channelsData['ret']?.sales || '',
+    ret_spend: channelsData['ret']?.spend || '',
     followers_real: fol ? fol.value : '',
     posts_real: pos ? pos.value : ''
   };

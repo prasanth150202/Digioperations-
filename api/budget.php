@@ -557,16 +557,29 @@ function getAggregatedPeriod(string $brandId, array $yearMonths): array {
 // ROUTES
 // ════════════════════════════════════════════════════════════
 
-// GET dashboard — all brands latest month summary
+// GET dashboard — all brands latest month summary (filtered by month if provided)
 if ($method === 'GET' && $action === 'dashboard') {
+    $filterMonth = $_GET['month'] ?? ''; // Format: "YYYY-MM"
+    
     $brands = dbAll('SELECT id,slug,name,industry FROM brands ORDER BY name');
     if ($user['role'] !== 'superadmin' && $user['brands'] !== '*') {
         $allowed = is_array($user['brands']) ? $user['brands'] : json_decode($user['brands']??'[]',true);
         $brands = array_values(array_filter($brands, fn($b) => in_array($b['slug'],$allowed)));
     }
+    
+    // Get distinct months for the dropdown filter
+    $availableMonths = dbAll('SELECT DISTINCT year, month, label FROM budget_months ORDER BY year DESC, month DESC');
+    
     $result = [];
     foreach ($brands as $b) {
-        $month = dbGet('SELECT * FROM budget_months WHERE brand_id=? ORDER BY year DESC, month DESC LIMIT 1', [$b['id']]);
+        if ($filterMonth) {
+            $parts = explode('-', $filterMonth);
+            $y = (int)$parts[0]; $m = (int)$parts[1];
+            $month = dbGet('SELECT * FROM budget_months WHERE brand_id=? AND year=? AND month=? LIMIT 1', [$b['id'], $y, $m]);
+        } else {
+            $month = dbGet('SELECT * FROM budget_months WHERE brand_id=? ORDER BY year DESC, month DESC LIMIT 1', [$b['id']]);
+        }
+        
         if (!$month) { $result[] = ['brand'=>$b,'month'=>null,'summary'=>null,'todayFlags'=>[],'hasAlerts'=>false,'hasWarnings'=>false]; continue; }
         $dayRows  = dbAll('SELECT * FROM budget_days WHERE month_id=? ORDER BY day_number', [$month['id']]);
         $computed = computeMonth($month, $dayRows);
@@ -592,7 +605,7 @@ if ($method === 'GET' && $action === 'dashboard') {
             'hasWarnings'=> (bool)array_filter($todayFlags, fn($f) => $f['level'] === 'warn')
         ];
     }
-    json_out($result);
+    json_out(['brands' => $result, 'availableMonths' => $availableMonths]);
 }
 
 // GET brands list
@@ -639,6 +652,13 @@ if ($method === 'POST' && $action === 'months' && $brandId) {
     $b = body();
     if (empty($b['label'])||empty($b['year'])||empty($b['month'])||empty($b['total_days'])||empty($b['revenue_target'])) json_err('label,year,month,total_days,revenue_target required');
     if (empty($b['channels'])) json_err('channels config required');
+    
+    // Prevent duplicate month creation for the same brand
+    $existing = dbGet('SELECT id FROM budget_months WHERE brand_id=? AND year=? AND month=?', [$brandId, $b['year'], $b['month']]);
+    if ($existing) {
+        json_err('A budget for this month already exists for this brand.', 409);
+    }
+    
     $id = uuid4();
     dbRun('INSERT INTO budget_months (id,brand_id,label,year,month,total_days,revenue_target,overall_roas,channels,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)',
         [$id,$brandId,$b['label'],$b['year'],$b['month'],$b['total_days'],$b['revenue_target'],$b['overall_roas']??5,json_encode($b['channels']),$user['name']]);
