@@ -1830,27 +1830,10 @@ async function loadBrandProducts() {
   if (!activeBrand) return;
   const r = await api(`/api/pricing/${activeBrand.slug}/products`);
   if (!r) return;
-  // Map API field names (variants_json/extras_json) to local names (variants/extras)
-  prods = (r.products || []).map(p => ({
-    ...p,
-    variants: Array.isArray(p.variants_json) ? p.variants_json.map(v => ({
-      ...v,
-      sellingO: v.sellingO !== undefined ? v.sellingO : null,
-      compO: v.compO !== undefined ? v.compO : null
-    })) : [],
-    extras:   Array.isArray(p.extras_json)   ? p.extras_json   : [],
-  }));
-  // Restore saved globals into the input fields
-  const g = r.globals || {};
-  const sv = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
-  sv('g-brand', g.brand); sv('g-photo', g.photo); sv('g-ship', g.ship);
-  sv('g-ops',   g.ops);   sv('g-gw',   g.gw);    sv('g-rto',  g.rto);
-  sv('g-roas',  g.roas);  sv('g-disc', g.disc);
-  if (document.getElementById('g-disc-type') && g.discType != null) {
-    document.getElementById('g-disc-type').value = g.discType;
-  }
   
-  // Load and migrate global extra charges
+  const g = r.globals || {};
+  
+  // Load and migrate global extra charges first so they are available for calculation comparison
   globalExtras = Array.isArray(g.extra_charges) ? g.extra_charges : [];
   if (globalExtras.length === 0 && g.addl && parseFloat(g.addl) > 0) {
     globalExtras.push({
@@ -1860,6 +1843,41 @@ async function loadBrandProducts() {
       amount: parseFloat(g.addl)
     });
   }
+  g.extra_charges = globalExtras; // Sync to globals object
+  
+  // Map API field names (variants_json/extras_json) to local names (variants/extras)
+  prods = (r.products || []).map(p => {
+    const extras = Array.isArray(p.extras_json) ? p.extras_json : [];
+    const tempP = { ...p, extras };
+    return {
+      ...p,
+      extras,
+      variants: Array.isArray(p.variants_json) ? p.variants_json.map(v => {
+        // Calculate what the price would be without overrides based on loaded globals
+        const calc = calcVariant({ ...v, sellingO: null, compO: null }, tempP, g);
+        
+        // If saved price equals calculated price, it was not manually overridden (Auto mode)
+        const isSellingCalc = v.selling == null || parseFloat(v.selling) === calc.selling;
+        const isCompCalc = v.comp == null || parseFloat(v.comp) === calc.comp;
+        
+        return {
+          ...v,
+          sellingO: isSellingCalc ? null : (v.sellingO != null ? parseFloat(v.sellingO) : null),
+          compO: isCompCalc ? null : (v.compO != null ? parseFloat(v.compO) : null)
+        };
+      }) : [],
+    };
+  });
+  
+  // Restore saved globals into the input fields
+  const sv = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+  sv('g-brand', g.brand); sv('g-photo', g.photo); sv('g-ship', g.ship);
+  sv('g-ops',   g.ops);   sv('g-gw',   g.gw);    sv('g-rto',  g.rto);
+  sv('g-roas',  g.roas);  sv('g-disc', g.disc);
+  if (document.getElementById('g-disc-type') && g.discType != null) {
+    document.getElementById('g-disc-type').value = g.discType;
+  }
+  
   renderGlobalExtrasList();
   renderAll();
 }
@@ -2051,19 +2069,6 @@ function removeGlobalExtra(id) {
   globalExtras = globalExtras.filter(x => x.id !== id);
   renderGlobalExtrasList();
   deferSaveAndRender();
-}
-
-function resetAllOverrides() {
-  if (!confirm('Are you sure you want to reset all manual selling price and competitor price overrides? This will automatically calculate all prices based on global assumptions.')) return;
-  prods.forEach(p => {
-    (p.variants || []).forEach(v => {
-      v.sellingO = null;
-      v.compO = null;
-    });
-  });
-  renderAll();
-  deferPricingSave();
-  showToast('All manual price overrides reset to auto-calculate!', 'success');
 }
 
 function deferPricingSave() {
