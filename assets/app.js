@@ -3282,14 +3282,14 @@ async function bgtSaveDay() {
   const body = {
     day_date: `${bgtState.currentMonth.year}-${String(bgtState.currentMonth.month).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`,
     channels_data: channelsData,
-    meta_sales: channelsData['meta']?.sales || '',
-    meta_spend: channelsData['meta']?.spend || '',
-    google_sales: channelsData['google']?.sales || '',
-    google_spend: channelsData['google']?.spend || '',
-    mp_sales: channelsData['mp']?.sales || '',
-    mp_spend: channelsData['mp']?.spend || '',
-    ret_sales: channelsData['ret']?.sales || '',
-    ret_spend: channelsData['ret']?.spend || '',
+    meta_sales: channelsData['meta']?.sales ?? '',
+    meta_spend: channelsData['meta']?.spend ?? '',
+    google_sales: channelsData['google']?.sales ?? '',
+    google_spend: channelsData['google']?.spend ?? '',
+    mp_sales: channelsData['mp']?.sales ?? '',
+    mp_spend: channelsData['mp']?.spend ?? '',
+    ret_sales: channelsData['ret']?.sales ?? '',
+    ret_spend: channelsData['ret']?.spend ?? '',
     followers_real: fol ? fol.value : '',
     posts_real: pos ? pos.value : ''
   };
