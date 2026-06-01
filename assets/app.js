@@ -2426,8 +2426,8 @@ async function bgtLoadDashboard() {
   showBgtView('dashboard');
   const r = await api('/api/budget/dashboard');
   if (!r) return;
-  bgtState.brands = r;
-  renderBgtDashboard(r);
+  bgtState.brands = r.brands || [];
+  renderBgtDashboard(r.brands || []);
 
   // Show new brand button for managers+
   const u = window.currentUser;
