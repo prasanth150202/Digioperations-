@@ -2245,9 +2245,9 @@ async function renderAdmin() {
 }
 
 function setAdminTab(tab) {
-  document.getElementById('admin-sec-users').style.display = tab === 'users' ? 'block' : 'none';
-  document.getElementById('admin-sec-settings').style.display = tab === 'settings' ? 'block' : 'none';
-  const secMonths = document.getElementById('admin-sec-months');
+  document.getElementById('admin-page-users').style.display = tab === 'users' ? 'block' : 'none';
+  document.getElementById('admin-page-settings').style.display = tab === 'settings' ? 'block' : 'none';
+  const secMonths = document.getElementById('admin-page-months');
   if (secMonths) secMonths.style.display = tab === 'months' ? 'block' : 'none';
   
   document.getElementById('tab-admin-users').classList.toggle('active', tab === 'users');

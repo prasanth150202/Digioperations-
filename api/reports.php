@@ -304,7 +304,17 @@ if ($method === 'POST' && $action === 'create') {
     }
     
     // 4. Generate unique client token
-    $uniqueToken = bin2hex(random_bytes(16));
+    $safeBrandName = strtolower(preg_replace('/[^a-z0-9]+/', '-', $brand['name']));
+    $safeBrandName = trim($safeBrandName, '-');
+    
+    if ($reportType === 'monthly') {
+        $monthName = strtolower(date('F', strtotime($startDate)));
+        $year = date('Y', strtotime($startDate));
+        $uniqueToken = "digifyce-{$safeBrandName}-{$monthName}-{$year}";
+    } else {
+        $uniqueToken = "digifyce-{$safeBrandName}-{$startDate}-{$endDate}";
+    }
+    
     $sharedLink = 'report_' . $uniqueToken;
     
     // 5. Store report
@@ -323,30 +333,62 @@ if ($method === 'POST' && $action === 'create') {
         ]
     ];
     
-    dbRun('INSERT INTO reports (id, brand_id, report_type, period_start, period_end, total_spend, total_conversions, total_revenue, overall_cpa, overall_roas, overall_aov, report_data, shared_link, highlights, blockers, next_steps, created_by) 
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-        [
-            $reportId,
-            $brandId,
-            $reportType,
-            $startDate,
-            $endDate,
-            $currentStats['totals']['spend'],
-            $currentStats['totals']['conversions'],
-            $currentStats['totals']['revenue'],
-            $currentStats['totals']['cpa'],
-            $currentStats['totals']['roas'],
-            $currentStats['totals']['aov'],
-            json_encode($reportData),
-            $sharedLink,
-            $aiHighlights['highlights'],
-            $aiHighlights['blockers'],
-            $aiHighlights['next_steps'],
-            $user['name']
-        ]);
+    // UPSERT LOGIC
+    // Check if report already exists for this exact period and type
+    $existing = dbGet('SELECT id FROM reports WHERE brand_id=? AND period_start=? AND period_end=? AND report_type=?', 
+        [$brandId, $startDate, $endDate, $reportType]);
         
-    // Insert into report_links
-    dbRun('INSERT INTO report_links (id, report_id, unique_token) VALUES (?,?,?)', [uuid4(), $reportId, $uniqueToken]);
+    if ($existing) {
+        $reportId = $existing['id'];
+        dbRun('UPDATE reports SET total_spend=?, total_conversions=?, total_revenue=?, overall_cpa=?, overall_roas=?, overall_aov=?, report_data=?, shared_link=?, highlights=?, blockers=?, next_steps=? WHERE id=?',
+            [
+                $currentStats['totals']['spend'],
+                $currentStats['totals']['conversions'],
+                $currentStats['totals']['revenue'],
+                $currentStats['totals']['cpa'],
+                $currentStats['totals']['roas'],
+                $currentStats['totals']['aov'],
+                json_encode($reportData),
+                $sharedLink,
+                $aiHighlights['highlights'],
+                $aiHighlights['blockers'],
+                $aiHighlights['next_steps'],
+                $reportId
+            ]);
+            
+        // Make sure the link exists or update token if needed
+        $existingLink = dbGet('SELECT id FROM report_links WHERE report_id=?', [$reportId]);
+        if ($existingLink) {
+            dbRun('UPDATE report_links SET unique_token=? WHERE report_id=?', [$uniqueToken, $reportId]);
+        } else {
+            dbRun('INSERT INTO report_links (id, report_id, unique_token) VALUES (?,?,?)', [uuid4(), $reportId, $uniqueToken]);
+        }
+    } else {
+        dbRun('INSERT INTO reports (id, brand_id, report_type, period_start, period_end, total_spend, total_conversions, total_revenue, overall_cpa, overall_roas, overall_aov, report_data, shared_link, highlights, blockers, next_steps, created_by) 
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            [
+                $reportId,
+                $brandId,
+                $reportType,
+                $startDate,
+                $endDate,
+                $currentStats['totals']['spend'],
+                $currentStats['totals']['conversions'],
+                $currentStats['totals']['revenue'],
+                $currentStats['totals']['cpa'],
+                $currentStats['totals']['roas'],
+                $currentStats['totals']['aov'],
+                json_encode($reportData),
+                $sharedLink,
+                $aiHighlights['highlights'],
+                $aiHighlights['blockers'],
+                $aiHighlights['next_steps'],
+                $user['name']
+            ]);
+            
+        // Insert into report_links
+        dbRun('INSERT INTO report_links (id, report_id, unique_token) VALUES (?,?,?)', [uuid4(), $reportId, $uniqueToken]);
+    }
     
     auditLog($user['id'], $user['name'], 'REPORT_GENERATE', "{$brand['name']} - {$startDate} to {$endDate}");
     

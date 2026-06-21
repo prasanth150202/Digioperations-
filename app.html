@@ -64,18 +64,18 @@
         <div class="dash-main-col">
           <!-- Alerts Panel -->
           <div class="dash-alerts-panel" id="dash-alerts-panel" style="display:none;">
-            <div class="sec-hd" style="margin-bottom:12px;">
-              <div class="sec-title" style="color:var(--dark); font-size:14px;">Today's Active Alerts</div>
+            <div class="page-hd" style="margin-bottom:12px;">
+              <div class="page-title" style="color:var(--dark); font-size:14px;">Today's Active Alerts</div>
               <div class="alert-badge" id="dash-alert-count">0</div>
             </div>
             <div class="alert-feed" id="dash-alerts-feed"></div>
           </div>
 
           <!-- Brands Grid -->
-          <div class="sec-hd">
+          <div class="page-hd">
             <div>
-              <div class="sec-title" id="dash-brands-title">Brand Performance</div>
-              <div class="sec-sub" style="display:flex;align-items:center;gap:10px">
+              <div class="page-title" id="dash-brands-title">Brand Performance</div>
+              <div class="page-sub" style="display:flex;align-items:center;gap:10px">
                 Performance tracking
                 <select id="dash-month-filter" onchange="loadDashboard(this.value)" style="border:1px solid var(--border);border-radius:4px;font-size:11px;padding:2px 6px;background:transparent;outline:none;cursor:pointer">
                   <option value="">Latest Month (Default)</option>
@@ -109,8 +109,8 @@
     </div>
     <div class="page hidden" id="page-pricing">
       <div id="pricing-brands-view">
-        <div class="sec-hd">
-          <div><div class="sec-title">Brands</div><div class="sec-sub">Select a brand to open the pricing calculator</div></div>
+        <div class="page-hd">
+          <div><div class="page-title">Brands</div><div class="page-sub">Select a brand to open the pricing calculator</div></div>
           <button class="btn primary" id="new-brand-btn" onclick="openNewBrand()" style="display:none">+ New Brand</button>
         </div>
         <div class="brand-grid" id="brand-grid"></div>
@@ -178,8 +178,8 @@
     <!-- PRODUCT PRICE CATALOG LOOKUP -->
     <div class="page hidden" id="page-catalog">
       <div id="catalog-brands-view">
-        <div class="sec-hd">
-          <div><div class="sec-title">Price Catalog Lookup</div><div class="sec-sub">Select a brand to lookup product and variant pricing</div></div>
+        <div class="page-hd">
+          <div><div class="page-title">Price Catalog Lookup</div><div class="page-sub">Select a brand to lookup product and variant pricing</div></div>
         </div>
         <div class="brand-grid" id="catalog-brand-grid"></div>
       </div>
@@ -218,8 +218,8 @@
     <!-- BUDGET TRACKER -->
     <div class="page hidden" id="page-budget">
       <div id="bgt-dashboard-view">
-        <div class="sec-hd" style="margin-bottom:18px">
-          <div><div class="sec-title">Budget Tracker</div><div class="sec-sub">Monthly performance across all brands</div></div>
+        <div class="page-hd" style="margin-bottom:18px">
+          <div><div class="page-title">Budget Tracker</div><div class="page-sub">Monthly performance across all brands</div></div>
           <div style="display:flex;gap:8px"><button class="btn sm" id="bgt-new-brand-btn" onclick="bgtOpenNewBrand()" style="display:none">+ New Brand</button></div>
         </div>
         <div id="bgt-agency-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px"></div>
@@ -279,10 +279,10 @@
     <div class="page hidden" id="page-reports">
       <!-- 1. REPORTS LIST VIEW -->
       <div id="reports-list-view">
-        <div class="sec-hd">
+        <div class="page-hd">
           <div>
-            <div class="sec-title">Performance Reports</div>
-            <div class="sec-sub">Generate and manage weekly and monthly summaries for clients</div>
+            <div class="page-title">Performance Reports</div>
+            <div class="page-sub">Generate and manage weekly and monthly summaries for clients</div>
           </div>
           <button class="btn primary" onclick="openCreateReport()">+ Create Report</button>
         </div>
@@ -507,8 +507,8 @@
 
 
     <div class="page hidden" id="page-activity">
-      <div class="sec-hd" style="margin-bottom:20px">
-        <div><div class="sec-title">Activity Logs</div><div class="sec-sub">Complete database-side operations timeline for all team members</div></div>
+      <div class="page-hd" style="margin-bottom:20px">
+        <div><div class="page-title">Activity Logs</div><div class="page-sub">Complete database-side operations timeline for all team members</div></div>
       </div>
       
       <div class="card" style="padding:16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -535,8 +535,8 @@
     </div>
 
     <div class="page hidden" id="page-admin">
-      <div class="sec-hd" style="margin-bottom:20px">
-        <div><div class="sec-title">Admin Console</div><div class="sec-sub">Manage platform settings and user access</div></div>
+      <div class="page-hd" style="margin-bottom:20px">
+        <div><div class="page-title">Admin Console</div><div class="page-sub">Manage platform settings and user access</div></div>
       </div>
       
       <div class="bgt-tabs" style="margin-bottom:20px">
@@ -545,7 +545,7 @@
         <button class="bgt-tab" id="tab-admin-months" onclick="setAdminTab('months')">Budget Months</button>
       </div>
 
-      <div id="admin-sec-users">
+      <div id="admin-page-users">
         <div class="card" style="padding:0;overflow:hidden">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
             <div style="font-weight:600">Team Members</div>
@@ -555,7 +555,7 @@
         </div>
       </div>
       
-      <div id="admin-sec-months" style="display:none">
+      <div id="admin-page-months" style="display:none">
         <div class="card" style="padding:0;overflow:hidden">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
             <div style="font-weight:600">Budget Months Data</div>
@@ -565,7 +565,7 @@
         </div>
       </div>
 
-      <div id="admin-sec-settings" style="display:none">
+      <div id="admin-page-settings" style="display:none">
         <div style="display:grid;grid-template-columns:1fr;gap:20px">
           
           <!-- Top Info & Selection Bar -->
