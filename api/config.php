@@ -168,6 +168,17 @@ function db(): PDO {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
         } catch (Throwable $migrationErr) {}
 
+        // Self-healing migration for report_manual_data table
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `report_manual_data` (
+              `report_id`     VARCHAR(36)  NOT NULL PRIMARY KEY,
+              `channels_json` LONGTEXT     NOT NULL,
+              `totals_json`   LONGTEXT     NOT NULL,
+              `updated_at`    DATETIME     NOT NULL DEFAULT NOW() ON UPDATE NOW(),
+              CONSTRAINT `fk_rmd_report` FOREIGN KEY (`report_id`) REFERENCES `reports`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        } catch (Throwable $migrationErr) {}
+
         // Run self-cleaning retention policy to delete reports older than 12 weeks
         try {
             $pdo->exec("DELETE FROM reports WHERE created_at < DATE_SUB(NOW(), INTERVAL 12 WEEK)");

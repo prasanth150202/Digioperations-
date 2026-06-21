@@ -52,7 +52,7 @@
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
           <div>
             <div class="dash-hero-title">
-              <span id="dash-greeting">Loadingâ€¦</span>
+              <span id="dash-greeting">Loading&hellip;</span>
               <span class="role-chip" id="dash-role-chip" style="display:none;">Role</span>
             </div>
             <div class="dash-hero-sub" id="dash-sub">Loading dashboard data...</div>
@@ -144,7 +144,7 @@
         <div class="globals-card">
           <div class="globals-hd" onclick="toggleGlobals()">
             <span class="globals-hd-title">âš™ Global Cost Assumptions</span>
-            <span class="globals-hd-note">Applied to all products Â· click to expand</span>
+            <span class="globals-hd-note">Applied to all products  &middot;  click to expand</span>
             <span id="g-arrow" style="color:var(--mid);font-size:11px;margin-left:8px">â–¶</span>
           </div>
           <div class="globals-body" id="globals-body">
@@ -368,94 +368,101 @@
 
       <!-- 3. REPORT DETAILS DASHBOARD VIEW -->
       <div id="reports-detail-view" style="display:none">
-        <div class="calc-hd">
-          <button class="calc-back" onclick="backToReportsList()">â† Back</button>
+
+        <!-- Header bar -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <button class="calc-back" onclick="backToReportsList()">&#8592; Back</button>
+            <div style="width:44px;height:44px;background:linear-gradient(135deg,#2B4EFF,#6366f1);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;font-weight:900;box-shadow:0 4px 18px rgba(67,97,238,0.35)">&#9830;</div>
+            <div>
+              <div id="rep-detail-title" style="font-size:21px;font-weight:800;letter-spacing:-0.4px;color:var(--dark)">Performance Report</div>
+              <div style="font-size:12px;color:var(--mid);margin-top:3px;display:flex;align-items:center;gap:8px">
+                <span class="chip brand" id="rep-detail-brand-pill" style="font-size:10px;padding:2px 8px;font-weight:700"></span>
+                <span id="rep-detail-meta"></span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn sm" onclick="openEditReportDataModal()" style="font-weight:700">&#9998; Edit Data</button>
+            <button class="btn sm" onclick="printReportDetail()" style="font-weight:700">&#128424; Print PDF</button>
+            <button class="btn sm primary" onclick="copyReportShareLink()" id="btn-copy-share-link" style="font-weight:700">&#128279; Copy Client Link</button>
+          </div>
+        </div>
+
+        <!-- 6 KPI cards -->
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:24px">
+          <div class="card" style="padding:18px;margin-bottom:0">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);margin-bottom:4px">Spent</div>
+            <div id="rep-kpi-spend" style="font-size:20px;font-weight:800;color:var(--fg)">&#8377;0</div>
+            <div id="rep-change-spend" class="bgt-stat-sub" style="font-size:11px;font-weight:600;margin-top:4px">-</div>
+          </div>
+          <div class="card" style="padding:18px;margin-bottom:0">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);margin-bottom:4px">Total Sales</div>
+            <div id="rep-kpi-sales" style="font-size:20px;font-weight:800;color:var(--fg)">&#8377;0</div>
+            <div id="rep-change-sales" class="bgt-stat-sub" style="font-size:11px;font-weight:600;margin-top:4px">-</div>
+          </div>
+          <div class="card" style="padding:18px;margin-bottom:0">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);margin-bottom:4px">ROAS</div>
+            <div id="rep-kpi-roas" style="font-size:20px;font-weight:800;color:var(--fg)">0.00x</div>
+            <div id="rep-change-roas" class="bgt-stat-sub" style="font-size:11px;font-weight:600;margin-top:4px">-</div>
+          </div>
+          <div class="card" style="padding:18px;margin-bottom:0">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);margin-bottom:4px">Orders</div>
+            <div id="rep-kpi-orders" style="font-size:20px;font-weight:800;color:var(--fg)">0</div>
+            <div id="rep-change-orders" class="bgt-stat-sub" style="font-size:11px;font-weight:600;margin-top:4px">-</div>
+          </div>
+          <div class="card" style="padding:18px;margin-bottom:0">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);margin-bottom:4px">CPA</div>
+            <div id="rep-kpi-cpa" style="font-size:20px;font-weight:800;color:var(--fg)">&#8377;0</div>
+            <div id="rep-change-cpa" class="bgt-stat-sub" style="font-size:11px;font-weight:600;margin-top:4px">-</div>
+          </div>
+          <div class="card" style="padding:18px;margin-bottom:0">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);margin-bottom:4px">AOV</div>
+            <div id="rep-kpi-aov" style="font-size:20px;font-weight:800;color:var(--fg)">&#8377;0</div>
+            <div id="rep-change-aov" class="bgt-stat-sub" style="font-size:11px;font-weight:600;margin-top:4px">-</div>
+          </div>
+        </div>
+
+        <!-- Main 2-col layout -->
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+          <!-- LEFT col -->
           <div>
-            <div class="calc-brand-name" id="rep-detail-title">Weekly Performance Report</div>
-            <div style="font-size:11px;color:var(--mid)" id="rep-detail-meta">Hapli Earth Â· June 2026</div>
-          </div>
-          <div style="margin-left:auto;display:flex;gap:8px" id="rep-detail-actions">
-            <button class="btn sm" onclick="printReportDetail()">ðŸ–¨ï¸ Print / Save PDF</button>
-            <button class="btn sm primary" onclick="copyReportShareLink()" id="btn-copy-share-link">ðŸ”— Copy Share Link</button>
-          </div>
-        </div>
-
-        <!-- Premium Glassmorphic Stats Grid -->
-        <div class="bgt-summary-row" style="margin-bottom:20px">
-          <div class="bgt-stat" style="grid-column: span 2">
-            <div class="bgt-stat-label">Spent</div>
-            <div class="bgt-stat-value" id="rep-kpi-spend">â‚¹0</div>
-            <div class="bgt-stat-sub" id="rep-change-spend">-</div>
-          </div>
-          <div class="bgt-stat" style="grid-column: span 2">
-            <div class="bgt-stat-label">Total Sales</div>
-            <div class="bgt-stat-value" id="rep-kpi-sales">â‚¹0</div>
-            <div class="bgt-stat-sub" id="rep-change-sales">-</div>
-          </div>
-          <div class="bgt-stat" style="grid-column: span 2">
-            <div class="bgt-stat-label">ROAS</div>
-            <div class="bgt-stat-value" id="rep-kpi-roas">0.0x</div>
-            <div class="bgt-stat-sub" id="rep-change-roas">-</div>
-          </div>
-          <div class="bgt-stat" style="grid-column: span 2">
-            <div class="bgt-stat-label">Orders</div>
-            <div class="bgt-stat-value" id="rep-kpi-orders">0</div>
-            <div class="bgt-stat-sub" id="rep-change-orders">-</div>
-          </div>
-          <div class="bgt-stat" style="grid-column: span 2">
-            <div class="bgt-stat-label">CPA</div>
-            <div class="bgt-stat-value" id="rep-kpi-cpa">â‚¹0</div>
-            <div class="bgt-stat-sub" id="rep-change-cpa">-</div>
-          </div>
-          <div class="bgt-stat" style="grid-column: span 2">
-            <div class="bgt-stat-label">AOV</div>
-            <div class="bgt-stat-value" id="rep-kpi-aov">â‚¹0</div>
-            <div class="bgt-stat-sub" id="rep-change-aov">-</div>
-          </div>
-        </div>
-
-        <div class="dash-layout" style="margin-top:0">
-          <div class="dash-main-col">
-            <!-- Charts block -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
               <div class="card" style="margin-bottom:0;padding:16px">
-                <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:12px">Spend Share by Channel</div>
-                <div style="height:160px;position:relative"><canvas id="rep-spend-chart"></canvas></div>
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:10px;text-align:center">Spend Share by Channel</div>
+                <div style="height:175px;position:relative"><canvas id="rep-spend-chart"></canvas></div>
               </div>
               <div class="card" style="margin-bottom:0;padding:16px">
-                <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:12px">Revenue Share by Channel</div>
-                <div style="height:160px;position:relative"><canvas id="rep-revenue-chart"></canvas></div>
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:10px;text-align:center">Revenue Share by Channel</div>
+                <div style="height:175px;position:relative"><canvas id="rep-revenue-chart"></canvas></div>
               </div>
             </div>
-            
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
               <div class="card" style="margin-bottom:0;padding:16px">
-                <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:12px">Channel ROI & Efficiency</div>
-                <div style="height:200px;position:relative"><canvas id="rep-efficiency-chart"></canvas></div>
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:10px;text-align:center">Channel ROI &amp; Efficiency</div>
+                <div style="height:175px;position:relative"><canvas id="rep-efficiency-chart"></canvas></div>
               </div>
               <div class="card" style="margin-bottom:0;padding:16px">
-                <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:12px">Spend vs Revenue Balance</div>
-                <div style="height:200px;position:relative"><canvas id="rep-radar-chart"></canvas></div>
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:10px;text-align:center">Spend vs Revenue Balance</div>
+                <div style="height:175px;position:relative"><canvas id="rep-radar-chart"></canvas></div>
               </div>
             </div>
-            
-            <div class="card" style="margin-bottom:16px;padding:16px">
-              <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:12px">Conversion Funnel</div>
-              <div style="height:180px;position:relative"><canvas id="rep-funnel-chart"></canvas></div>
+            <div class="card" id="rep-funnel-chart-container" style="margin-bottom:16px;padding:16px;display:none">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:10px;text-align:center">Conversion Funnel</div>
+              <div style="height:220px;position:relative"><canvas id="rep-funnel-chart"></canvas></div>
             </div>
-
-            <!-- Channels performance table -->
             <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px">
-              <div style="font-size:13px;font-weight:600;color:var(--fg);padding:12px 16px;border-bottom:1px solid var(--border)">Performance by Channel</div>
+              <div style="font-size:13px;font-weight:700;color:var(--fg);padding:14px 16px;border-bottom:1px solid var(--border)">Channel Level Performance</div>
               <div style="overflow-x:auto">
                 <table class="bgt-table" id="rep-channel-table">
                   <thead>
                     <tr>
                       <th>Channel</th>
                       <th>Spend</th>
-                      <th>Conversions</th>
+                      <th>Orders</th>
                       <th>Revenue</th>
                       <th>CPA</th>
+                      <th>AOV</th>
                       <th>ROAS</th>
                       <th>CTR %</th>
                     </tr>
@@ -464,50 +471,43 @@
                 </table>
               </div>
             </div>
-            
-            <div id="rep-untapped-container" style="display:none; margin-top:30px;">
-              <div style="font-weight:700; font-size:16px; margin-bottom:15px; color:var(--dark)">Untapped Growth Opportunities</div>
-              <!-- Injected by JS -->
+            <div id="rep-untapped-container" style="display:none;margin-bottom:16px">
+              <div style="font-weight:700;font-size:14px;margin-bottom:12px;color:var(--dark)">Untapped Growth Opportunities</div>
             </div>
-            
           </div>
 
-          <!-- Notes / Highlights Col -->
-          <div class="dash-side-col">
-            <div class="card" style="padding:16px;margin-bottom:16px;background:rgba(43,78,255,0.03);border:1px solid rgba(43,78,255,0.1)">
-              <div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:12px;display:flex;align-items:center;gap:6px">
-                ðŸ¤– Client Summary (AI Assisted)
+          <!-- RIGHT col -->
+          <div>
+            <div class="card" style="padding:16px;margin-bottom:16px;border:1px solid rgba(43,78,255,0.12);background:rgba(43,78,255,0.02)">
+              <div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:14px;display:flex;align-items:center;gap:6px">
+                &#129302; Client Summary (AI Assisted)
               </div>
               <div style="display:flex;flex-direction:column;gap:12px">
-                <div class="field">
-                  <label>Highlights (What went well)</label>
-                  <textarea id="rep-notes-hl" style="font-size:12px;min-height:90px"></textarea>
+                <div>
+                  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);margin-bottom:5px">Highlights (What went well)</div>
+                  <textarea id="rep-notes-hl" style="font-size:12px;min-height:85px;width:100%;resize:vertical"></textarea>
                 </div>
-                <div class="field">
-                  <label>Blockers (Underperforming items)</label>
-                  <textarea id="rep-notes-bl" style="font-size:12px;min-height:90px"></textarea>
+                <div>
+                  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);margin-bottom:5px">Blockers (Concerns &amp; Underperformance)</div>
+                  <textarea id="rep-notes-bl" style="font-size:12px;min-height:85px;width:100%;resize:vertical"></textarea>
                 </div>
-                <div class="field">
-                  <label>Action Plan (Next Steps)</label>
-                  <textarea id="rep-notes-ns" style="font-size:12px;min-height:90px"></textarea>
+                <div>
+                  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);margin-bottom:5px">Action Plan (Next Steps)</div>
+                  <textarea id="rep-notes-ns" style="font-size:12px;min-height:85px;width:100%;resize:vertical"></textarea>
                 </div>
-                <button class="btn primary sm" onclick="saveReportNotes()" style="justify-content:center;margin-top:6px">Save Report Notes</button>
+                <button class="btn primary sm" onclick="saveReportNotes()" style="justify-content:center;margin-top:4px;font-weight:700">Save Report Notes</button>
               </div>
             </div>
-
-            <!-- Share Info -->
             <div class="card" style="padding:16px;margin-bottom:0">
               <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:8px">Client Share Link</div>
-              <input type="text" id="rep-share-link-input" readonly style="width:100%;padding:8px;font-size:11px;font-family:var(--fm);border:1px solid var(--border);border-radius:6px;background:var(--off);outline:none;margin-bottom:10px">
-              <div style="font-size:10px;color:var(--mid);line-height:1.4">
-                Share this link with your client. They can view it on a secure dashboard without logging into the platform. Link expires after 12 weeks.
-              </div>
+              <input type="text" id="rep-share-link-input" readonly onclick="this.select()" style="width:100%;padding:8px;font-size:10px;font-family:var(--fm);border:1px solid var(--border);border-radius:6px;background:var(--off);outline:none;margin-bottom:10px">
+              <button class="btn sm primary" onclick="copyReportShareLink()" style="width:100%;justify-content:center;font-weight:700">&#128279; Copy &amp; Share with Client</button>
+              <div style="font-size:10px;color:var(--mid);line-height:1.4;margin-top:8px">Client sees identical report. Edits here reflect instantly on the client view.</div>
             </div>
           </div>
         </div>
       </div>
     </div>
-
 
     <div class="page hidden" id="page-activity">
       <div class="page-hd" style="margin-bottom:20px">
@@ -734,7 +734,7 @@
 <div class="modal-overlay" id="mo-gen" style="display:none"><div class="modal" style="text-align:center">
   <div style="font-size:32px;margin-bottom:12px">âœ¦</div>
   <div class="modal-title" style="text-align:center">Generating Strategy Deck</div>
-  <div id="gen-status" style="font-size:13px;color:var(--mid);margin-bottom:16px">Connecting to AIâ€¦</div>
+  <div id="gen-status" style="font-size:13px;color:var(--mid);margin-bottom:16px">Connecting to AI&hellip;</div>
   <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:16px"><div id="gen-prog" style="height:100%;background:var(--blue);border-radius:2px;width:0%;transition:width .5s"></div></div>
   <div id="gen-done" style="display:none">
     <div style="color:var(--green);font-weight:700;margin-bottom:12px">âœ“ Strategy deck ready!</div>
@@ -902,6 +902,24 @@
     </div>
   </div>
 </div>
+
+
+<!-- EDIT REPORT DATA MODAL -->
+<div class="modal-overlay" id="mo-edit-report-data" style="display:none"><div class="modal" style="min-width:620px;max-width:90vw">
+  <div class="modal-title">&#9998; Edit Report Performance Data</div>
+  <div style="font-size:12px;color:var(--mid);margin-bottom:14px;line-height:1.5">
+    Edit channel-level metrics directly. Changes will reflect in both your view and the client-facing report link immediately.
+  </div>
+  <div id="edit-report-channels-container" style="max-height:420px;overflow-y:auto;padding-right:4px"></div>
+  <div style="margin-top:12px;display:flex;gap:8px">
+    <button class="btn sm" onclick="addChannelToEditModal()">+ Add Channel</button>
+  </div>
+  <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn" onclick="closeMo('mo-edit-report-data')">Cancel</button>
+    <button class="btn primary" onclick="submitEditReportData()">Save Changes</button>
+  </div>
+</div></div>
+
 
 <script src="/api/config_js.php"></script>
 </body>

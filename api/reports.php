@@ -3,7 +3,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/ai.php';
 
 $user = requireAuth();
-requirePage($user, 'budget');
+requirePage($user, 'reports');
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
@@ -304,11 +304,11 @@ if ($method === 'POST' && $action === 'create') {
     }
     
     // 4. Generate unique client token
-    $safeBrandName = strtolower(preg_replace('/[^a-z0-9]+/', '-', $brand['name']));
+    $safeBrandName = preg_replace('/[^A-Za-z0-9]+/', '-', $brand['name']);
     $safeBrandName = trim($safeBrandName, '-');
     
     if ($reportType === 'monthly') {
-        $monthName = strtolower(date('F', strtotime($startDate)));
+        $monthName = date('F', strtotime($startDate));
         $year = date('Y', strtotime($startDate));
         $uniqueToken = "digifyce-{$safeBrandName}-{$monthName}-{$year}";
     } else {
@@ -410,6 +410,72 @@ if ($method === 'GET' && $action === 'view') {
     
     $report['report_data'] = json_decode($report['report_data'] ?? '{}', true);
     json_out($report);
+}
+
+// POST update report performance data (channelwise & overall totals)
+if ($method === 'POST' && $action === 'update_data') {
+    $reportId = bodyGet('report_id', '');
+    $channelsInput = bodyGet('channels', []);
+    $totalsInput = bodyGet('totals', []);
+    
+    if (!$reportId) json_err('Report ID required');
+    if (empty($channelsInput) || empty($totalsInput)) json_err('Channels and Totals data required');
+    
+    // Retrieve report and verify access
+    $report = dbGet('SELECT r.*, b.slug, b.name as brand_name FROM reports r JOIN brands b ON b.id = r.brand_id WHERE r.id=?', [$reportId]);
+    if (!$report || !canAccessBrand($user, $report['slug'])) json_err('Access denied', 403);
+    
+    $reportData = json_decode($report['report_data'] ?? '{}', true);
+    
+    // Update channels and totals in the report JSON
+    $reportData['channels'] = $channelsInput;
+    $reportData['totals'] = $totalsInput;
+    
+    // Recalculate WoW / MoM Comparisons based on new totals and previous period totals
+    $prevTotals = $reportData['prev_period']['totals'] ?? [];
+    
+    $pctChange = function($curr, $prev) {
+        if ($prev <= 0) return $curr > 0 ? 100.0 : 0.0;
+        return round((($curr - $prev) / $prev) * 100, 1);
+    };
+    
+    $comparisons = [
+        'spend' => $pctChange($totalsInput['spend'] ?? 0, $prevTotals['spend'] ?? 0),
+        'revenue' => $pctChange($totalsInput['revenue'] ?? 0, $prevTotals['revenue'] ?? 0),
+        'conversions' => $pctChange($totalsInput['conversions'] ?? 0, $prevTotals['conversions'] ?? 0),
+        'roas' => $pctChange($totalsInput['roas'] ?? 0, $prevTotals['roas'] ?? 0),
+        'cpa' => $pctChange($totalsInput['cpa'] ?? 0, $prevTotals['cpa'] ?? 0),
+        'aov' => $pctChange($totalsInput['aov'] ?? 0, $prevTotals['aov'] ?? 0),
+    ];
+    $reportData['comparisons'] = $comparisons;
+    
+    $reportDataJson = json_encode($reportData);
+    
+    // Update reports table
+    dbRun('UPDATE reports SET total_spend=?, total_conversions=?, total_revenue=?, overall_cpa=?, overall_roas=?, overall_aov=?, report_data=? WHERE id=?',
+        [
+            $totalsInput['spend'] ?? 0,
+            $totalsInput['conversions'] ?? 0,
+            $totalsInput['revenue'] ?? 0,
+            $totalsInput['cpa'] ?? 0,
+            $totalsInput['roas'] ?? 0,
+            $totalsInput['aov'] ?? 0,
+            $reportDataJson,
+            $reportId
+        ]);
+        
+    // Also store manual override in report_manual_data table
+    dbRun('INSERT INTO report_manual_data (report_id, channels_json, totals_json) VALUES (?,?,?) 
+           ON DUPLICATE KEY UPDATE channels_json=VALUES(channels_json), totals_json=VALUES(totals_json)',
+        [
+            $reportId,
+            json_encode($channelsInput),
+            json_encode($totalsInput)
+        ]);
+        
+    auditLog($user['id'], $user['name'], 'REPORT_EDIT', "{$report['brand_name']} - Report period: {$report['period_start']} to {$report['period_end']}");
+    
+    json_out(['ok' => true]);
 }
 
 // POST save notes overrides

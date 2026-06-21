@@ -6,7 +6,17 @@ $id     = $_GET['id'] ?? '';
 
 // GET /api/brands.php — list all brands
 if ($method === 'GET' && !$id) {
-    requirePage($user, 'dashboard');
+    // Allow if user has access to at least one valid page
+    $allowedPages = ['dashboard', 'strategy', 'pricing', 'budget', 'reports'];
+    $hasAccess = false;
+    foreach ($allowedPages as $ap) {
+        if ($user['role'] === 'superadmin' || in_array($ap, $user['pages'])) {
+            $hasAccess = true;
+            break;
+        }
+    }
+    if (!$hasAccess) json_err('Access denied', 403);
+
     $brands = dbAll('SELECT b.id, b.slug, b.name, b.industry, b.platform, b.channels_config,
         (SELECT COUNT(*) FROM pricing_products WHERE brand_id = b.id) AS product_count,
         (SELECT COUNT(*) FROM strategy_generations WHERE brand_id = b.id) AS generation_count

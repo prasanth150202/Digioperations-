@@ -4251,6 +4251,9 @@ function renderActivityPageLogs(logs) {
 // ─── REPORTS GENERATOR PAGE ──────────────────────────────────────────────────
 let reportsChartSpend = null;
 let reportsChartRevenue = null;
+let reportsChartEfficiency = null;
+let reportsChartRadar = null;
+let reportsChartFunnel = null;
 let activeReportId = null;
 
 async function initReportsPage() {
@@ -4537,25 +4540,40 @@ async function loadReportDetails(reportId) {
     const untappedChannels = {};
     
     Object.entries(data.channels || {}).forEach(([ch, m]) => {
-      if ((m.spend && parseFloat(m.spend) > 0) || (m.sales && parseFloat(m.sales) > 0) || (m.conversions && parseInt(m.conversions) > 0)) {
+      const revVal = parseFloat(m.revenue || m.sales) || 0;
+      if ((m.spend && parseFloat(m.spend) > 0) || revVal > 0 || (m.conversions && parseInt(m.conversions) > 0)) {
         activeChannels[ch] = m;
       } else {
         untappedChannels[ch] = m;
       }
     });
 
+    // Populate brand chip in detail header
+    const brandPill = document.getElementById('rep-detail-brand-pill');
+    if (brandPill) brandPill.textContent = r.brand_name || '';
+
     const tbody = document.getElementById('rep-channel-tbody');
-    tbody.innerHTML = Object.entries(activeChannels).map(([ch, m]) => `
+    tbody.innerHTML = Object.entries(activeChannels).map(([ch, m]) => {
+      const spend   = parseFloat(m.spend) || 0;
+      const revenue = parseFloat(m.revenue || m.sales) || 0;
+      const orders  = parseInt(m.conversions) || 0;
+      const roas    = parseFloat(m.roas) || (spend > 0 ? (revenue / spend) : 0);
+      const cpa     = parseFloat(m.cpa) || (orders > 0 ? (spend / orders) : 0);
+      const aov     = orders > 0 ? Math.round(revenue / orders) : 0;
+      const ctr     = parseFloat(m.ctr) || 0;
+      return `
       <tr>
         <td style="font-weight:700;text-transform:capitalize">${ch}</td>
-        <td style="font-family:var(--fm)">₹${parseFloat(m.spend).toLocaleString('en-IN')}</td>
-        <td style="font-family:var(--fm)">${m.conversions}</td>
-        <td style="font-family:var(--fm)">₹${parseFloat(m.revenue).toLocaleString('en-IN')}</td>
-        <td style="font-family:var(--fm)">₹${parseFloat(m.cpa).toLocaleString('en-IN')}</td>
-        <td style="font-family:var(--fm);font-weight:700">${m.roas}x</td>
-        <td style="font-family:var(--fm)">${m.ctr}%</td>
+        <td style="font-family:var(--fm)">₹${spend.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm)">${orders.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm)">₹${revenue.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm)">₹${Math.round(cpa).toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm)">₹${aov.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm);font-weight:700">${roas.toFixed(2)}x</td>
+        <td style="font-family:var(--fm)">${ctr}%</td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
     
     const untappedContainer = document.getElementById('rep-untapped-container');
     if (untappedContainer) {
@@ -4572,18 +4590,20 @@ async function loadReportDetails(reportId) {
       }
     }
     
-    // Draw charts
-    setTimeout(() => renderReportCharts(activeChannels), 100);
+    // Draw charts - double requestAnimationFrame ensures DOM is painted before Chart.js draws
+    requestAnimationFrame(() => requestAnimationFrame(() =>
+      renderReportCharts(activeChannels, data.totals || {})
+    ));
     
   } catch (e) {
     alert('Failed to load report: ' + e.message);
   }
 }
 
-function renderReportCharts(channels) {
+function renderReportCharts(channels, totals) {
   const labels = Object.keys(channels).map(c => c.charAt(0).toUpperCase() + c.slice(1));
   const spendData = Object.values(channels).map(c => c.spend);
-  const revenueData = Object.values(channels).map(c => c.revenue);
+  const revenueData = Object.values(channels).map(c => parseFloat(c.revenue || c.sales) || 0);
   
   const colors = ['#2B4EFF', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
   
@@ -4686,32 +4706,77 @@ function renderReportCharts(channels) {
 
   // Conversion Funnel
   const ctxFunnel = document.getElementById('rep-funnel-chart').getContext('2d');
-  const impData = Object.values(channels).map(c => c.impressions || 0);
-  const clkData = Object.values(channels).map(c => c.clicks || 0);
-  const convData = Object.values(channels).map(c => c.conversions || 0);
-  
-  reportsChartFunnel = new Chart(ctxFunnel, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: 'Impressions', data: impData, backgroundColor: 'rgba(43, 78, 255, 0.8)' },
-        { label: 'Clicks', data: clkData, backgroundColor: 'rgba(139, 92, 246, 0.8)' },
-        { label: 'Orders', data: convData, backgroundColor: 'rgba(16, 185, 129, 0.8)' }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales: {
-        y: { type: 'logarithmic', grid: { color: 'rgba(255,255,255,0.05)' } },
-        x: { grid: { color: 'rgba(255,255,255,0.05)' } }
+  const imp = totals ? (totals.impressions || 0) : 0;
+  const clk = totals ? (totals.clicks || 0) : 0;
+  const conv = totals ? (totals.conversions || 0) : 0;
+
+  const funnelContainer = document.getElementById('rep-funnel-chart-container');
+  if (imp <= 0 || clk <= 0 || conv <= 0) {
+    if (funnelContainer) funnelContainer.style.display = 'none';
+  } else {
+    if (funnelContainer) funnelContainer.style.display = 'block';
+    const funnelData = [
+      [-imp / 2, imp / 2],
+      [-clk / 2, clk / 2],
+      [-conv / 2, conv / 2]
+    ];
+    
+    reportsChartFunnel = new Chart(ctxFunnel, {
+      type: 'bar',
+      data: {
+        labels: ['Impressions', 'Clicks', 'Orders'],
+        datasets: [{
+          label: 'Conversion Journey',
+          data: funnelData,
+          backgroundColor: [
+            'rgba(43, 78, 255, 0.8)',
+            'rgba(139, 92, 246, 0.8)',
+            'rgba(16, 185, 129, 0.8)'
+          ],
+          borderColor: [
+            '#2B4EFF',
+            '#8b5cf6',
+            '#10B981'
+          ],
+          borderWidth: 1,
+          barPercentage: 0.6
+        }]
       },
-      plugins: {
-        legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
-        tooltip: { callbacks: { label: function(context) { return context.dataset.label + ': ' + context.raw.toLocaleString(); } } }
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            display: false,
+            grid: { display: false }
+          },
+          y: {
+            grid: { display: false },
+            ticks: { color: '#9ca3af', font: { family: 'Plus Jakarta Sans', weight: 'bold' } }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const val = context.raw;
+                const absVal = Math.round(val[1] - val[0]);
+                let rate = '';
+                if (context.dataIndex === 1 && imp > 0) {
+                  rate = ` (CTR: ${((absVal / imp) * 100).toFixed(2)}%)`;
+                } else if (context.dataIndex === 2 && clk > 0) {
+                  rate = ` (CVR: ${((absVal / clk) * 100).toFixed(2)}%)`;
+                }
+                return context.label + ': ' + absVal.toLocaleString() + rate;
+              }
+            }
+          }
+        }
       }
-    }
-  });
+    });
+  }
 }
 
 async function saveReportNotes() {
@@ -4767,6 +4832,192 @@ async function deleteReport(reportId) {
     }
   } catch (e) {
     alert('Failed to delete report: ' + e.message);
+  }
+}
+
+let currentEditReportData = null;
+
+async function openEditReportDataModal() {
+  if (!activeReportId) return;
+  try {
+    const r = await api(`/api/reports?action=view&id=${activeReportId}`);
+    if (!r) return;
+    
+    currentEditReportData = r;
+    const data = r.report_data;
+    const channels = data.channels || {};
+    
+    const container = document.getElementById('edit-report-channels-container');
+    container.innerHTML = '';
+    
+    // Add existing report channels
+    Object.entries(channels).forEach(([chName, metrics]) => {
+      const rowHtml = createEditChannelRow(chName, metrics);
+      container.insertAdjacentHTML('beforeend', rowHtml);
+    });
+    
+    // Also add configured brand channels if they aren't already added
+    const brandChannels = (activeBrand.channels_config && Array.isArray(activeBrand.channels_config)) 
+      ? activeBrand.channels_config 
+      : ['meta', 'google'];
+      
+    brandChannels.forEach(chName => {
+      if (!channels[chName]) {
+        const rowHtml = createEditChannelRow(chName, { spend: 0, revenue: 0, conversions: 0, clicks: 0, impressions: 0 });
+        container.insertAdjacentHTML('beforeend', rowHtml);
+      }
+    });
+    
+    openMo('mo-edit-report-data');
+  } catch (e) {
+    alert("Failed to load report data: " + e.message);
+  }
+}
+
+function createEditChannelRow(chName, m) {
+  const spend = parseFloat(m.spend) || 0;
+  const revenue = parseFloat(m.revenue) || 0;
+  const conversions = parseInt(m.conversions) || 0;
+  const clicks = parseInt(m.clicks) || 0;
+  const impressions = parseInt(m.impressions) || 0;
+  
+  const roas = spend > 0 ? (revenue / spend).toFixed(2) : '0.00';
+  const cpa = conversions > 0 ? Math.round(spend / conversions) : 0;
+  const aov = conversions > 0 ? Math.round(revenue / conversions) : 0;
+
+  return `
+    <div class="edit-channel-card" data-edit-channel="${chName}" style="background:var(--off);padding:12px;border-radius:8px;border:1px solid var(--border);margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-weight:700;text-transform:capitalize;font-size:12px;color:var(--dark)">${chName}</span>
+        <button class="btn sm danger" onclick="this.closest('.edit-channel-card').remove()" style="padding:2px 6px;font-size:10px">Remove</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:8px">
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:9px;margin-bottom:2px">Spend (₹)</label>
+          <input type="number" class="ch-edit-spend" value="${spend}" style="padding:4px;height:28px;font-size:11px" oninput="recalculateEditRowMetrics('${chName}')">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:9px;margin-bottom:2px">Revenue (₹)</label>
+          <input type="number" class="ch-edit-revenue" value="${revenue}" style="padding:4px;height:28px;font-size:11px" oninput="recalculateEditRowMetrics('${chName}')">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:9px;margin-bottom:2px">Orders</label>
+          <input type="number" class="ch-edit-orders" value="${conversions}" style="padding:4px;height:28px;font-size:11px" oninput="recalculateEditRowMetrics('${chName}')">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:9px;margin-bottom:2px">Clicks</label>
+          <input type="number" class="ch-edit-clicks" value="${clicks}" style="padding:4px;height:28px;font-size:11px">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:9px;margin-bottom:2px">Impressions</label>
+          <input type="number" class="ch-edit-impressions" value="${impressions}" style="padding:4px;height:28px;font-size:11px">
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:8px;font-size:10px;color:var(--mid)">
+        <span>ROAS: <strong class="ch-edit-roas-lbl">${roas}x</strong></span>
+        <span>CPA: <strong class="ch-edit-cpa-lbl">₹${cpa.toLocaleString('en-IN')}</strong></span>
+        <span>AOV: <strong class="ch-edit-aov-lbl">₹${aov.toLocaleString('en-IN')}</strong></span>
+      </div>
+    </div>
+  `;
+}
+
+function recalculateEditRowMetrics(chName) {
+  const row = document.querySelector(`[data-edit-channel="${chName}"]`);
+  if (!row) return;
+  const spend = parseFloat(row.querySelector('.ch-edit-spend').value) || 0;
+  const revenue = parseFloat(row.querySelector('.ch-edit-revenue').value) || 0;
+  const orders = parseInt(row.querySelector('.ch-edit-orders').value) || 0;
+  
+  const roas = spend > 0 ? (revenue / spend).toFixed(2) : '0.00';
+  const cpa = orders > 0 ? Math.round(spend / orders) : 0;
+  const aov = orders > 0 ? Math.round(revenue / orders) : 0;
+  
+  row.querySelector('.ch-edit-roas-lbl').textContent = `${roas}x`;
+  row.querySelector('.ch-edit-cpa-lbl').textContent = `₹${cpa.toLocaleString('en-IN')}`;
+  row.querySelector('.ch-edit-aov-lbl').textContent = `₹${aov.toLocaleString('en-IN')}`;
+}
+
+function addChannelToEditModal() {
+  const chNameRaw = prompt("Enter new channel name (e.g. flipkart, amazon, pinterest):");
+  if (!chNameRaw) return;
+  const chName = chNameRaw.trim().toLowerCase();
+  if (!chName) return;
+  
+  if (document.querySelector(`[data-edit-channel="${chName}"]`)) {
+    return alert("Channel already exists!");
+  }
+  
+  const container = document.getElementById('edit-report-channels-container');
+  const rowHtml = createEditChannelRow(chName, { spend: 0, revenue: 0, conversions: 0, clicks: 0, impressions: 0 });
+  container.insertAdjacentHTML('beforeend', rowHtml);
+}
+
+async function submitEditReportData() {
+  if (!activeReportId || !currentEditReportData) return;
+  
+  const cards = document.querySelectorAll('.edit-channel-card');
+  const updatedChannels = {};
+  
+  let totalSpend = 0;
+  let totalRevenue = 0;
+  let totalConversions = 0;
+  let totalClicks = 0;
+  let totalImpressions = 0;
+  
+  cards.forEach(card => {
+    const chName = card.dataset.editChannel;
+    const spend = parseFloat(card.querySelector('.ch-edit-spend').value) || 0;
+    const revenue = parseFloat(card.querySelector('.ch-edit-revenue').value) || 0;
+    const conversions = parseInt(card.querySelector('.ch-edit-orders').value) || 0;
+    const clicks = parseInt(card.querySelector('.ch-edit-clicks').value) || 0;
+    const impressions = parseInt(card.querySelector('.ch-edit-impressions').value) || 0;
+    
+    if (spend > 0 || revenue > 0 || conversions > 0 || clicks > 0 || impressions > 0) {
+      updatedChannels[chName] = {
+        spend,
+        revenue,
+        conversions,
+        clicks,
+        impressions,
+        roas: spend > 0 ? parseFloat((revenue / spend).toFixed(2)) : 0.0,
+        cpa: conversions > 0 ? parseFloat((spend / conversions).toFixed(2)) : 0.0,
+        ctr: impressions > 0 ? parseFloat(((clicks / impressions) * 100).toFixed(2)) : 0.0
+      };
+      
+      totalSpend += spend;
+      totalRevenue += revenue;
+      totalConversions += conversions;
+      totalClicks += clicks;
+      totalImpressions += impressions;
+    }
+  });
+  
+  const updatedTotals = {
+    spend: totalSpend,
+    revenue: totalRevenue,
+    conversions: totalConversions,
+    clicks: totalClicks,
+    impressions: totalImpressions,
+    roas: totalSpend > 0 ? parseFloat((totalRevenue / totalSpend).toFixed(2)) : 0.0,
+    cpa: totalConversions > 0 ? parseFloat((totalSpend / totalConversions).toFixed(2)) : 0.0,
+    aov: totalConversions > 0 ? parseFloat((totalRevenue / totalConversions).toFixed(2)) : 0.0
+  };
+  
+  try {
+    const r = await api('/api/reports?action=update_data', 'POST', {
+      report_id: activeReportId,
+      channels: updatedChannels,
+      totals: updatedTotals
+    });
+    
+    if (r && r.ok) {
+      closeMo('mo-edit-report-data');
+      showToast('Report performance data updated successfully!', 'success');
+      loadReportDetails(activeReportId);
+    }
+  } catch (e) {
+    alert('Failed to update report data: ' + e.message);
   }
 }
 
