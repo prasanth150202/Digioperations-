@@ -96,11 +96,10 @@ function db(): PDO {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
         } catch (Throwable $migrationErr) {}
 
-        // Self-healing migrations for missing columns in budget tables
         try {
             $cols = $pdo->query("SHOW COLUMNS FROM `brands` LIKE 'channels_config'")->fetchAll();
             if (empty($cols)) {
-                $pdo->exec("ALTER TABLE `brands` ADD COLUMN `channels_config` TEXT DEFAULT NULL AFTER `user_id`");
+                $pdo->exec("ALTER TABLE `brands` ADD COLUMN `channels_config` TEXT DEFAULT NULL");
             }
         } catch (Throwable $migrationErr) {}
 
