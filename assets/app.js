@@ -1746,54 +1746,90 @@ function cleanPrice(r) {
 }
 
 function calcVariant(v, p, globals) {
-  const { brand=30, photo=15, ship=70, ops=25, gw=0, rto=5, roas=3, discType='pct', disc=0 } = globals;
-  const mfgPc = (v.mfgO != null) ? v.mfgO : p.mfg_per_pc;
-  const qty   = p.variant_type === 'bundle' ? (v.qty || 1) : 1;
+  const {
+    brand=30, photo=15, pack=20, ship=70, ops=25, gw=0,
+    rto=5, roas=3, cod_rate=50, cod_fee=35, pg_fee=1.8,
+    discType='pct', disc=0
+  } = globals;
+
+  const mfgPc  = (v.mfgO  != null) ? v.mfgO  : p.mfg_per_pc;
+  const packPc = (v.packO != null) ? v.packO : pack;
+  const qty    = p.variant_type === 'bundle' ? (v.qty || 1) : 1;
   const extras = (p.extras || []).reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
-  
-  let base  = mfgPc * qty + brand + photo + ship + ops + extras;
-  
-  // Apply all dynamic global extra charges
+
+  // Variable costs — lost/incurred on every shipment and on RTO returns
+  let varCost = mfgPc * qty + packPc + ship + ops + extras;
+
+  // Apply global extra charges to variable cost base
   const extraCharges = Array.isArray(globals.extra_charges) ? globals.extra_charges : [];
   extraCharges.forEach(charge => {
     const amt = parseFloat(charge.amount) || 0;
-    if (charge.type === 'pct') {
-      base = base * (1 + (amt / 100));
-    } else {
-      base = base + amt;
-    }
+    if (charge.type === 'pct') varCost = varCost * (1 + amt / 100);
+    else varCost = varCost + amt;
   });
-  
-  const mult  = rto > 0 ? 1 / (1 - rto / 100) : 1;
-  const adjC  = base * mult;
-  
-  // Exclusive Flat or Percentage Discount conversion
-  const discF = discType === 'pct' ? disc / 100 : 0;
+
+  // Fixed/amortised costs — already paid regardless of RTO returns
+  const fixCost = brand + photo;
+
+  // RTO multiplier applies only to variable costs (not branding/photography)
+  const mult = rto > 0 ? 1 / (1 - rto / 100) : 1;
+  const adjC = fixCost + varCost * mult;
+
+  // COD average cost per order: (% of orders on COD) × (COD remittance fee)
+  const codCost = (cod_rate / 100) * cod_fee;
+
+  const discF    = discType === 'pct' ? disc / 100 : 0;
   const discFlat = discType === 'flat' ? disc : 0;
-  
-  // Breakeven ROAS Math with Flat Gift Wrap cost and Pct or Flat Discount
-  const denom = 1 - (1 / roas);
-  const minEff = denom > 0 ? (adjC + gw) / denom : (adjC + gw) * 4;
+
+  // Minimum effective selling price so net profit after ads ≥ 0:
+  //   netProfit = effS*(1 - pg_fee/100 - 1/roas) - adjC - codCost - gw ≥ 0
+  const denom = 1 - (1 / roas) - (pg_fee / 100);
+  const totalBaseCost = adjC + codCost + gw;
+  const minEff = denom > 0 ? totalBaseCost / denom : totalBaseCost * 4;
   const minRaw = (1 - discF) > 0 ? (minEff + discFlat) / (1 - discF) : (minEff + discFlat);
-  
+
   const selling = v.sellingO != null ? parseFloat(v.sellingO) : cleanPrice(minRaw);
-  const effS  = selling * (1 - discF) - discFlat;
-  const effC  = adjC + gw;
-  const profit = effS - effC;
-  const margin = effS > 0 ? profit / effS : 0;
-  const roasCalc = profit > 0 ? effS / profit : 0;
-  const comp  = v.compO != null ? parseFloat(v.compO) : cleanPrice(selling * 1.5);
-  
-  return { adjC, effS, selling, comp, profit, margin, roas: roasCalc };
+  const effS    = selling * (1 - discF) - discFlat;
+
+  // Revenue deductions (% of revenue)
+  const pgCost = effS * (pg_fee / 100);
+
+  // Gross profit: revenue minus production/logistics cost, before COD/PG/ad spend
+  const grossProfit = effS - adjC - gw;
+
+  // Total effective cost including COD and PG fees
+  const effC = adjC + gw + codCost + pgCost;
+
+  // Ad spend implied at target ROAS (revenue ÷ ROAS = what you can spend on ads)
+  const adSpend = effS / roas;
+
+  // Net profit: what you actually keep after all costs and ad spend
+  const netProfit = effS - effC - adSpend;
+
+  const margin    = effS > 0 ? grossProfit / effS : 0;
+  const netMargin = effS > 0 ? netProfit   / effS : 0;
+  const roasCalc  = grossProfit > 0 ? effS / grossProfit : 0;
+  const comp = v.compO != null ? parseFloat(v.compO) : cleanPrice(selling * 1.5);
+
+  return {
+    adjC, effC, effS, selling, comp,
+    grossProfit, profit: grossProfit,
+    netProfit, netMargin, margin,
+    roas: roasCalc, adSpend, pgCost, codCost
+  };
 }
 
 function gv(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
 function getGlobals() {
-  return { brand:gv('g-brand'), photo:gv('g-photo'), ship:gv('g-ship'), ops:gv('g-ops'),
-           gw:gv('g-gw'), rto:gv('g-rto'), roas:gv('g-roas'),
-           discType: document.getElementById('g-disc-type')?.value || 'pct',
-           disc:gv('g-disc'),
-           extra_charges: globalExtras };
+  return {
+    brand:gv('g-brand'), photo:gv('g-photo'), pack:gv('g-pack'),
+    ship:gv('g-ship'),   ops:gv('g-ops'),     gw:gv('g-gw'),
+    rto:gv('g-rto'),     roas:gv('g-roas'),
+    cod_rate:gv('g-cod-rate'), cod_fee:gv('g-cod-fee'), pg_fee:gv('g-pg-fee'),
+    discType: document.getElementById('g-disc-type')?.value || 'pct',
+    disc:gv('g-disc'),
+    extra_charges: globalExtras
+  };
 }
 
 function renderPricingBrands() {
@@ -1874,9 +1910,10 @@ async function loadBrandProducts() {
   
   // Restore saved globals into the input fields
   const sv = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
-  sv('g-brand', g.brand); sv('g-photo', g.photo); sv('g-ship', g.ship);
-  sv('g-ops',   g.ops);   sv('g-gw',   g.gw);    sv('g-rto',  g.rto);
-  sv('g-roas',  g.roas);  sv('g-disc', g.disc);
+  sv('g-brand', g.brand); sv('g-photo', g.photo); sv('g-pack', g.pack);
+  sv('g-ship',  g.ship);  sv('g-ops',  g.ops);   sv('g-gw',   g.gw);
+  sv('g-rto',   g.rto);   sv('g-roas', g.roas);  sv('g-disc', g.disc);
+  sv('g-cod-rate', g.cod_rate); sv('g-cod-fee', g.cod_fee); sv('g-pg-fee', g.pg_fee);
   if (document.getElementById('g-disc-type') && g.discType != null) {
     document.getElementById('g-disc-type').value = g.discType;
   }
@@ -1892,7 +1929,7 @@ function renderAll() {
   let totalVars = 0, totalMargin = 0, totalROAS = 0;
 
   // Disable global inputs for standard executionist users
-  const inputs = ['g-brand','g-photo','g-ship','g-ops','g-gw','g-rto','g-roas','g-disc-type','g-disc'];
+  const inputs = ['g-brand','g-photo','g-pack','g-ship','g-ops','g-gw','g-rto','g-roas','g-cod-rate','g-cod-fee','g-pg-fee','g-disc-type','g-disc'];
   inputs.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = !canEdit;
@@ -1903,9 +1940,9 @@ function renderAll() {
   if (gc) gc.style.display = pricingViewMode === 'std' ? 'none' : 'block';
   
   const isAdv = pricingViewMode === 'adv';
-  const tableHeaders = isAdv 
-    ? `<tr><th>Variant</th><th>Mfg Cost/pc</th><th>Total Cost</th><th>Selling Price</th><th>Margin</th><th>ROAS</th><th>Comp Price</th>${canEdit?'<th></th>':''}</tr>`
-    : `<tr><th>Variant</th><th>Mfg Cost/pc</th><th>Selling Price</th><th>Margin</th><th>Net Profit</th>${canEdit?'<th></th>':''}</tr>`;
+  const tableHeaders = isAdv
+    ? `<tr><th>Variant</th><th>Mfg/pc</th><th>Pack/pc</th><th>Total Cost</th><th>Selling</th><th>Gross</th><th>Net Profit</th><th>Comp</th>${canEdit?'<th></th>':''}</tr>`
+    : `<tr><th>Variant</th><th>Mfg/pc</th><th>Pack/pc</th><th>Selling</th><th>Gross Margin</th><th>Net Profit</th>${canEdit?'<th></th>':''}</tr>`;
 
   document.getElementById('products-container').innerHTML = prods.map(p => {
     let rows = (p.variants || []).map(v => {
@@ -1915,32 +1952,41 @@ function renderAll() {
       const mColor = r.margin >= 0.35 ? 'var(--green)' : r.margin >= 0.25 ? 'var(--amber)' : 'var(--red)';
       
       const mfgInput = canEdit
-        ? `<input type="text" inputmode="decimal" value="${v.mfgO != null ? v.mfgO : p.mfg_per_pc}" style="width:75px${v.mfgO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','mfgO',this.value)">`
+        ? `<input type="text" inputmode="decimal" value="${v.mfgO != null ? v.mfgO : p.mfg_per_pc}" style="width:65px${v.mfgO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','mfgO',this.value)">`
         : `<span style="font-family:var(--fm)">₹${v.mfgO != null ? v.mfgO : p.mfg_per_pc}</span>`;
 
+      const packDefault = globals.pack || 20;
+      const packInput = canEdit
+        ? `<input type="text" inputmode="decimal" value="${v.packO != null ? v.packO : packDefault}" style="width:55px${v.packO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','packO',this.value)">`
+        : `<span style="font-family:var(--fm)">₹${v.packO != null ? v.packO : packDefault}</span>`;
+
       const sellingInput = canEdit
-        ? `<input type="text" inputmode="decimal" value="${v.sellingO != null ? v.sellingO : r.selling}" style="width:75px${v.sellingO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','sellingO',this.value)">`
+        ? `<input type="text" inputmode="decimal" value="${v.sellingO != null ? v.sellingO : r.selling}" style="width:65px${v.sellingO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','sellingO',this.value)">`
         : `<span class="pill ${mc}">₹${r.selling.toLocaleString('en-IN')}</span>`;
 
       const compInput = canEdit
-        ? `<input type="text" inputmode="decimal" value="${v.compO != null ? v.compO : r.comp.toFixed(0)}" style="width:75px${v.compO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','compO',this.value)">`
+        ? `<input type="text" inputmode="decimal" value="${v.compO != null ? v.compO : r.comp.toFixed(0)}" style="width:65px${v.compO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','compO',this.value)">`
         : `<span style="font-family:var(--fm);color:var(--mid)">₹${r.comp.toLocaleString('en-IN')}</span>`;
 
+      const netColor = r.netProfit > 0 ? 'var(--green)' : 'var(--red)';
+
       return isAdv ? `<tr>
-        <td>${canEdit ? `<input value="${v.name||''}" style="width:90px" onchange="setVF('${p.id}','${v.id}','name',this.value)">` : `<span style="font-family:var(--fm)">${v.name}</span>`}</td>
+        <td>${canEdit ? `<input value="${v.name||''}" style="width:85px" onchange="setVF('${p.id}','${v.id}','name',this.value)">` : `<span style="font-family:var(--fm)">${v.name}</span>`}</td>
         <td>${mfgInput}</td>
+        <td>${packInput}</td>
         <td style="font-family:var(--fm);color:var(--mid)">₹${r.adjC.toFixed(0)}</td>
         <td>${sellingInput}</td>
         <td><span class="pill ${mc}">${(r.margin*100).toFixed(1)}%</span></td>
-        <td style="font-family:var(--fm)">${r.roas.toFixed(1)}x</td>
+        <td style="font-family:var(--fm);font-weight:600;color:${netColor}">₹${r.netProfit.toFixed(0)}</td>
         <td>${compInput}</td>
         ${canEdit ? `<td><button class="btn sm danger" onclick="removeVariant('${p.id}','${v.id}')">✕</button></td>` : ''}
       </tr>` : `<tr>
-        <td>${canEdit ? `<input value="${v.name||''}" style="width:105px" onchange="setVF('${p.id}','${v.id}','name',this.value)">` : `<span style="font-family:var(--fm)">${v.name}</span>`}</td>
+        <td>${canEdit ? `<input value="${v.name||''}" style="width:90px" onchange="setVF('${p.id}','${v.id}','name',this.value)">` : `<span style="font-family:var(--fm)">${v.name}</span>`}</td>
         <td>${mfgInput}</td>
+        <td>${packInput}</td>
         <td>${sellingInput}</td>
         <td><span class="pill ${mc}">${(r.margin*100).toFixed(1)}%</span></td>
-        <td style="font-family:var(--fm);font-weight:600;color:${mColor}">₹${r.profit.toFixed(0)}</td>
+        <td style="font-family:var(--fm);font-weight:600;color:${netColor}">₹${r.netProfit.toFixed(0)}</td>
         ${canEdit ? `<td><button class="btn sm danger" onclick="removeVariant('${p.id}','${v.id}')">✕</button></td>` : ''}
       </tr>`;
     }).join('');
@@ -1978,7 +2024,7 @@ function renderAll() {
 function setVF(pid, vid, k, val) {
   const p = prods.find(p => p.id === pid); if (!p) return;
   const v = p.variants.find(v => v.id === vid); if (!v) return;
-  if (k === 'mfgO' || k === 'sellingO' || k === 'compO') {
+  if (k === 'mfgO' || k === 'packO' || k === 'sellingO' || k === 'compO') {
     v[k] = val === '' ? null : parseFloat(val) || 0;
   } else {
     v[k] = val;
@@ -1988,7 +2034,7 @@ function setVF(pid, vid, k, val) {
 function setProdName(pid, name) { const p = prods.find(p => p.id === pid); if (p) p.name = name; deferPricingSave(); }
 function addVariant(pid) {
   const p = prods.find(p => p.id === pid); if (!p) return;
-  p.variants.push({ id: 'v' + Date.now(), name: 'New Variant', qty: 1, mfgO: null, compO: null });
+  p.variants.push({ id: 'v' + Date.now(), name: 'New Variant', qty: 1, mfgO: null, packO: null, compO: null });
   renderAll(); deferPricingSave();
 }
 function removeVariant(pid, vid) {
@@ -2091,14 +2137,17 @@ async function executePricingSave(chip) {
       return {
         ...v,
         // Persist all display values so the catalogue reads them directly — no recalculation
-        sellingO: v.sellingO != null ? parseFloat(v.sellingO) : null,
-        selling:  calc.selling,
-        comp:     v.compO != null ? parseFloat(v.compO) : calc.comp,
-        compO:    v.compO != null ? parseFloat(v.compO) : null,
-        adjC:     calc.adjC,
-        margin:   calc.margin,
-        profit:   calc.profit,
-        roas:     calc.roas,
+        sellingO:  v.sellingO  != null ? parseFloat(v.sellingO)  : null,
+        packO:     v.packO     != null ? parseFloat(v.packO)     : null,
+        selling:   calc.selling,
+        comp:      v.compO != null ? parseFloat(v.compO) : calc.comp,
+        compO:     v.compO != null ? parseFloat(v.compO) : null,
+        adjC:      calc.adjC,
+        margin:    calc.margin,
+        profit:    calc.grossProfit,
+        netProfit: calc.netProfit,
+        netMargin: calc.netMargin,
+        roas:      calc.roas,
       };
     }),
     extras_json: p.extras || [],
@@ -2153,13 +2202,13 @@ function exportExcel() {
   if (!activeBrand || !prods.length) return alert('No products to export');
   const data = [];
   // Build header
-  data.push(['Product Name', 'Variant', 'Qty', 'Selling Price', 'Profit', 'Margin %', 'ROAS']);
-  
+  data.push(['Product Name', 'Variant', 'Qty', 'Selling Price', 'Adj Cost', 'Gross Profit', 'Gross Margin %', 'Net Profit (After Ads)', 'Net Margin %']);
+
   const globals = getGlobals();
   prods.forEach(p => {
     p.variants.forEach(v => {
       const res = calcVariant(v, p, globals);
-      data.push([p.name, v.name, v.qty, res.selling, res.profit, (res.margin * 100).toFixed(1), res.roas.toFixed(1)]);
+      data.push([p.name, v.name, v.qty, res.selling, res.adjC.toFixed(0), res.grossProfit.toFixed(0), (res.margin * 100).toFixed(1), res.netProfit.toFixed(0), (res.netMargin * 100).toFixed(1)]);
     });
   });
 
@@ -3851,36 +3900,39 @@ async function openBrandCatalog(id) {
       // --- Pre-compute all display values here, once ---
       // Priority 1: use fields saved directly into the DB by the calculator
       // Priority 2: fall back to calcVariant with saved globals (legacy data)
-      let selling, comp, margin, profit, adjC;
+      let selling, comp, margin, profit, netProfit, adjC;
 
       const hasSavedSelling = (v.selling != null && v.selling !== 0) || (v.sellingO != null);
 
       if (hasSavedSelling) {
         // Use saved values — the calculator already computed and stored these
-        selling = parseFloat(v.selling || v.sellingO);
-        comp    = v.compO != null ? parseFloat(v.compO) : (v.comp != null ? parseFloat(v.comp) : selling * 1.5);
-        margin  = (v.margin != null) ? parseFloat(v.margin) : 0;
-        profit  = (v.profit != null) ? parseFloat(v.profit) : 0;
-        adjC    = (v.adjC  != null) ? parseFloat(v.adjC)  : 0;
+        selling   = parseFloat(v.selling || v.sellingO);
+        comp      = v.compO != null ? parseFloat(v.compO) : (v.comp != null ? parseFloat(v.comp) : selling * 1.5);
+        margin    = (v.margin    != null) ? parseFloat(v.margin)    : 0;
+        profit    = (v.profit    != null) ? parseFloat(v.profit)    : 0;
+        netProfit = (v.netProfit != null) ? parseFloat(v.netProfit) : profit;
+        adjC      = (v.adjC     != null) ? parseFloat(v.adjC)      : 0;
       } else {
         // Legacy: no saved price — fall back to calcVariant with saved globals
         const fallbackP = { ...p, extras };
         const fallbackV = { ...v, sellingO: null, compO: null };
         const calc = calcVariant(fallbackV, fallbackP, savedGlobals);
-        selling = calc.selling;
-        comp    = calc.comp;
-        margin  = calc.margin;
-        profit  = calc.profit;
-        adjC    = calc.adjC;
+        selling   = calc.selling;
+        comp      = calc.comp;
+        margin    = calc.margin;
+        profit    = calc.grossProfit;
+        netProfit = calc.netProfit;
+        adjC      = calc.adjC;
       }
 
       return {
         ...v,
-        _selling: selling,
-        _comp:    comp,
-        _margin:  margin,
-        _profit:  profit,
-        _adjC:    adjC,
+        _selling:   selling,
+        _comp:      comp,
+        _margin:    margin,
+        _profit:    profit,
+        _netProfit: netProfit,
+        _adjC:      adjC,
       };
     }) : [];
 
@@ -3930,17 +3982,19 @@ function renderCatalogProducts() {
 
     const variantsHtml = p.variants.map(v => {
       // Read pre-computed values set in openBrandCatalog — no recalculation here
-      const selling = v._selling || 0;
-      const comp    = v._comp    || 0;
-      const margin  = v._margin  || 0;
-      const profit  = v._profit  || 0;
-      const adjC    = v._adjC    || 0;
+      const selling   = v._selling   || 0;
+      const comp      = v._comp      || 0;
+      const margin    = v._margin    || 0;
+      const profit    = v._profit    || 0;
+      const netProfit = v._netProfit != null ? v._netProfit : profit;
+      const adjC      = v._adjC      || 0;
 
       totalVars++;
       totalMargin += margin;
 
-      const mc     = margin >= 0.35 ? 'good' : margin >= 0.25 ? 'warn' : 'bad';
-      const mColor = margin >= 0.35 ? 'var(--green)' : margin >= 0.25 ? 'var(--amber)' : 'var(--red)';
+      const mc       = margin >= 0.35 ? 'good' : margin >= 0.25 ? 'warn' : 'bad';
+      const mColor   = margin >= 0.35 ? 'var(--green)' : margin >= 0.25 ? 'var(--amber)' : 'var(--red)';
+      const netColor = netProfit > 0 ? 'var(--green)' : 'var(--red)';
       const copyText = `${p.name} - ${v.name} | MRP: ₹${comp.toFixed(0)} | Selling Price: ₹${selling} | Gross Margin: ${(margin*100).toFixed(1)}%`;
 
       return `
@@ -3958,8 +4012,9 @@ function renderCatalogProducts() {
             <span class="pill ${mc}" style="font-size:10px;margin-left:auto">${(margin*100).toFixed(1)}% gross</span>
           </div>
           <div class="catalog-metrics">
-            <span class="catalog-metric-item">Adjusted Cost: <em>₹${adjC.toFixed(0)}</em></span>
-            <span class="catalog-metric-item">Net Profit: <em style="color:${mColor}">₹${profit.toFixed(0)}</em></span>
+            <span class="catalog-metric-item">Adj Cost: <em>₹${adjC.toFixed(0)}</em></span>
+            <span class="catalog-metric-item">Gross Profit: <em style="color:${mColor}">₹${profit.toFixed(0)}</em></span>
+            <span class="catalog-metric-item">Net (after ads): <em style="color:${netColor}">₹${netProfit.toFixed(0)}</em></span>
           </div>
         </div>`;
     }).join('');
