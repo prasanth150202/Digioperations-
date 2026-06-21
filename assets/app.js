@@ -4385,6 +4385,18 @@ async function submitGenerateReport() {
   generateBtn.textContent = 'Generating…';
   
   try {
+    // 0. Force check missing data if not rendered
+    const rCheck = await api(`/api/reports?action=check_missing&brand_id=${activeBrand.id}&start_date=${start}&end_date=${end}`);
+    if (rCheck && rCheck.missing && rCheck.missing.length > 0) {
+      const cards = document.querySelectorAll('.reports-missing-day-card');
+      if (cards.length === 0) {
+        await checkReportMissingData();
+        generateBtn.disabled = false;
+        generateBtn.textContent = 'Generate Report';
+        return alert('Missing data detected! Please fill in the highlighted fields or click Generate again to proceed with 0s.');
+      }
+    }
+    
     // 1. Gather and save missing data if forms exist
     const cards = document.querySelectorAll('.reports-missing-day-card');
     if (cards.length > 0) {
@@ -4501,8 +4513,19 @@ async function loadReportDetails(reportId) {
     document.getElementById('rep-share-link-input').value = shareUrl;
     
     // Populate Channel Table
+    const activeChannels = {};
+    const untappedChannels = {};
+    
+    Object.entries(data.channels || {}).forEach(([ch, m]) => {
+      if ((m.spend && parseFloat(m.spend) > 0) || (m.sales && parseFloat(m.sales) > 0) || (m.conversions && parseInt(m.conversions) > 0)) {
+        activeChannels[ch] = m;
+      } else {
+        untappedChannels[ch] = m;
+      }
+    });
+
     const tbody = document.getElementById('rep-channel-tbody');
-    tbody.innerHTML = Object.entries(data.channels || {}).map(([ch, m]) => `
+    tbody.innerHTML = Object.entries(activeChannels).map(([ch, m]) => `
       <tr>
         <td style="font-weight:700;text-transform:capitalize">${ch}</td>
         <td style="font-family:var(--fm)">₹${parseFloat(m.spend).toLocaleString('en-IN')}</td>
@@ -4514,8 +4537,23 @@ async function loadReportDetails(reportId) {
       </tr>
     `).join('');
     
+    const untappedContainer = document.getElementById('rep-untapped-container');
+    if (untappedContainer) {
+      if (Object.keys(untappedChannels).length > 0) {
+        untappedContainer.style.display = 'block';
+        untappedContainer.innerHTML = Object.keys(untappedChannels).map(ch => `
+          <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); padding:15px; border-radius:10px; margin-top:10px;">
+            <div style="color:var(--emerald); font-weight:700; text-transform:capitalize; margin-bottom:5px;">✨ ${ch} Ads</div>
+            <div style="color:var(--mid); font-size:13px;">No spend was allocated to ${ch} this period. Activating this channel could be a strong opportunity to scale reach and acquire net-new customers.</div>
+          </div>
+        `).join('');
+      } else {
+        untappedContainer.style.display = 'none';
+      }
+    }
+    
     // Draw charts
-    setTimeout(() => renderReportCharts(data.channels || {}), 100);
+    setTimeout(() => renderReportCharts(activeChannels), 100);
     
   } catch (e) {
     alert('Failed to load report: ' + e.message);
@@ -4531,6 +4569,9 @@ function renderReportCharts(channels) {
   
   if (reportsChartSpend) reportsChartSpend.destroy();
   if (reportsChartRevenue) reportsChartRevenue.destroy();
+  if (reportsChartEfficiency) reportsChartEfficiency.destroy();
+  if (reportsChartRadar) reportsChartRadar.destroy();
+  if (reportsChartFunnel) reportsChartFunnel.destroy();
   
   const ctxSpend = document.getElementById('rep-spend-chart').getContext('2d');
   reportsChartSpend = new Chart(ctxSpend, {
@@ -4548,10 +4589,7 @@ function renderReportCharts(channels) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: {
-          position: 'right',
-          labels: { boxWidth: 10, font: { size: 10 } }
-        }
+        legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } }
       }
     }
   });
@@ -4572,10 +4610,85 @@ function renderReportCharts(channels) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: {
-          position: 'right',
-          labels: { boxWidth: 10, font: { size: 10 } }
+        legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } }
+      }
+    }
+  });
+
+  // ROI & Efficiency (Horizontal Bar)
+  const ctxEff = document.getElementById('rep-efficiency-chart').getContext('2d');
+  const roasData = Object.values(channels).map(c => parseFloat(c.roas) || 0);
+  const cpaData = Object.values(channels).map(c => parseFloat(c.cpa) || 0);
+  reportsChartEfficiency = new Chart(ctxEff, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'ROAS', data: roasData, backgroundColor: 'rgba(16, 185, 129, 0.7)', yAxisID: 'y' },
+        { label: 'CPA (₹)', data: cpaData, backgroundColor: 'rgba(245, 158, 11, 0.7)', yAxisID: 'y1' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { type: 'linear', position: 'left', grid: { color: 'rgba(255,255,255,0.05)' } },
+        y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } },
+        x: { grid: { color: 'rgba(255,255,255,0.05)' } }
+      },
+      plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } }
+    }
+  });
+
+  // Spend vs Revenue Radar
+  const ctxRadar = document.getElementById('rep-radar-chart').getContext('2d');
+  reportsChartRadar = new Chart(ctxRadar, {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Spend', data: spendData, backgroundColor: 'rgba(43, 78, 255, 0.3)', borderColor: '#2B4EFF', borderWidth: 2 },
+        { label: 'Revenue', data: revenueData, backgroundColor: 'rgba(16, 185, 129, 0.3)', borderColor: '#10B981', borderWidth: 2 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        r: {
+          angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+          grid: { color: 'rgba(255, 255, 255, 0.1)' },
+          pointLabels: { color: '#9ca3af', font: { size: 10 } },
+          ticks: { display: false }
         }
+      },
+      plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } }
+    }
+  });
+
+  // Conversion Funnel
+  const ctxFunnel = document.getElementById('rep-funnel-chart').getContext('2d');
+  const impData = Object.values(channels).map(c => c.impressions || 0);
+  const clkData = Object.values(channels).map(c => c.clicks || 0);
+  const convData = Object.values(channels).map(c => c.conversions || 0);
+  
+  reportsChartFunnel = new Chart(ctxFunnel, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Impressions', data: impData, backgroundColor: 'rgba(43, 78, 255, 0.8)' },
+        { label: 'Clicks', data: clkData, backgroundColor: 'rgba(139, 92, 246, 0.8)' },
+        { label: 'Orders', data: convData, backgroundColor: 'rgba(16, 185, 129, 0.8)' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { type: 'logarithmic', grid: { color: 'rgba(255,255,255,0.05)' } },
+        x: { grid: { color: 'rgba(255,255,255,0.05)' } }
+      },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: { callbacks: { label: function(context) { return context.dataset.label + ': ' + context.raw.toLocaleString(); } } }
       }
     }
   });

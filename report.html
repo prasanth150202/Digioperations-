@@ -547,6 +547,30 @@ table.report-table tr:hover td {
           </div>
         </div>
       </div>
+      
+      <div class="card">
+        <div class="card-title">Advanced Performance Analysis</div>
+        <div class="charts-container" style="margin-bottom:16px;">
+          <div>
+            <div style="font-size:11px;color:var(--text-secondary);font-weight:700;margin-bottom:12px;text-align:center;text-transform:uppercase;">Channel ROI & Efficiency</div>
+            <div class="chart-wrapper">
+              <canvas id="efficiency-chart"></canvas>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-secondary);font-weight:700;margin-bottom:12px;text-align:center;text-transform:uppercase;">Spend vs Revenue Balance</div>
+            <div class="chart-wrapper">
+              <canvas id="radar-chart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);font-weight:700;margin-bottom:12px;text-align:center;text-transform:uppercase;">Conversion Funnel</div>
+          <div class="chart-wrapper">
+            <canvas id="funnel-chart"></canvas>
+          </div>
+        </div>
+      </div>
 
       <!-- Channel Table Card -->
       <div class="card" style="padding:0;overflow:hidden;">
@@ -570,6 +594,12 @@ table.report-table tr:hover td {
           </table>
         </div>
       </div>
+      
+      <div id="untapped-container" style="display:none; margin-bottom:24px;">
+        <div style="font-weight:700; font-size:16px; margin-bottom:15px; color:var(--white)">Untapped Growth Opportunities</div>
+        <!-- Injected by JS -->
+      </div>
+      
     </div>
 
     <!-- Side Summary Panel -->
@@ -699,8 +729,19 @@ table.report-table tr:hover td {
     document.getElementById('ns-content').innerHTML = formatBullets(r.next_steps);
 
     // Channel Table
+    const activeChannels = {};
+    const untappedChannels = {};
+    
+    Object.entries(data.channels || {}).forEach(([ch, m]) => {
+      if ((m.spend && parseFloat(m.spend) > 0) || (m.sales && parseFloat(m.sales) > 0) || (m.conversions && parseInt(m.conversions) > 0)) {
+        activeChannels[ch] = m;
+      } else {
+        untappedChannels[ch] = m;
+      }
+    });
+
     const tbody = document.getElementById('channel-tbody');
-    tbody.innerHTML = Object.entries(data.channels || {}).map(([ch, m]) => `
+    tbody.innerHTML = Object.entries(activeChannels).map(([ch, m]) => `
       <tr>
         <td style="font-weight:700;text-transform:capitalize">${ch}</td>
         <td style="font-family:var(--font-mono)">₹${parseFloat(m.spend).toLocaleString('en-IN')}</td>
@@ -711,9 +752,24 @@ table.report-table tr:hover td {
         <td style="font-family:var(--font-mono)">${parseFloat(m.ctr).toFixed(2)}%</td>
       </tr>
     `).join('');
+    
+    const untappedContainer = document.getElementById('untapped-container');
+    if (untappedContainer) {
+      if (Object.keys(untappedChannels).length > 0) {
+        untappedContainer.style.display = 'block';
+        untappedContainer.innerHTML = Object.keys(untappedChannels).map(ch => `
+          <div style="background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); padding:16px; border-radius:12px; margin-top:12px;">
+            <div style="color:var(--green); font-weight:700; text-transform:capitalize; margin-bottom:6px; display:flex; align-items:center; gap:6px;">✨ ${ch} Ads</div>
+            <div style="color:var(--text-secondary); font-size:13px; line-height:1.5;">No spend was allocated to ${ch} this period. Activating this channel could be a strong opportunity to scale reach and acquire net-new customers.</div>
+          </div>
+        `).join('');
+      } else {
+        untappedContainer.style.display = 'none';
+      }
+    }
 
     // Charts
-    renderCharts(data.channels || {});
+    renderCharts(activeChannels);
   }
 
   function renderCharts(channels) {
@@ -764,6 +820,75 @@ table.report-table tr:hover td {
         }]
       },
       options: chartOptions
+    });
+
+    // ROI & Efficiency (Horizontal Bar)
+    new Chart(document.getElementById('efficiency-chart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'ROAS', data: Object.values(channels).map(c => parseFloat(c.roas) || 0), backgroundColor: 'rgba(16, 185, 129, 0.7)', yAxisID: 'y' },
+          { label: 'CPA (₹)', data: Object.values(channels).map(c => parseFloat(c.cpa) || 0), backgroundColor: 'rgba(245, 158, 11, 0.7)', yAxisID: 'y1' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { type: 'linear', position: 'left', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+          y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#9ca3af' } },
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
+        },
+        plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 }, color: '#9ca3af' } } }
+      }
+    });
+
+    // Spend vs Revenue Radar
+    new Chart(document.getElementById('radar-chart').getContext('2d'), {
+      type: 'radar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Spend', data: spendData, backgroundColor: 'rgba(43, 78, 255, 0.3)', borderColor: '#2B4EFF', borderWidth: 2 },
+          { label: 'Revenue', data: revenueData, backgroundColor: 'rgba(16, 185, 129, 0.3)', borderColor: '#10B981', borderWidth: 2 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          r: {
+            angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+            pointLabels: { color: '#9ca3af', font: { size: 10 } },
+            ticks: { display: false }
+          }
+        },
+        plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 }, color: '#9ca3af' } } }
+      }
+    });
+
+    // Conversion Funnel
+    new Chart(document.getElementById('funnel-chart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Impressions', data: Object.values(channels).map(c => c.impressions || 0), backgroundColor: 'rgba(43, 78, 255, 0.8)' },
+          { label: 'Clicks', data: Object.values(channels).map(c => c.clicks || 0), backgroundColor: 'rgba(139, 92, 246, 0.8)' },
+          { label: 'Orders', data: Object.values(channels).map(c => c.conversions || 0), backgroundColor: 'rgba(16, 185, 129, 0.8)' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { type: 'logarithmic', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
+        },
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 }, color: '#9ca3af' } },
+          tooltip: { callbacks: { label: function(context) { return context.dataset.label + ': ' + context.raw.toLocaleString(); } } }
+        }
+      }
     });
   }
 })();

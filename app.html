@@ -424,6 +424,22 @@
                 <div style="height:160px;position:relative"><canvas id="rep-revenue-chart"></canvas></div>
               </div>
             </div>
+            
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+              <div class="card" style="margin-bottom:0;padding:16px">
+                <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:12px">Channel ROI & Efficiency</div>
+                <div style="height:200px;position:relative"><canvas id="rep-efficiency-chart"></canvas></div>
+              </div>
+              <div class="card" style="margin-bottom:0;padding:16px">
+                <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:12px">Spend vs Revenue Balance</div>
+                <div style="height:200px;position:relative"><canvas id="rep-radar-chart"></canvas></div>
+              </div>
+            </div>
+            
+            <div class="card" style="margin-bottom:16px;padding:16px">
+              <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:12px">Conversion Funnel</div>
+              <div style="height:180px;position:relative"><canvas id="rep-funnel-chart"></canvas></div>
+            </div>
 
             <!-- Channels performance table -->
             <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px">
@@ -445,6 +461,12 @@
                 </table>
               </div>
             </div>
+            
+            <div id="rep-untapped-container" style="display:none; margin-top:30px;">
+              <div style="font-weight:700; font-size:16px; margin-bottom:15px; color:var(--dark)">Untapped Growth Opportunities</div>
+              <!-- Injected by JS -->
+            </div>
+            
           </div>
 
           <!-- Notes / Highlights Col -->
