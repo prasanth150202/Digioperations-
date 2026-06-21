@@ -98,6 +98,13 @@ function db(): PDO {
 
         // Self-healing migrations for missing columns in budget tables
         try {
+            $cols = $pdo->query("SHOW COLUMNS FROM `brands` LIKE 'channels_config'")->fetchAll();
+            if (empty($cols)) {
+                $pdo->exec("ALTER TABLE `brands` ADD COLUMN `channels_config` TEXT DEFAULT NULL AFTER `user_id`");
+            }
+        } catch (Throwable $migrationErr) {}
+
+        try {
             $cols = $pdo->query("SHOW COLUMNS FROM `budget_days` LIKE 'channels_json'")->fetchAll();
             if (empty($cols)) {
                 $pdo->exec("ALTER TABLE `budget_days` ADD COLUMN `channels_json` TEXT DEFAULT NULL AFTER `posts_real`");

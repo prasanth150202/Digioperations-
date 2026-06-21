@@ -2175,13 +2175,23 @@ async function submitNewBrand() {
   const name     = document.getElementById('nb-name').value.trim();
   const industry = document.getElementById('nb-industry').value.trim();
   const platform = document.getElementById('nb-platform').value.trim();
+  const channelsRaw = document.getElementById('nb-channels').value.trim();
+  
   if (!name) return alert('Brand name is required');
-  const r = await api('/api/brands', 'POST', { name, industry, platform });
+  
+  // Parse comma separated string to JSON array
+  let channels_config = ['meta', 'google'];
+  if (channelsRaw) {
+    channels_config = channelsRaw.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
+  }
+  
+  const r = await api('/api/brands', 'POST', { name, industry, platform, channels_config });
   if (!r || !r.ok) return alert(r?.error || 'Failed to create brand');
   closeMo('mo-new-brand');
   document.getElementById('nb-name').value = '';
   document.getElementById('nb-industry').value = '';
   document.getElementById('nb-platform').value = '';
+  document.getElementById('nb-channels').value = 'meta, google';
   const brands = await api('/api/brands');
   if (brands) allBrands = brands;
   renderPricingBrands();
@@ -3410,15 +3420,31 @@ async function bgtSubmitNewBrand() {
 }// ── New Month ────────────────────────────────────────────────
 function bgtOpenNewMonth() {
   const container = document.getElementById('bgt-new-month-channels') || document.querySelector('#mo-bgt-month .g2').nextElementSibling.nextElementSibling.nextElementSibling;
-  const defaultChannels = {
+  
+  const allKnownChannels = {
     meta: { name: 'Meta', cat: 'push' },
     google: { name: 'Google', cat: 'pull' },
     amazon: { name: 'Amazon', cat: 'marketplace' },
     flipkart: { name: 'Flipkart', cat: 'marketplace' },
     email: { name: 'Email', cat: 'retention' },
     whatsapp: { name: 'WhatsApp', cat: 'retention' },
-    push_notifications: { name: 'Push Notifications', cat: 'retention' }
+    push_notifications: { name: 'Push Notifications', cat: 'retention' },
+    tiktok: { name: 'TikTok', cat: 'push' },
+    snapchat: { name: 'Snapchat', cat: 'push' }
   };
+  
+  const brandChannels = (bgtState.currentBrand.channels_config && Array.isArray(bgtState.currentBrand.channels_config) && bgtState.currentBrand.channels_config.length > 0)
+    ? bgtState.currentBrand.channels_config
+    : ['meta', 'google'];
+    
+  const defaultChannels = {};
+  for (const ch of brandChannels) {
+    if (allKnownChannels[ch]) {
+      defaultChannels[ch] = allKnownChannels[ch];
+    } else {
+      defaultChannels[ch] = { name: ch.charAt(0).toUpperCase() + ch.slice(1), cat: 'push' };
+    }
+  }
   
   let html = '';
   for (const [ch, info] of Object.entries(defaultChannels)) {
@@ -3427,7 +3453,7 @@ function bgtOpenNewMonth() {
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;margin-bottom:8px">
           <input type="checkbox" id="bgtc-${ch}-active" checked onchange="bgtToggleChannel('${ch}')"> ${info.name}
         </label>
-        <div class="field" style="margin-bottom:6px"><label>% of Revenue</label><input type="number" id="bgtc-${ch}-pct" value="15" min="0" max="100"></div>
+        <div class="field" style="margin-bottom:6px"><label>% of Revenue</label><input type="number" id="bgtc-${ch}-pct" value="${ch === 'meta' || ch === 'google' ? '15' : '5'}" min="0" max="100"></div>
         <div class="field" style="margin-bottom:6px"><label>Target ROAS</label><input type="number" id="bgtc-${ch}-roas" value="5" step="0.1"></div>
         <div class="field" style="margin-bottom:6px"><label>Start Day</label><input type="number" id="bgtc-${ch}-start" value="1" min="1" max="31"></div>
         <div class="field">
@@ -4335,32 +4361,26 @@ async function checkReportMissingData() {
     
     if (r && r.missing && r.missing.length > 0) {
       alertEl.style.display = 'block';
+      const channels = (activeBrand.channels_config && Array.isArray(activeBrand.channels_config) && activeBrand.channels_config.length > 0) 
+        ? activeBrand.channels_config 
+        : ['meta', 'google'];
+
       formsEl.innerHTML = r.missing.map((date, idx) => `
         <div class="card reports-missing-day-card" data-date="${date}" style="padding:14px;border-left:4px solid var(--amber)">
           <div style="font-weight:700;font-size:12px;color:var(--dark);margin-bottom:10px">${date} (Enter performance data)</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-            <!-- Meta input block -->
+            ${channels.map(ch => `
             <div style="background:var(--off);padding:10px;border-radius:8px;border:1px solid var(--border)">
-              <div style="font-weight:700;font-size:11px;color:var(--mid);text-transform:uppercase;margin-bottom:8px">Meta (Facebook/Instagram)</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                <div class="field"><label style="font-size:9px">Spend (₹)</label><input type="text" class="m-sp" placeholder="0" style="padding:6px;height:30px"></div>
-                <div class="field"><label style="font-size:9px">Revenue (₹)</label><input type="text" class="m-rev" placeholder="0" style="padding:6px;height:30px"></div>
-                <div class="field"><label style="font-size:9px">Orders</label><input type="text" class="m-ord" placeholder="0" style="padding:6px;height:30px"></div>
-                <div class="field"><label style="font-size:9px">Clicks</label><input type="text" class="m-clk" placeholder="0" style="padding:6px;height:30px"></div>
-                <div class="field" style="grid-column: span 2"><label style="font-size:9px">Impressions</label><input type="text" class="m-imp" placeholder="0" style="padding:6px;height:30px"></div>
+              <div style="font-weight:700;font-size:11px;color:var(--mid);text-transform:uppercase;margin-bottom:8px">${ch}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" data-channel="${ch}">
+                <div class="field"><label style="font-size:9px">Spend (₹)</label><input type="number" class="ch-sp" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field"><label style="font-size:9px">Revenue (₹)</label><input type="number" class="ch-rev" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field"><label style="font-size:9px">Orders</label><input type="number" class="ch-ord" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field"><label style="font-size:9px">Clicks</label><input type="number" class="ch-clk" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field" style="grid-column: span 2"><label style="font-size:9px">Impressions</label><input type="number" class="ch-imp" placeholder="0" style="padding:6px;height:30px"></div>
               </div>
             </div>
-            <!-- Google input block -->
-            <div style="background:var(--off);padding:10px;border-radius:8px;border:1px solid var(--border)">
-              <div style="font-weight:700;font-size:11px;color:var(--mid);text-transform:uppercase;margin-bottom:8px">Google Ads</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                <div class="field"><label style="font-size:9px">Spend (₹)</label><input type="text" class="g-sp" placeholder="0" style="padding:6px;height:30px"></div>
-                <div class="field"><label style="font-size:9px">Revenue (₹)</label><input type="text" class="g-rev" placeholder="0" style="padding:6px;height:30px"></div>
-                <div class="field"><label style="font-size:9px">Orders</label><input type="text" class="g-ord" placeholder="0" style="padding:6px;height:30px"></div>
-                <div class="field"><label style="font-size:9px">Clicks</label><input type="text" class="g-clk" placeholder="0" style="padding:6px;height:30px"></div>
-                <div class="field" style="grid-column: span 2"><label style="font-size:9px">Impressions</label><input type="text" class="g-imp" placeholder="0" style="padding:6px;height:30px"></div>
-              </div>
-            </div>
+            `).join('')}
           </div>
         </div>
       `).join('');

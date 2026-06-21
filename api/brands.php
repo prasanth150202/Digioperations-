@@ -7,7 +7,7 @@ $id     = $_GET['id'] ?? '';
 // GET /api/brands.php — list all brands
 if ($method === 'GET' && !$id) {
     requirePage($user, 'dashboard');
-    $brands = dbAll('SELECT b.id, b.slug, b.name, b.industry, b.platform,
+    $brands = dbAll('SELECT b.id, b.slug, b.name, b.industry, b.platform, b.channels_config,
         (SELECT COUNT(*) FROM pricing_products WHERE brand_id = b.id) AS product_count,
         (SELECT COUNT(*) FROM strategy_generations WHERE brand_id = b.id) AS generation_count
         FROM brands b ORDER BY b.name');
@@ -29,7 +29,9 @@ if ($method === 'POST') {
     $slug = trim($slug, '-');
     if (dbGet('SELECT id FROM brands WHERE slug=?', [$slug])) json_err('Brand already exists', 409);
     $bid = uuid4();
-    dbRun('INSERT INTO brands (id,slug,name,industry,platform,memory_json) VALUES (?,?,?,?,?,?)', [$bid,$slug,$name,$industry,$platform,'{}']);
+    $channels_config = bodyGet('channels_config', '["meta","google"]');
+    if (is_array($channels_config)) $channels_config = json_encode($channels_config);
+    dbRun('INSERT INTO brands (id,slug,name,industry,platform,channels_config,memory_json) VALUES (?,?,?,?,?,?,?)', [$bid,$slug,$name,$industry,$platform,$channels_config,'{}']);
     auditLog($user['id'], $user['name'], 'CREATE_BRAND', $name);
     json_out(['ok' => true, 'id' => $bid, 'slug' => $slug]);
 }
@@ -42,6 +44,23 @@ if ($method === 'GET' && $id) {
     if (!$brand) json_err('Not found', 404);
     $brand['memory_json'] = json_decode($brand['memory_json'] ?? '{}', true);
     json_out($brand);
+}
+
+// PUT /api/brands.php?id=slug — update brand
+if ($method === 'PUT' && $id) {
+    if (!canManage($user)) json_err('Insufficient permissions', 403);
+    $brand = dbGet('SELECT * FROM brands WHERE slug=?', [$id]);
+    if (!$brand) json_err('Not found', 404);
+    
+    $name = bodyGet('name', $brand['name']);
+    $industry = bodyGet('industry', $brand['industry']);
+    $platform = bodyGet('platform', $brand['platform']);
+    
+    $channels_config = bodyGet('channels_config', $brand['channels_config']);
+    if (is_array($channels_config)) $channels_config = json_encode($channels_config);
+    
+    dbRun('UPDATE brands SET name=?, industry=?, platform=?, channels_config=? WHERE slug=?', [$name, $industry, $platform, $channels_config, $id]);
+    json_out(['ok' => true]);
 }
 
 json_err('Not found', 404);
