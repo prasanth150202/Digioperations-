@@ -3270,6 +3270,8 @@ function bgtClickDay(dayNum) {
     const chDay = day ? day.channels[ch] || {} : {};
     const salesV = chDay.salesReal != null ? chDay.salesReal : '';
     const spendV = chDay.spendReal != null ? chDay.spendReal : '';
+    const ordersV = chDay.conversions != null ? chDay.conversions : '';
+    const custV = chDay.customers_acquired != null ? chDay.customers_acquired : '';
     const expSales = chDay.salesExp || 0;
     const expSpend = chDay.spendExp || 0;
     const roasTarget = chDay.roasTarget || 5;
@@ -3279,9 +3281,11 @@ function bgtClickDay(dayNum) {
         <div style="font-size:11px;font-weight:700;color:var(--fg);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em">
           ${name} <span style="font-weight:400;color:var(--mid);text-transform:none">(Pacing Target: ₹${fmtN(expSales)} sales · ₹${fmtN(expSpend)} spend)</span>
         </div>
-        <div class="g2">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="field"><label>Sales (₹)</label><input type="number" id="bgtd-${ch}-sales" placeholder="0" value="${salesV}" oninput="bgtLiveDiag('${ch}', ${expSales}, ${expSpend}, ${roasTarget})"></div>
           <div class="field"><label>Ad Spend (₹)</label><input type="number" id="bgtd-${ch}-spend" placeholder="0" value="${spendV}" oninput="bgtLiveDiag('${ch}', ${expSales}, ${expSpend}, ${roasTarget})"></div>
+          <div class="field"><label>Orders</label><input type="number" id="bgtd-${ch}-orders" placeholder="0" value="${ordersV}"></div>
+          <div class="field"><label>Customers Acquired</label><input type="number" id="bgtd-${ch}-customers" placeholder="0" value="${custV}"></div>
         </div>
         <div id="bgt-live-diag-${ch}" style="margin-top:8px; font-size:11px; font-weight:700; display:none;" class="live-diag-text"></div>
       </div>
@@ -3372,11 +3376,15 @@ async function bgtSaveDay() {
 
   const channelsData = {};
   for (const ch of Object.keys(activeChannels)) {
-    const sv = document.getElementById(`bgtd-${ch}-sales`);
-    const spv = document.getElementById(`bgtd-${ch}-spend`);
+    const sv   = document.getElementById(`bgtd-${ch}-sales`);
+    const spv  = document.getElementById(`bgtd-${ch}-spend`);
+    const ordv = document.getElementById(`bgtd-${ch}-orders`);
+    const custv = document.getElementById(`bgtd-${ch}-customers`);
     channelsData[ch] = {
-      sales: sv && sv.value !== '' ? parseFloat(sv.value) : null,
-      spend: spv && spv.value !== '' ? parseFloat(spv.value) : null
+      sales:               sv   && sv.value   !== '' ? parseFloat(sv.value)   : null,
+      spend:               spv  && spv.value  !== '' ? parseFloat(spv.value)  : null,
+      conversions:         ordv && ordv.value !== '' ? parseInt(ordv.value)   : null,
+      customers_acquired:  custv && custv.value !== '' ? parseInt(custv.value) : null,
     };
   }
 
@@ -4368,9 +4376,9 @@ async function checkReportMissingData() {
         ? activeBrand.channels_config 
         : ['meta', 'google'];
 
-      formsEl.innerHTML = r.missing.map((date, idx) => `
+      formsEl.innerHTML = r.missing.map((date) => `
         <div class="card reports-missing-day-card" data-date="${date}" style="padding:14px;border-left:4px solid var(--amber)">
-          <div style="font-weight:700;font-size:12px;color:var(--dark);margin-bottom:10px">${date} (Enter performance data)</div>
+          <div style="font-weight:700;font-size:12px;color:var(--dark);margin-bottom:10px">${date} — Enter performance data per channel</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             ${channels.map(ch => `
             <div style="background:var(--off);padding:10px;border-radius:8px;border:1px solid var(--border)">
@@ -4379,8 +4387,9 @@ async function checkReportMissingData() {
                 <div class="field"><label style="font-size:9px">Spend (₹)</label><input type="number" class="ch-sp" placeholder="0" style="padding:6px;height:30px"></div>
                 <div class="field"><label style="font-size:9px">Revenue (₹)</label><input type="number" class="ch-rev" placeholder="0" style="padding:6px;height:30px"></div>
                 <div class="field"><label style="font-size:9px">Orders</label><input type="number" class="ch-ord" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field"><label style="font-size:9px">Customers Acquired</label><input type="number" class="ch-cust" placeholder="0" style="padding:6px;height:30px"></div>
                 <div class="field"><label style="font-size:9px">Clicks</label><input type="number" class="ch-clk" placeholder="0" style="padding:6px;height:30px"></div>
-                <div class="field" style="grid-column: span 2"><label style="font-size:9px">Impressions</label><input type="number" class="ch-imp" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field"><label style="font-size:9px">Impressions</label><input type="number" class="ch-imp" placeholder="0" style="padding:6px;height:30px"></div>
               </div>
             </div>
             `).join('')}
@@ -4426,27 +4435,23 @@ async function submitGenerateReport() {
       const missingData = [];
       cards.forEach(card => {
         const date = card.dataset.date;
-        const metaSpend = parseFloat(card.querySelector('.m-sp').value) || 0;
-        const metaSales = parseFloat(card.querySelector('.m-rev').value) || 0;
-        const metaOrd = parseInt(card.querySelector('.m-ord').value) || 0;
-        const metaClk = parseInt(card.querySelector('.m-clk').value) || 0;
-        const metaImp = parseInt(card.querySelector('.m-imp').value) || 0;
-        
-        const googSpend = parseFloat(card.querySelector('.g-sp').value) || 0;
-        const googSales = parseFloat(card.querySelector('.g-rev').value) || 0;
-        const googOrd = parseInt(card.querySelector('.g-ord').value) || 0;
-        const googClk = parseInt(card.querySelector('.g-clk').value) || 0;
-        const googImp = parseInt(card.querySelector('.g-imp').value) || 0;
-        
-        // Skip dates that weren't filled to allow partial data generation
-        if (metaSpend > 0 || metaSales > 0 || googSpend > 0 || googSales > 0) {
-          missingData.push({
-            date,
-            channels: {
-              meta: { spend: metaSpend, sales: metaSales, clicks: metaClk, impressions: metaImp, conversions: metaOrd },
-              google: { spend: googSpend, sales: googSales, clicks: googClk, impressions: googImp, conversions: googOrd }
-            }
-          });
+        const channels = {};
+        let hasAnyData = false;
+
+        card.querySelectorAll('[data-channel]').forEach(chDiv => {
+          const ch = chDiv.dataset.channel;
+          const spend = parseFloat(chDiv.querySelector('.ch-sp')?.value) || 0;
+          const sales = parseFloat(chDiv.querySelector('.ch-rev')?.value) || 0;
+          const orders = parseInt(chDiv.querySelector('.ch-ord')?.value) || 0;
+          const custAcq = parseInt(chDiv.querySelector('.ch-cust')?.value) || 0;
+          const clicks = parseInt(chDiv.querySelector('.ch-clk')?.value) || 0;
+          const impressions = parseInt(chDiv.querySelector('.ch-imp')?.value) || 0;
+          channels[ch] = { spend, sales, conversions: orders, customers_acquired: custAcq, clicks, impressions };
+          if (spend > 0 || sales > 0 || orders > 0) hasAnyData = true;
+        });
+
+        if (hasAnyData) {
+          missingData.push({ date, channels });
         }
       });
       
@@ -4508,6 +4513,10 @@ async function loadReportDetails(reportId) {
     const formatBadge = (val, id, lowerIsBetter = false) => {
       const el = document.getElementById(id);
       if (!el) return;
+      if (val === null || val === undefined) {
+        el.textContent = 'No prior period'; el.className = 'bgt-stat-sub';
+        return;
+      }
       const num = parseFloat(val);
       if (isNaN(num) || num === 0) {
         el.textContent = 'WoW: 0%'; el.className = 'bgt-stat-sub';
@@ -4554,18 +4563,20 @@ async function loadReportDetails(reportId) {
 
     const tbody = document.getElementById('rep-channel-tbody');
     tbody.innerHTML = Object.entries(activeChannels).map(([ch, m]) => {
-      const spend   = parseFloat(m.spend) || 0;
-      const revenue = parseFloat(m.revenue || m.sales) || 0;
-      const orders  = parseInt(m.conversions) || 0;
-      const roas    = parseFloat(m.roas) || (spend > 0 ? (revenue / spend) : 0);
-      const cpa     = parseFloat(m.cpa) || (orders > 0 ? (spend / orders) : 0);
-      const aov     = orders > 0 ? Math.round(revenue / orders) : 0;
-      const ctr     = parseFloat(m.ctr) || 0;
+      const spend    = parseFloat(m.spend) || 0;
+      const revenue  = parseFloat(m.revenue || m.sales) || 0;
+      const orders   = parseInt(m.conversions) || 0;
+      const custAcq  = parseInt(m.customers_acquired) || 0;
+      const roas     = parseFloat(m.roas) || (spend > 0 ? (revenue / spend) : 0);
+      const cpa      = parseFloat(m.cpa) || (custAcq > 0 ? (spend / custAcq) : (orders > 0 ? (spend / orders) : 0));
+      const aov      = orders > 0 ? Math.round(revenue / orders) : 0;
+      const ctr      = parseFloat(m.ctr) || 0;
       return `
       <tr>
         <td style="font-weight:700;text-transform:capitalize">${ch}</td>
         <td style="font-family:var(--fm)">₹${spend.toLocaleString('en-IN')}</td>
         <td style="font-family:var(--fm)">${orders.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm)">${custAcq > 0 ? custAcq.toLocaleString('en-IN') : '—'}</td>
         <td style="font-family:var(--fm)">₹${revenue.toLocaleString('en-IN')}</td>
         <td style="font-family:var(--fm)">₹${Math.round(cpa).toLocaleString('en-IN')}</td>
         <td style="font-family:var(--fm)">₹${aov.toLocaleString('en-IN')}</td>

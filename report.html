@@ -582,6 +582,7 @@ table.report-table tr:hover td {
                 <th>Channel</th>
                 <th>Spend</th>
                 <th>Orders</th>
+                <th>Customers Acquired</th>
                 <th>Revenue</th>
                 <th>CPA</th>
                 <th>AOV</th>
@@ -704,6 +705,11 @@ table.report-table tr:hover td {
     const formatBadge = (val, id, lowerIsBetter = false) => {
       const el = document.getElementById(id);
       if (!el) return;
+      if (val === null || val === undefined) {
+        el.textContent = 'No prior period';
+        el.className = 'kpi-change neutral';
+        return;
+      }
       const num = parseFloat(val);
       if (isNaN(num) || num === 0) {
         el.textContent = 'WoW: 0%';
@@ -742,19 +748,22 @@ table.report-table tr:hover td {
       }
     });
 
+    const tbody = document.getElementById('channel-tbody');
     tbody.innerHTML = Object.entries(activeChannels).map(([ch, m]) => {
-      const spend   = parseFloat(m.spend) || 0;
-      const revenue = parseFloat(m.revenue || m.sales) || 0;
-      const orders  = parseInt(m.conversions) || 0;
-      const roas    = parseFloat(m.roas) || (spend > 0 ? (revenue / spend) : 0);
-      const cpa     = parseFloat(m.cpa) || (orders > 0 ? (spend / orders) : 0);
-      const aov     = orders > 0 ? Math.round(revenue / orders) : 0;
-      const ctr     = parseFloat(m.ctr) || 0;
+      const spend    = parseFloat(m.spend) || 0;
+      const revenue  = parseFloat(m.revenue || m.sales) || 0;
+      const orders   = parseInt(m.conversions) || 0;
+      const custAcq  = parseInt(m.customers_acquired) || 0;
+      const roas     = parseFloat(m.roas) || (spend > 0 ? (revenue / spend) : 0);
+      const cpa      = parseFloat(m.cpa) || (custAcq > 0 ? (spend / custAcq) : (orders > 0 ? (spend / orders) : 0));
+      const aov      = orders > 0 ? Math.round(revenue / orders) : 0;
+      const ctr      = parseFloat(m.ctr) || 0;
       return `
       <tr>
         <td style="font-weight:700;text-transform:capitalize">${ch}</td>
         <td style="font-family:var(--font-mono)">₹${spend.toLocaleString('en-IN')}</td>
         <td style="font-family:var(--font-mono)">${orders.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--font-mono)">${custAcq > 0 ? custAcq.toLocaleString('en-IN') : '—'}</td>
         <td style="font-family:var(--font-mono)">₹${revenue.toLocaleString('en-IN')}</td>
         <td style="font-family:var(--font-mono)">₹${Math.round(cpa).toLocaleString('en-IN')}</td>
         <td style="font-family:var(--font-mono)">₹${aov.toLocaleString('en-IN')}</td>

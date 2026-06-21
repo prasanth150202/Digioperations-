@@ -141,7 +141,10 @@ if ($method === 'POST' && $action === 'save_missing') {
             
             if (isset($cData['conversions']) && $cData['conversions'] !== '') $cData['conversions'] = (int)$cData['conversions'];
             else $cData['conversions'] = null;
-            
+
+            if (isset($cData['customers_acquired']) && $cData['customers_acquired'] !== '') $cData['customers_acquired'] = (int)$cData['customers_acquired'];
+            else $cData['customers_acquired'] = null;
+
             if ($cName === 'followers' && isset($cData['count'])) $followersReal = (int)$cData['count'];
             if ($cName === 'posts' && isset($cData['count'])) $postsReal = (int)$cData['count'];
         }
@@ -168,11 +171,11 @@ function aggregateStats(string $brandId, string $start, string $end): array {
     $rows = dbAll('SELECT * FROM budget_days WHERE brand_id = ? AND day_date BETWEEN ? AND ?', [$brandId, $start, $end]);
     
     $channels = [];
-    $totals = ['spend' => 0.0, 'revenue' => 0.0, 'conversions' => 0, 'clicks' => 0, 'impressions' => 0];
-    
+    $totals = ['spend' => 0.0, 'revenue' => 0.0, 'conversions' => 0, 'customers_acquired' => 0, 'clicks' => 0, 'impressions' => 0];
+
     foreach ($rows as $r) {
         $ch = json_decode($r['channels_json'] ?? '{}', true);
-        
+
         // Include legacy fallbacks
         if (!isset($ch['meta']) && ($r['meta_sales'] !== null || $r['meta_spend'] !== null)) {
             $ch['meta'] = ['sales' => $r['meta_sales'], 'spend' => $r['meta_spend']];
@@ -180,44 +183,50 @@ function aggregateStats(string $brandId, string $start, string $end): array {
         if (!isset($ch['google']) && ($r['google_sales'] !== null || $r['google_spend'] !== null)) {
             $ch['google'] = ['sales' => $r['google_sales'], 'spend' => $r['google_spend']];
         }
-        
+
         foreach ($ch as $chName => $data) {
             if ($chName === 'followers' || $chName === 'posts') continue;
-            
+
             if (!isset($channels[$chName])) {
-                $channels[$chName] = ['spend' => 0.0, 'revenue' => 0.0, 'conversions' => 0, 'clicks' => 0, 'impressions' => 0];
+                $channels[$chName] = ['spend' => 0.0, 'revenue' => 0.0, 'conversions' => 0, 'customers_acquired' => 0, 'clicks' => 0, 'impressions' => 0];
             }
-            
-            $sp = isset($data['spend']) ? (float)$data['spend'] : 0.0;
-            $rev = isset($data['sales']) ? (float)$data['sales'] : 0.0;
-            $conv = isset($data['conversions']) ? (int)$data['conversions'] : 0;
-            $clk = isset($data['clicks']) ? (int)$data['clicks'] : 0;
-            $imp = isset($data['impressions']) ? (int)$data['impressions'] : 0;
-            
-            $channels[$chName]['spend'] += $sp;
-            $channels[$chName]['revenue'] += $rev;
-            $channels[$chName]['conversions'] += $conv;
-            $channels[$chName]['clicks'] += $clk;
-            $channels[$chName]['impressions'] += $imp;
-            
-            $totals['spend'] += $sp;
-            $totals['revenue'] += $rev;
-            $totals['conversions'] += $conv;
-            $totals['clicks'] += $clk;
-            $totals['impressions'] += $imp;
+
+            $sp    = isset($data['spend']) ? (float)$data['spend'] : 0.0;
+            $rev   = isset($data['sales']) ? (float)$data['sales'] : 0.0;
+            $conv  = isset($data['conversions']) ? (int)$data['conversions'] : 0;
+            $cust  = isset($data['customers_acquired']) ? (int)$data['customers_acquired'] : 0;
+            $clk   = isset($data['clicks']) ? (int)$data['clicks'] : 0;
+            $imp   = isset($data['impressions']) ? (int)$data['impressions'] : 0;
+
+            $channels[$chName]['spend']              += $sp;
+            $channels[$chName]['revenue']             += $rev;
+            $channels[$chName]['conversions']         += $conv;
+            $channels[$chName]['customers_acquired']  += $cust;
+            $channels[$chName]['clicks']              += $clk;
+            $channels[$chName]['impressions']         += $imp;
+
+            $totals['spend']             += $sp;
+            $totals['revenue']            += $rev;
+            $totals['conversions']        += $conv;
+            $totals['customers_acquired'] += $cust;
+            $totals['clicks']             += $clk;
+            $totals['impressions']        += $imp;
         }
     }
-    
+
     // Add derived rates
     foreach ($channels as $chName => &$cMetrics) {
         $cMetrics['roas'] = $cMetrics['spend'] > 0 ? round($cMetrics['revenue'] / $cMetrics['spend'], 2) : 0.0;
-        $cMetrics['cpa'] = $cMetrics['conversions'] > 0 ? round($cMetrics['spend'] / $cMetrics['conversions'], 2) : 0.0;
+        // CPA = cost per customer acquired; fall back to cost per order if no customers_acquired data
+        $cpaDenominator = $cMetrics['customers_acquired'] > 0 ? $cMetrics['customers_acquired'] : $cMetrics['conversions'];
+        $cMetrics['cpa'] = $cpaDenominator > 0 ? round($cMetrics['spend'] / $cpaDenominator, 2) : 0.0;
         $cMetrics['ctr'] = $cMetrics['impressions'] > 0 ? round(($cMetrics['clicks'] / $cMetrics['impressions']) * 100, 2) : 0.0;
     }
-    
+
     $totals['roas'] = $totals['spend'] > 0 ? round($totals['revenue'] / $totals['spend'], 2) : 0.0;
-    $totals['cpa'] = $totals['conversions'] > 0 ? round($totals['spend'] / $totals['conversions'], 2) : 0.0;
-    $totals['aov'] = $totals['conversions'] > 0 ? round($totals['revenue'] / $totals['conversions'], 2) : 0.0;
+    $cpaDenomTotal  = $totals['customers_acquired'] > 0 ? $totals['customers_acquired'] : $totals['conversions'];
+    $totals['cpa']  = $cpaDenomTotal > 0 ? round($totals['spend'] / $cpaDenomTotal, 2) : 0.0;
+    $totals['aov']  = $totals['conversions'] > 0 ? round($totals['revenue'] / $totals['conversions'], 2) : 0.0;
     
     return [
         'channels' => $channels,
@@ -257,9 +266,9 @@ if ($method === 'POST' && $action === 'create') {
     $prevEndDateStr = $prevEndDt->format('Y-m-d');
     $prevStats = aggregateStats($brandId, $prevStartDateStr, $prevEndDateStr);
     
-    // Calculate WoW Percentage Changes
+    // Calculate WoW Percentage Changes — null when no prior data exists
     $pctChange = function($curr, $prev) {
-        if ($prev <= 0) return $curr > 0 ? 100.0 : 0.0;
+        if ($prev <= 0) return null;
         return round((($curr - $prev) / $prev) * 100, 1);
     };
     
@@ -435,10 +444,10 @@ if ($method === 'POST' && $action === 'update_data') {
     $prevTotals = $reportData['prev_period']['totals'] ?? [];
     
     $pctChange = function($curr, $prev) {
-        if ($prev <= 0) return $curr > 0 ? 100.0 : 0.0;
+        if ($prev <= 0) return null;
         return round((($curr - $prev) / $prev) * 100, 1);
     };
-    
+
     $comparisons = [
         'spend' => $pctChange($totalsInput['spend'] ?? 0, $prevTotals['spend'] ?? 0),
         'revenue' => $pctChange($totalsInput['revenue'] ?? 0, $prevTotals['revenue'] ?? 0),

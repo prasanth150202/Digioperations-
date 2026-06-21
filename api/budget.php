@@ -255,10 +255,14 @@ function computeMonth(array $month, array $dayRows): array {
                 // Actual values entered
                 $salesReal = null;
                 $spendReal = null;
+                $conversions = null;
+                $customersAcquired = null;
 
                 if (isset($chData[$ch])) {
                     $salesReal = $chData[$ch]['sales'] !== null ? (float)$chData[$ch]['sales'] : null;
                     $spendReal = $chData[$ch]['spend'] !== null ? (float)$chData[$ch]['spend'] : null;
+                    $conversions = isset($chData[$ch]['conversions']) && $chData[$ch]['conversions'] !== null ? (int)$chData[$ch]['conversions'] : null;
+                    $customersAcquired = isset($chData[$ch]['customers_acquired']) && $chData[$ch]['customers_acquired'] !== null ? (int)$chData[$ch]['customers_acquired'] : null;
                 } else {
                     if ($ch === 'meta') { $salesReal = $e['meta_sales'] !== null ? (float)$e['meta_sales'] : null; $spendReal = $e['meta_spend'] !== null ? (float)$e['meta_spend'] : null; }
                     elseif ($ch === 'google') { $salesReal = $e['google_sales'] !== null ? (float)$e['google_sales'] : null; $spendReal = $e['google_spend'] !== null ? (float)$e['google_spend'] : null; }
@@ -282,12 +286,14 @@ function computeMonth(array $month, array $dayRows): array {
 
                 $roas = ($salesReal !== null && $spendReal !== null && $spendReal > 0) ? round($salesReal / $spendReal, 2) : null;
                 $row['channels'][$ch] = [
-                    'salesExp'   => round($salesExp, 2),
-                    'spendExp'   => round($spendExp, 2),
-                    'salesReal'  => $salesReal,
-                    'spendReal'  => $spendReal,
-                    'roas'       => $roas,
-                    'roasTarget' => $chROAS
+                    'salesExp'           => round($salesExp, 2),
+                    'spendExp'           => round($spendExp, 2),
+                    'salesReal'          => $salesReal,
+                    'spendReal'          => $spendReal,
+                    'conversions'        => $conversions,
+                    'customers_acquired' => $customersAcquired,
+                    'roas'               => $roas,
+                    'roasTarget'         => $chROAS
                 ];
                 
                 // Real-time Flag/Anomaly Diagnostics
