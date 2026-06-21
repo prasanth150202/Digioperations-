@@ -4715,79 +4715,69 @@ function renderReportCharts(channels, totals) {
     }
   });
 
-  // Conversion Funnel
-  const ctxFunnel = document.getElementById('rep-funnel-chart').getContext('2d');
+  // Conversion Funnel — HTML log-scale version
   const imp = totals ? (totals.impressions || 0) : 0;
   const clk = totals ? (totals.clicks || 0) : 0;
   const conv = totals ? (totals.conversions || 0) : 0;
+  renderFunnelViz('rep-funnel-viz', 'rep-funnel-chart-container', imp, clk, conv, false);
+}
 
-  const funnelContainer = document.getElementById('rep-funnel-chart-container');
+function renderFunnelViz(vizId, containerId, imp, clk, conv, dark) {
+  const viz = document.getElementById(vizId);
+  const container = document.getElementById(containerId);
+  if (!viz || !container) return;
+
   if (imp <= 0 || clk <= 0 || conv <= 0) {
-    if (funnelContainer) funnelContainer.style.display = 'none';
-  } else {
-    if (funnelContainer) funnelContainer.style.display = 'block';
-    const funnelData = [
-      [-imp / 2, imp / 2],
-      [-clk / 2, clk / 2],
-      [-conv / 2, conv / 2]
-    ];
-    
-    reportsChartFunnel = new Chart(ctxFunnel, {
-      type: 'bar',
-      data: {
-        labels: ['Impressions', 'Clicks', 'Orders'],
-        datasets: [{
-          label: 'Conversion Journey',
-          data: funnelData,
-          backgroundColor: [
-            'rgba(43, 78, 255, 0.8)',
-            'rgba(139, 92, 246, 0.8)',
-            'rgba(16, 185, 129, 0.8)'
-          ],
-          borderColor: [
-            '#2B4EFF',
-            '#8b5cf6',
-            '#10B981'
-          ],
-          borderWidth: 1,
-          barPercentage: 0.6
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          x: {
-            display: false,
-            grid: { display: false }
-          },
-          y: {
-            grid: { display: false },
-            ticks: { color: '#9ca3af', font: { family: 'Plus Jakarta Sans', weight: 'bold' } }
-          }
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: function(context) {
-                const val = context.raw;
-                const absVal = Math.round(val[1] - val[0]);
-                let rate = '';
-                if (context.dataIndex === 1 && imp > 0) {
-                  rate = ` (CTR: ${((absVal / imp) * 100).toFixed(2)}%)`;
-                } else if (context.dataIndex === 2 && clk > 0) {
-                  rate = ` (CVR: ${((absVal / clk) * 100).toFixed(2)}%)`;
-                }
-                return context.label + ': ' + absVal.toLocaleString() + rate;
-              }
-            }
-          }
-        }
-      }
-    });
+    container.style.display = 'none';
+    return;
   }
+  container.style.display = dark ? 'block' : 'block';
+
+  // Log scale: all widths relative to impressions (the largest)
+  // Even a 10,000:1 ratio stays visible — orders will never collapse to nothing
+  const logW = v => Math.max(18, Math.round((Math.log(v + 1) / Math.log(imp + 1)) * 100));
+  const clkW = logW(clk);
+  const convW = logW(conv);
+
+  const ctr = ((clk / imp) * 100).toFixed(2);
+  const cvr = ((conv / clk) * 100).toFixed(2);
+  const fmt = n => parseInt(n).toLocaleString('en-IN');
+
+  const subCol = dark ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.65)';
+  const mono = 'var(--fm, monospace)';
+
+  viz.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding:4px 0">
+
+      <div style="width:100%;background:rgba(43,78,255,0.82);border:1px solid rgba(43,78,255,0.9);border-radius:12px;padding:16px 20px;text-align:center">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:${subCol};text-transform:uppercase;margin-bottom:5px">Impressions</div>
+        <div style="font-size:26px;font-weight:800;color:#fff;font-family:${mono};line-height:1">${fmt(imp)}</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;width:${Math.max(clkW, 28)}%;padding:2px 0">
+        <div style="width:2px;height:10px;background:rgba(139,92,246,0.35)"></div>
+        <div style="background:rgba(139,92,246,0.14);border:1px solid rgba(139,92,246,0.4);border-radius:20px;padding:3px 14px;font-size:11px;font-weight:700;color:#8b5cf6;white-space:nowrap;margin:2px 0">↓ CTR: ${ctr}%</div>
+        <div style="width:2px;height:10px;background:rgba(139,92,246,0.35)"></div>
+      </div>
+
+      <div style="width:${clkW}%;background:rgba(139,92,246,0.82);border:1px solid rgba(139,92,246,0.9);border-radius:12px;padding:16px 20px;text-align:center">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:${subCol};text-transform:uppercase;margin-bottom:5px">Clicks</div>
+        <div style="font-size:26px;font-weight:800;color:#fff;font-family:${mono};line-height:1">${fmt(clk)}</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;width:${Math.max(convW, 20)}%;padding:2px 0">
+        <div style="width:2px;height:10px;background:rgba(16,185,129,0.35)"></div>
+        <div style="background:rgba(16,185,129,0.14);border:1px solid rgba(16,185,129,0.4);border-radius:20px;padding:3px 14px;font-size:11px;font-weight:700;color:#10B981;white-space:nowrap;margin:2px 0">↓ CVR: ${cvr}%</div>
+        <div style="width:2px;height:10px;background:rgba(16,185,129,0.35)"></div>
+      </div>
+
+      <div style="width:${convW}%;background:rgba(16,185,129,0.82);border:1px solid rgba(16,185,129,0.9);border-radius:12px;padding:16px 20px;text-align:center">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:${subCol};text-transform:uppercase;margin-bottom:5px">Orders</div>
+        <div style="font-size:26px;font-weight:800;color:#fff;font-family:${mono};line-height:1">${fmt(conv)}</div>
+      </div>
+
+    </div>
+  `;
 }
 
 async function saveReportNotes() {
