@@ -4,10 +4,13 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Digifyce Platform</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/style.css?v=15">
+
+<link rel="stylesheet" href="/assets/style.css?v=21">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="/assets/app.js?v=21"></script>
 <style>
 @media(max-width:1024px){ #sb-toggle{display:inline-flex!important} }
 </style>
@@ -16,13 +19,13 @@
 <div class="shell">
   <div class="sb">
     <div class="sb-top">
-      <div class="sb-logo"><div class="sb-logo-icon">◈</div><div class="sb-logo-text">DIGI<em>FYCE</em></div></div>
+      <div class="sb-logo"><div class="sb-logo-icon">â—ˆ</div><div class="sb-logo-text">DIGI<em>FYCE</em></div></div>
       <div class="sb-tagline">Internal Platform</div>
       <div class="sb-brand-sel" onclick="openBrandPicker()">
         <div class="sb-brand-dot" id="sb-dot"></div>
         <span class="sb-brand-name" id="sb-brand-name" style="display:none"></span>
-        <span class="sb-brand-empty" id="sb-brand-empty">Select brand →</span>
-        <span class="sb-brand-caret">▼</span>
+        <span class="sb-brand-empty" id="sb-brand-empty">Select brand â†’</span>
+        <span class="sb-brand-caret">â–¼</span>
       </div>
       <div class="sb-prog-wrap"><div class="sb-prog-fill" id="sb-prog" style="width:0%"></div></div>
     </div>
@@ -30,15 +33,15 @@
     <div class="sb-bot">
       <div class="sb-user">
         <div class="sb-av" id="sb-av">?</div>
-        <div class="sb-uinfo"><div class="sb-uname" id="sb-uname">—</div><div class="sb-urole" id="sb-urole">—</div></div>
-        <button class="sb-logout" title="Sign out" onclick="doLogout()">⏻</button>
+        <div class="sb-uinfo"><div class="sb-uname" id="sb-uname">â€”</div><div class="sb-urole" id="sb-urole">â€”</div></div>
+        <button class="sb-logout" title="Sign out" onclick="doLogout()">â»</button>
       </div>
     </div>
   </div>
   <div class="main">
     <div class="topbar">
       <div class="tb-left">
-        <button class="btn icon sm" id="sb-toggle" onclick="toggleSidebar()" style="display:none;margin-right:8px">☰</button>
+        <button class="btn icon sm" id="sb-toggle" onclick="toggleSidebar()" style="display:none;margin-right:8px">â˜°</button>
         <div class="tb-bc">Digifyce <span class="tb-sep">/</span> <span id="tb-page-name">Dashboard</span></div>
         <div class="chip brand" id="tb-brand-chip" style="display:none"></div>
       </div>
@@ -49,7 +52,7 @@
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
           <div>
             <div class="dash-hero-title">
-              <span id="dash-greeting">Loading…</span>
+              <span id="dash-greeting">Loadingâ€¦</span>
               <span class="role-chip" id="dash-role-chip" style="display:none;">Role</span>
             </div>
             <div class="dash-hero-sub" id="dash-sub">Loading dashboard data...</div>
@@ -97,13 +100,13 @@
       </div>
       <div class="strat-actions">
         <div style="display:flex;gap:8px">
-          <button class="btn" id="s-prev" onclick="stratPrev()">← Previous</button>
-          <button class="btn" onclick="bgtOpenHistory()" title="Load or download past strategy drafts and PPTX runs"><span style="margin-right:2px">📜</span> Past Strategy Runs</button>
+          <button class="btn" id="s-prev" onclick="stratPrev()">â† Previous</button>
+          <button class="btn" onclick="bgtOpenHistory()" title="Load or download past strategy drafts and PPTX runs"><span style="margin-right:2px">ðŸ“œ</span> Past Strategy Runs</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           <div class="save-indicator" id="strat-save-ind" style="display:none"></div>
-          <button class="btn amr" id="s-gen" onclick="genPPTX()" style="display:none">✦ Generate PPTX</button>
-          <button class="btn primary" id="s-next" onclick="stratNext()">Next Step →</button>
+          <button class="btn amr" id="s-gen" onclick="genPPTX()" style="display:none">âœ¦ Generate PPTX</button>
+          <button class="btn primary" id="s-next" onclick="stratNext()">Next Step â†’</button>
         </div>
       </div>
     </div>
@@ -117,16 +120,16 @@
       </div>
       <div id="pricing-calc-view" style="display:none">
         <div class="calc-hd" style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
-          <button class="calc-back" onclick="backToBrands()">← Brands</button>
-          <div><div class="calc-brand-name" id="calc-brand-name">—</div><div style="font-size:11px;color:var(--mid)" id="calc-brand-meta">—</div></div>
+          <button class="calc-back" onclick="backToBrands()">â† Brands</button>
+          <div><div class="calc-brand-name" id="calc-brand-name">â€”</div><div style="font-size:11px;color:var(--mid)" id="calc-brand-meta">â€”</div></div>
           
           <!-- Segmented View Mode Toggle -->
           <div class="view-mode-toggle" id="calc-view-toggle-container" style="margin-left:24px;display:flex;background:var(--off);border:1px solid var(--border);border-radius:20px;padding:2px;gap:2px">
-            <button class="toggle-btn active" id="mode-std" onclick="setPricingViewMode('std')" style="border:none;border-radius:18px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;background:var(--bg);box-shadow:0 2px 4px rgba(0,0,0,0.05);color:var(--fg);transition:all 0.2s">👁 Standard</button>
-            <button class="toggle-btn" id="mode-adv" onclick="setPricingViewMode('adv')" style="border:none;border-radius:18px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:var(--mid);transition:all 0.2s">⚙ Manager</button>
+            <button class="toggle-btn active" id="mode-std" onclick="setPricingViewMode('std')" style="border:none;border-radius:18px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;background:var(--bg);box-shadow:0 2px 4px rgba(0,0,0,0.05);color:var(--fg);transition:all 0.2s">ðŸ‘ Standard</button>
+            <button class="toggle-btn" id="mode-adv" onclick="setPricingViewMode('adv')" style="border:none;border-radius:18px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:var(--mid);transition:all 0.2s">âš™ Manager</button>
           </div>
           
-          <div class="chip save" id="save-chip" style="display:none;margin-left:auto">✓ Saved</div>
+          <div class="chip save" id="save-chip" style="display:none;margin-left:auto">âœ“ Saved</div>
         </div>
         <div class="sum-bar">
           <div class="sum-item"><div class="sum-val" id="sum-prods">0</div><div class="sum-lbl">Products</div></div>
@@ -134,29 +137,29 @@
           <div class="sum-item"><div class="sum-val" id="sum-margin">0%</div><div class="sum-lbl">Avg Margin</div></div>
           <div class="sum-item"><div class="sum-val" id="sum-roas">0x</div><div class="sum-lbl">Est. ROAS</div></div>
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-            <button class="btn sm" onclick="exportExcel()">↓ Export Excel</button>
+            <button class="btn sm" onclick="exportExcel()">â†“ Export Excel</button>
             <button class="btn sm primary" id="add-prod-btn" onclick="addProduct()" style="display:none">+ Add Product</button>
           </div>
         </div>
         <div class="globals-card">
           <div class="globals-hd" onclick="toggleGlobals()">
-            <span class="globals-hd-title">⚙ Global Cost Assumptions</span>
-            <span class="globals-hd-note">Applied to all products · click to expand</span>
-            <span id="g-arrow" style="color:var(--mid);font-size:11px;margin-left:8px">▶</span>
+            <span class="globals-hd-title">âš™ Global Cost Assumptions</span>
+            <span class="globals-hd-note">Applied to all products Â· click to expand</span>
+            <span id="g-arrow" style="color:var(--mid);font-size:11px;margin-left:8px">â–¶</span>
           </div>
           <div class="globals-body" id="globals-body">
-            <div class="field"><label>Branding (₹)</label><input type="text" inputmode="decimal" id="g-brand" value="30" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>Photography (₹)</label><input type="text" inputmode="decimal" id="g-photo" value="15" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>Shipping (₹)</label><input type="text" inputmode="decimal" id="g-ship" value="70" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>Operations (₹)</label><input type="text" inputmode="decimal" id="g-ops" value="25" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>Gift Wrap (₹)</label><input type="text" inputmode="decimal" id="g-gw" value="0" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field"><label>Branding (â‚¹)</label><input type="text" inputmode="decimal" id="g-brand" value="30" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field"><label>Photography (â‚¹)</label><input type="text" inputmode="decimal" id="g-photo" value="15" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field"><label>Shipping (â‚¹)</label><input type="text" inputmode="decimal" id="g-ship" value="70" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field"><label>Operations (â‚¹)</label><input type="text" inputmode="decimal" id="g-ops" value="25" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
+            <div class="field"><label>Gift Wrap (â‚¹)</label><input type="text" inputmode="decimal" id="g-gw" value="0" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
             <div class="field"><label>RTO Rate (%)</label><input type="text" inputmode="decimal" id="g-rto" value="5" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
             <div class="field"><label>Target ROAS</label><input type="text" inputmode="decimal" id="g-roas" value="3" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
             <div class="field">
               <label>Discount Type</label>
               <select id="g-disc-type" onchange="deferSaveAndRender()" style="width:100%;height:32px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:0 8px;outline:none;background:#fff;color:var(--fg)">
                 <option value="pct" selected>Percentage (%)</option>
-                <option value="flat">Flat ₹</option>
+                <option value="flat">Flat â‚¹</option>
               </select>
             </div>
             <div class="field"><label>Discount Value</label><input type="text" inputmode="decimal" id="g-disc" value="0" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
@@ -186,27 +189,27 @@
       
       <div id="catalog-view-panel" style="display:none">
         <div class="calc-hd" style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
-          <button class="calc-back" onclick="backToCatalogBrands()">← Brands</button>
-          <div><div class="calc-brand-name" id="catalog-brand-name">—</div><div style="font-size:11px;color:var(--mid)" id="catalog-brand-meta">—</div></div>
+          <button class="calc-back" onclick="backToCatalogBrands()">â† Brands</button>
+          <div><div class="calc-brand-name" id="catalog-brand-name">â€”</div><div style="font-size:11px;color:var(--mid)" id="catalog-brand-meta">â€”</div></div>
           
           <!-- Search box in header -->
           <div style="margin-left:auto;position:relative;display:flex;align-items:center;min-width:280px">
-            <span style="position:absolute;left:12px;color:var(--mid);font-size:12px">🔍</span>
+            <span style="position:absolute;left:12px;color:var(--mid);font-size:12px">ðŸ”</span>
             <input type="text" id="catalog-search" oninput="filterCatalog()" placeholder="Search product or variant name..." style="width:100%;padding:8px 12px 8px 32px;border:1px solid var(--border);border-radius:20px;font-size:12px;outline:none">
           </div>
         </div>
         
         <div class="catalog-summary-strip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0">
           <div class="card" style="padding:12px;display:flex;align-items:center;gap:12px;margin-bottom:0">
-            <div style="width:36px;height:36px;background:rgba(16,185,129,0.1);color:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">📦</div>
+            <div style="width:36px;height:36px;background:rgba(16,185,129,0.1);color:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">ðŸ“¦</div>
             <div><div style="font-size:18px;font-weight:700;color:var(--fg)" id="cat-sum-prods">0</div><div style="font-size:11px;color:var(--mid)">Total Products</div></div>
           </div>
           <div class="card" style="padding:12px;display:flex;align-items:center;gap:12px;margin-bottom:0">
-            <div style="width:36px;height:36px;background:rgba(43,78,255,0.1);color:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">🧩</div>
+            <div style="width:36px;height:36px;background:rgba(43,78,255,0.1);color:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">ðŸ§©</div>
             <div><div style="font-size:18px;font-weight:700;color:var(--fg)" id="cat-sum-vars">0</div><div style="font-size:11px;color:var(--mid)">Total Variants</div></div>
           </div>
           <div class="card" style="padding:12px;display:flex;align-items:center;gap:12px;margin-bottom:0">
-            <div style="width:36px;height:36px;background:rgba(245,158,11,0.1);color:var(--amber);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">💰</div>
+            <div style="width:36px;height:36px;background:rgba(245,158,11,0.1);color:var(--amber);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">ðŸ’°</div>
             <div><div style="font-size:18px;font-weight:700;color:var(--fg)" id="cat-sum-margin">0%</div><div style="font-size:11px;color:var(--mid)">Average Gross Margin</div></div>
           </div>
         </div>
@@ -226,15 +229,15 @@
       </div>
       <div id="bgt-months-view" style="display:none">
         <div class="calc-hd">
-          <button class="calc-back" onclick="bgtBackToDashboard()">← Dashboard</button>
-          <div><div class="calc-brand-name" id="bgt-brand-name">—</div><div style="font-size:11px;color:var(--mid)" id="bgt-brand-sub">—</div></div>
+          <button class="calc-back" onclick="bgtBackToDashboard()">â† Dashboard</button>
+          <div><div class="calc-brand-name" id="bgt-brand-name">â€”</div><div style="font-size:11px;color:var(--mid)" id="bgt-brand-sub">â€”</div></div>
           <div style="margin-left:auto;display:flex;gap:8px"><button class="btn sm primary" id="bgt-new-month-btn" onclick="bgtOpenNewMonth()">+ New Month</button></div>
         </div>
         <div id="bgt-months-list" style="display:flex;flex-direction:column;gap:10px;margin-top:16px"></div>
       </div>
       <div id="bgt-month-view" style="display:none">
         <div class="calc-hd">
-          <button class="calc-back" onclick="bgtBackToMonths()">← Months</button>
+          <button class="calc-back" onclick="bgtBackToMonths()">â† Months</button>
           <div>
             <div class="calc-brand-name" id="bgt-month-title">-</div>
             <div style="font-size:11px;color:var(--mid);display:flex;align-items:center;gap:6px">
@@ -243,19 +246,19 @@
             </div>
           </div>
           <div style="margin-left:auto;display:flex;gap:8px">
-            <button class="btn sm" onclick="bgtOpenEditMonth()" id="bgt-edit-btn">⚙ Edit Settings</button>
-            <button class="btn sm" onclick="bgtOpenCompare()" id="bgt-compare-btn">⇄ Compare</button>
+            <button class="btn sm" onclick="bgtOpenEditMonth()" id="bgt-edit-btn">âš™ Edit Settings</button>
+            <button class="btn sm" onclick="bgtOpenCompare()" id="bgt-compare-btn">â‡„ Compare</button>
           </div>
         </div>
         <div class="bgt-summary-row" id="bgt-summary-row"></div>
         <div id="bgt-flags-panel" style="display:none;margin-bottom:14px"></div>
         <div class="bgt-tabs" id="bgt-tabs">
-          <button class="bgt-tab active" onclick="bgtSetTab('overview')">📊 Overview</button>
-          <button class="bgt-tab" onclick="bgtSetTab('push')">📣 Push (Meta)</button>
-          <button class="bgt-tab" onclick="bgtSetTab('pull')">🎯 Pull (Google)</button>
-          <button class="bgt-tab" onclick="bgtSetTab('retention')">💌 Retention (WhatsApp/Mail)</button>
-          <button class="bgt-tab" onclick="bgtSetTab('marketplace')">🛒 Push Marketplace</button>
-          <button class="bgt-tab" onclick="bgtSetTab('social')">📱 Social</button>
+          <button class="bgt-tab active" onclick="bgtSetTab('overview')">ðŸ“Š Overview</button>
+          <button class="bgt-tab" onclick="bgtSetTab('push')">ðŸ“£ Push (Meta)</button>
+          <button class="bgt-tab" onclick="bgtSetTab('pull')">ðŸŽ¯ Pull (Google)</button>
+          <button class="bgt-tab" onclick="bgtSetTab('retention')">ðŸ’Œ Retention (WhatsApp/Mail)</button>
+          <button class="bgt-tab" onclick="bgtSetTab('marketplace')">ðŸ›’ Push Marketplace</button>
+          <button class="bgt-tab" onclick="bgtSetTab('social')">ðŸ“± Social</button>
         </div>
         <div class="card" style="margin-bottom:14px;padding:14px"><canvas id="bgt-chart" height="120"></canvas></div>
         <div class="card" style="padding:0;overflow:hidden">
@@ -268,7 +271,7 @@
       </div>
       <div id="bgt-compare-view" style="display:none">
         <div class="calc-hd">
-          <button class="calc-back" onclick="bgtBackToMonth()">← Back</button>
+          <button class="calc-back" onclick="bgtBackToMonth()">â† Back</button>
           <div><div class="calc-brand-name">Period Comparison</div></div>
         </div>
         <div id="bgt-compare-content" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px"></div>
@@ -314,7 +317,7 @@
       <!-- 2. CREATE REPORT WIZARD VIEW -->
       <div id="reports-create-view" style="display:none">
         <div class="calc-hd">
-          <button class="calc-back" onclick="backToReportsList()">← Back to Reports</button>
+          <button class="calc-back" onclick="backToReportsList()">â† Back to Reports</button>
           <div>
             <div class="calc-brand-name">Create Performance Report</div>
             <div style="font-size:11px;color:var(--mid)" id="reports-create-brand-meta">Brand Name</div>
@@ -347,7 +350,7 @@
           <!-- Dynamic Missing Data Section -->
           <div id="reports-missing-alert" style="display:none;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:12px 16px;margin-bottom:20px">
             <div style="color:#b45309;font-weight:700;font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:6px">
-              ⚠️ Missing Daily Data Found
+              âš ï¸ Missing Daily Data Found
             </div>
             <div style="font-size:12px;color:var(--body);line-height:1.4">
               Daily spend or sales data is missing for the following dates. Fill them below to generate an accurate report, or click "Generate Report" directly to calculate using partial data.
@@ -366,14 +369,14 @@
       <!-- 3. REPORT DETAILS DASHBOARD VIEW -->
       <div id="reports-detail-view" style="display:none">
         <div class="calc-hd">
-          <button class="calc-back" onclick="backToReportsList()">← Back</button>
+          <button class="calc-back" onclick="backToReportsList()">â† Back</button>
           <div>
             <div class="calc-brand-name" id="rep-detail-title">Weekly Performance Report</div>
-            <div style="font-size:11px;color:var(--mid)" id="rep-detail-meta">Hapli Earth · June 2026</div>
+            <div style="font-size:11px;color:var(--mid)" id="rep-detail-meta">Hapli Earth Â· June 2026</div>
           </div>
           <div style="margin-left:auto;display:flex;gap:8px" id="rep-detail-actions">
-            <button class="btn sm" onclick="printReportDetail()">🖨️ Print / Save PDF</button>
-            <button class="btn sm primary" onclick="copyReportShareLink()" id="btn-copy-share-link">🔗 Copy Share Link</button>
+            <button class="btn sm" onclick="printReportDetail()">ðŸ–¨ï¸ Print / Save PDF</button>
+            <button class="btn sm primary" onclick="copyReportShareLink()" id="btn-copy-share-link">ðŸ”— Copy Share Link</button>
           </div>
         </div>
 
@@ -381,12 +384,12 @@
         <div class="bgt-summary-row" style="margin-bottom:20px">
           <div class="bgt-stat" style="grid-column: span 2">
             <div class="bgt-stat-label">Spent</div>
-            <div class="bgt-stat-value" id="rep-kpi-spend">₹0</div>
+            <div class="bgt-stat-value" id="rep-kpi-spend">â‚¹0</div>
             <div class="bgt-stat-sub" id="rep-change-spend">-</div>
           </div>
           <div class="bgt-stat" style="grid-column: span 2">
             <div class="bgt-stat-label">Total Sales</div>
-            <div class="bgt-stat-value" id="rep-kpi-sales">₹0</div>
+            <div class="bgt-stat-value" id="rep-kpi-sales">â‚¹0</div>
             <div class="bgt-stat-sub" id="rep-change-sales">-</div>
           </div>
           <div class="bgt-stat" style="grid-column: span 2">
@@ -401,12 +404,12 @@
           </div>
           <div class="bgt-stat" style="grid-column: span 2">
             <div class="bgt-stat-label">CPA</div>
-            <div class="bgt-stat-value" id="rep-kpi-cpa">₹0</div>
+            <div class="bgt-stat-value" id="rep-kpi-cpa">â‚¹0</div>
             <div class="bgt-stat-sub" id="rep-change-cpa">-</div>
           </div>
           <div class="bgt-stat" style="grid-column: span 2">
             <div class="bgt-stat-label">AOV</div>
-            <div class="bgt-stat-value" id="rep-kpi-aov">₹0</div>
+            <div class="bgt-stat-value" id="rep-kpi-aov">â‚¹0</div>
             <div class="bgt-stat-sub" id="rep-change-aov">-</div>
           </div>
         </div>
@@ -473,7 +476,7 @@
           <div class="dash-side-col">
             <div class="card" style="padding:16px;margin-bottom:16px;background:rgba(43,78,255,0.03);border:1px solid rgba(43,78,255,0.1)">
               <div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:12px;display:flex;align-items:center;gap:6px">
-                🤖 Client Summary (AI Assisted)
+                ðŸ¤– Client Summary (AI Assisted)
               </div>
               <div style="display:flex;flex-direction:column;gap:12px">
                 <div class="field">
@@ -572,7 +575,7 @@
           <div class="card" style="padding:20px;border-radius:12px;background:#fff;box-shadow:var(--sh);margin-bottom:0">
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
               <div>
-                <div class="card-title" style="margin-bottom:4px;font-size:15px"><div class="ct-num" style="background:var(--blue)">⚡</div>AI Configuration Hub</div>
+                <div class="card-title" style="margin-bottom:4px;font-size:15px"><div class="ct-num" style="background:var(--blue)">âš¡</div>AI Configuration Hub</div>
                 <p style="font-size:12px;color:var(--mid)">Choose your primary intelligence engine and define fallback parameters for real-time strategy generation.</p>
               </div>
               
@@ -622,13 +625,13 @@
                 <label>API Connection Key</label>
                 <div style="position:relative;display:flex;align-items:center">
                   <input type="password" id="ai-ant-key" placeholder="sk-ant-..." oninput="saveAISettings()" style="width:100%;padding-right:40px">
-                  <button type="button" class="btn-pwd-toggle" onclick="togglePasswordVisibility('ai-ant-key', this)" style="position:absolute;right:8px;background:none;border:none;color:var(--mid);cursor:pointer;padding:4px;font-size:14px;outline:none">👁️</button>
+                  <button type="button" class="btn-pwd-toggle" onclick="togglePasswordVisibility('ai-ant-key', this)" style="position:absolute;right:8px;background:none;border:none;color:var(--mid);cursor:pointer;padding:4px;font-size:14px;outline:none">ðŸ‘ï¸</button>
                 </div>
               </div>
 
               <div style="display:flex;align-items:center;justify-content:space-between">
                 <button class="btn sm primary" id="btn-test-anthropic" onclick="testKeyDirect('anthropic', this)" style="border-radius:6px;font-size:11px">
-                  ⚡ Test Connection
+                  âš¡ Test Connection
                 </button>
                 <div class="key-status-text" id="status-anthropic" style="font-size:11px;font-weight:600;color:var(--mid)">Not checked</div>
               </div>
@@ -661,13 +664,13 @@
                 <label>API Connection Key</label>
                 <div style="position:relative;display:flex;align-items:center">
                   <input type="password" id="ai-oai-key" placeholder="sk-..." oninput="saveAISettings()" style="width:100%;padding-right:40px">
-                  <button type="button" class="btn-pwd-toggle" onclick="togglePasswordVisibility('ai-oai-key', this)" style="position:absolute;right:8px;background:none;border:none;color:var(--mid);cursor:pointer;padding:4px;font-size:14px;outline:none">👁️</button>
+                  <button type="button" class="btn-pwd-toggle" onclick="togglePasswordVisibility('ai-oai-key', this)" style="position:absolute;right:8px;background:none;border:none;color:var(--mid);cursor:pointer;padding:4px;font-size:14px;outline:none">ðŸ‘ï¸</button>
                 </div>
               </div>
 
               <div style="display:flex;align-items:center;justify-content:space-between">
                 <button class="btn sm primary" id="btn-test-openai" onclick="testKeyDirect('openai', this)" style="border-radius:6px;font-size:11px">
-                  ⚡ Test Connection
+                  âš¡ Test Connection
                 </button>
                 <div class="key-status-text" id="status-openai" style="font-size:11px;font-weight:600;color:var(--mid)">Not checked</div>
               </div>
@@ -729,14 +732,14 @@
 </div></div>
 
 <div class="modal-overlay" id="mo-gen" style="display:none"><div class="modal" style="text-align:center">
-  <div style="font-size:32px;margin-bottom:12px">✦</div>
+  <div style="font-size:32px;margin-bottom:12px">âœ¦</div>
   <div class="modal-title" style="text-align:center">Generating Strategy Deck</div>
-  <div id="gen-status" style="font-size:13px;color:var(--mid);margin-bottom:16px">Connecting to AI…</div>
+  <div id="gen-status" style="font-size:13px;color:var(--mid);margin-bottom:16px">Connecting to AIâ€¦</div>
   <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:16px"><div id="gen-prog" style="height:100%;background:var(--blue);border-radius:2px;width:0%;transition:width .5s"></div></div>
   <div id="gen-done" style="display:none">
-    <div style="color:var(--green);font-weight:700;margin-bottom:12px">✓ Strategy deck ready!</div>
+    <div style="color:var(--green);font-weight:700;margin-bottom:12px">âœ“ Strategy deck ready!</div>
     <div style="display:flex;gap:8px;justify-content:center">
-      <a id="gen-download-link" class="btn primary" href="#" download>↓ Download PPTX</a>
+      <a id="gen-download-link" class="btn primary" href="#" download>â†“ Download PPTX</a>
       <button class="btn" onclick="closeMo('mo-gen')">Close</button>
     </div>
   </div>
@@ -763,7 +766,7 @@
       <div class="field"><label>Month</label><select id="bgtm-month"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4" selected>April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
       <div class="field"><label>Year</label><input type="number" id="bgtm-year" value="2026" min="2024" max="2030"></div>
     </div>
-    <div class="field"><label>Revenue Target (₹)</label><input type="number" id="bgtm-target" placeholder="e.g. 2500000"></div>
+    <div class="field"><label>Revenue Target (â‚¹)</label><input type="number" id="bgtm-target" placeholder="e.g. 2500000"></div>
     <div class="field"><label>Overall Target ROAS</label><input type="number" id="bgtm-roas" value="5" step="0.1"></div>
     <div style="font-size:12px;font-weight:600;color:var(--fg);margin-top:4px">Channel Setup</div>
     <div id="bgt-new-month-channels" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:220px;overflow-y:auto;padding-right:4px"></div>
@@ -791,9 +794,9 @@
     <div class="field">
       <label>Comparison Level</label>
       <select id="bgt-cmp-type" onchange="bgtChangeCompareType()" style="width:100%">
-        <option value="month">📅 Month-over-Month (MoM)</option>
-        <option value="quarter">📊 Quarter-over-Quarter (QoQ)</option>
-        <option value="year">⏳ Year-over-Year (YoY)</option>
+        <option value="month">ðŸ“… Month-over-Month (MoM)</option>
+        <option value="quarter">ðŸ“Š Quarter-over-Quarter (QoQ)</option>
+        <option value="year">â³ Year-over-Year (YoY)</option>
       </select>
     </div>
     
@@ -861,7 +864,7 @@
 <div class="modal-overlay" id="mo-bgt-edit" style="display:none"><div class="modal" style="min-width:420px">
   <div class="modal-title">Edit Month Settings</div>
   <div style="display:flex;flex-direction:column;gap:11px">
-    <div class="field"><label>Revenue Target (₹)</label><input type="number" id="bgte-target" placeholder="e.g. 2500000"></div>
+    <div class="field"><label>Revenue Target (â‚¹)</label><input type="number" id="bgte-target" placeholder="e.g. 2500000"></div>
     <div class="field"><label>Overall Target ROAS</label><input type="number" id="bgte-roas" value="5" step="0.1"></div>
     <div style="font-size:12px;font-weight:600;color:var(--fg);margin-top:4px">Channel Setup</div>
     <div id="bgte-edit-channels-container" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:220px;overflow-y:auto;padding-right:4px"></div>
@@ -889,7 +892,7 @@
         <div style="font-size:15px;font-weight:800;color:var(--dark)">Price Adjustment Timeline</div>
         <div style="font-size:11px;color:var(--mid);margin-top:2px" id="hist-drawer-subtitle">Product pricing history</div>
       </div>
-      <button onclick="closeHistoryDrawer()" style="background:none;border:none;font-size:22px;color:var(--mid);cursor:pointer;line-height:1;outline:none;padding:4px">✕</button>
+      <button onclick="closeHistoryDrawer()" style="background:none;border:none;font-size:22px;color:var(--mid);cursor:pointer;line-height:1;outline:none;padding:4px">âœ•</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:24px" id="hist-drawer-content">
       <div class="timeline" id="history-timeline"></div>
@@ -901,9 +904,9 @@
 </div>
 
 <script src="/api/config_js.php"></script>
-<script src="/assets/app.js?v=15"></script>
 </body>
 </html>
+
 
 
 
