@@ -10,6 +10,7 @@ const NAV = [
     { id:'pricing',   label:'Pricing Calculator',icon:'💰', sub:'Margin & price analysis'  },
     { id:'catalog',   label:'Price Catalog',     icon:'📋', sub:'Searchable price lookup'  },
     { id:'budget',    label:'Budget Tracker',    icon:'📊', sub:'Monthly performance & ROAS'},
+    { id:'reports',   label:'Reports Generator', icon:'📄', sub:'Weekly & monthly summaries' },
   ]},
   { group:'Admin', adminOnly:true, items:[
     { id:'admin',     label:'User Management',   icon:'👥', sub:'Users & permissions'      },
@@ -160,6 +161,7 @@ function showPage(id) {
     pricing: 'Pricing Calculator', 
     catalog: 'Price Catalog', 
     budget: 'Budget Tracker', 
+    reports: 'Reports Generator',
     admin: 'User Management',
     activity: 'Activity Logs'
   };
@@ -170,6 +172,7 @@ function showPage(id) {
   if (id === 'catalog')  { renderCatalogBrands(); backToCatalogBrands(); }
   if (id === 'admin')    renderAdmin();
   if (id === 'budget')   initBudget();
+  if (id === 'reports')  initReportsPage();
   if (id === 'activity') initActivityPage();
 }
 
@@ -2289,6 +2292,7 @@ async function submitAddUser() {
   if (document.getElementById('pg-strategy').checked) pages.push('strategy');
   if (document.getElementById('pg-pricing').checked)  pages.push('pricing');
   const pgb = document.getElementById('pg-budget'); if (pgb && pgb.checked) pages.push('budget');
+  const pgr = document.getElementById('pg-reports'); if (pgr && pgr.checked) pages.push('reports');
   const r = await api('POST', '/api/admin/users', {
     name, email, password: pw, role, pages,
     brands: brands === '*' ? '*' : [brands],
@@ -4217,3 +4221,419 @@ function renderActivityPageLogs(logs) {
   
   container.innerHTML = html;
 }
+
+// ─── REPORTS GENERATOR PAGE ──────────────────────────────────────────────────
+let reportsChartSpend = null;
+let reportsChartRevenue = null;
+let activeReportId = null;
+
+async function initReportsPage() {
+  const list = document.getElementById('reports-tbody');
+  if (!activeBrand) {
+    list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--mid);padding:24px 0">Select a brand from the sidebar dropdown to view reports</td></tr>`;
+    return;
+  }
+  
+  // Reset subviews
+  document.getElementById('reports-list-view').style.display = 'block';
+  document.getElementById('reports-create-view').style.display = 'none';
+  document.getElementById('reports-detail-view').style.display = 'none';
+  
+  list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--mid);padding:24px 0">Loading reports…</td></tr>`;
+  try {
+    const r = await api(`/api/reports?action=list&brand_id=${activeBrand.id}`);
+    if (!r || !r.length) {
+      list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--mid);padding:24px 0">No reports generated yet for ${activeBrand.name}. Click "+ Create Report" to start.</td></tr>`;
+      return;
+    }
+    
+    list.innerHTML = r.map(h => {
+      const start = new Date(h.period_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const end = new Date(h.period_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const shareUrl = `${window.location.origin}/report.html?token=${h.unique_token}`;
+      return `
+        <tr>
+          <td style="font-weight:600;text-transform:capitalize">${h.report_type}</td>
+          <td style="font-family:var(--fm)">${start} - ${end}</td>
+          <td style="font-family:var(--fm)">₹${parseFloat(h.total_spend).toLocaleString('en-IN')}</td>
+          <td style="font-family:var(--fm)">₹${parseFloat(h.total_revenue).toLocaleString('en-IN')}</td>
+          <td style="font-family:var(--fm);font-weight:700">${h.overall_roas}x</td>
+          <td style="font-family:var(--fm)">${h.view_count} views</td>
+          <td>
+            <input type="text" value="${shareUrl}" readonly style="width:180px;font-size:10px;padding:3px 6px;border:1px solid var(--border);border-radius:4px" onclick="this.select()">
+          </td>
+          <td>
+            <div style="display:flex;gap:4px">
+              <button class="btn sm" onclick="loadReportDetails('${h.id}')">View</button>
+              <button class="btn sm danger" onclick="deleteReport('${h.id}')">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px 0">Failed to load reports: ${e.message}</td></tr>`;
+  }
+}
+
+function openCreateReport() {
+  if (!activeBrand) return alert('Please select a brand first.');
+  document.getElementById('reports-list-view').style.display = 'none';
+  document.getElementById('reports-create-view').style.display = 'block';
+  document.getElementById('reports-create-brand-meta').textContent = `${activeBrand.name} · Report Creator`;
+  
+  // Set default dates
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  document.getElementById('rep-start-date').value = firstDay.toISOString().split('T')[0];
+  document.getElementById('rep-end-date').value = today.toISOString().split('T')[0];
+  
+  handleReportTypeChange();
+}
+
+function backToReportsList() {
+  initReportsPage();
+}
+
+function handleReportTypeChange() {
+  const type = document.querySelector('input[name="rep-type"]:checked').value;
+  const startEl = document.getElementById('rep-start-date');
+  const endEl = document.getElementById('rep-end-date');
+  const today = new Date();
+  
+  if (type === 'weekly') {
+    // Default to last completed week Mon-Sun
+    const prevMon = new Date();
+    prevMon.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1) - 7);
+    const prevSun = new Date(prevMon);
+    prevSun.setDate(prevMon.getDate() + 6);
+    
+    startEl.value = prevMon.toISOString().split('T')[0];
+    endEl.value = prevSun.toISOString().split('T')[0];
+  } else {
+    // Default to last full calendar month
+    const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    
+    startEl.value = firstDayLastMonth.toISOString().split('T')[0];
+    endEl.value = lastDayLastMonth.toISOString().split('T')[0];
+  }
+  
+  checkReportMissingData();
+}
+
+async function checkReportMissingData() {
+  if (!activeBrand) return;
+  const start = document.getElementById('rep-start-date').value;
+  const end = document.getElementById('rep-end-date').value;
+  if (!start || !end) return;
+  
+  try {
+    const r = await api(`/api/reports?action=check_missing&brand_id=${activeBrand.id}&start_date=${start}&end_date=${end}`);
+    const alertEl = document.getElementById('reports-missing-alert');
+    const formsEl = document.getElementById('reports-missing-forms');
+    
+    if (r && r.missing && r.missing.length > 0) {
+      alertEl.style.display = 'block';
+      formsEl.innerHTML = r.missing.map((date, idx) => `
+        <div class="card reports-missing-day-card" data-date="${date}" style="padding:14px;border-left:4px solid var(--amber)">
+          <div style="font-weight:700;font-size:12px;color:var(--dark);margin-bottom:10px">${date} (Enter performance data)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <!-- Meta input block -->
+            <div style="background:var(--off);padding:10px;border-radius:8px;border:1px solid var(--border)">
+              <div style="font-weight:700;font-size:11px;color:var(--mid);text-transform:uppercase;margin-bottom:8px">Meta (Facebook/Instagram)</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div class="field"><label style="font-size:9px">Spend (₹)</label><input type="text" class="m-sp" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field"><label style="font-size:9px">Revenue (₹)</label><input type="text" class="m-rev" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field"><label style="font-size:9px">Orders</label><input type="text" class="m-ord" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field"><label style="font-size:9px">Clicks</label><input type="text" class="m-clk" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field" style="grid-column: span 2"><label style="font-size:9px">Impressions</label><input type="text" class="m-imp" placeholder="0" style="padding:6px;height:30px"></div>
+              </div>
+            </div>
+            <!-- Google input block -->
+            <div style="background:var(--off);padding:10px;border-radius:8px;border:1px solid var(--border)">
+              <div style="font-weight:700;font-size:11px;color:var(--mid);text-transform:uppercase;margin-bottom:8px">Google Ads</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div class="field"><label style="font-size:9px">Spend (₹)</label><input type="text" class="g-sp" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field"><label style="font-size:9px">Revenue (₹)</label><input type="text" class="g-rev" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field"><label style="font-size:9px">Orders</label><input type="text" class="g-ord" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field"><label style="font-size:9px">Clicks</label><input type="text" class="g-clk" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field" style="grid-column: span 2"><label style="font-size:9px">Impressions</label><input type="text" class="g-imp" placeholder="0" style="padding:6px;height:30px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    } else {
+      alertEl.style.display = 'none';
+      formsEl.innerHTML = '';
+    }
+  } catch (e) {
+    console.error('Check missing data error:', e);
+  }
+}
+
+async function submitGenerateReport() {
+  const type = document.querySelector('input[name="rep-type"]:checked').value;
+  const start = document.getElementById('rep-start-date').value;
+  const end = document.getElementById('rep-end-date').value;
+  
+  if (!start || !end) return alert('Please enter start and end dates.');
+  
+  const generateBtn = document.getElementById('btn-generate-report');
+  generateBtn.disabled = true;
+  generateBtn.textContent = 'Generating…';
+  
+  try {
+    // 1. Gather and save missing data if forms exist
+    const cards = document.querySelectorAll('.reports-missing-day-card');
+    if (cards.length > 0) {
+      const missingData = [];
+      cards.forEach(card => {
+        const date = card.dataset.date;
+        const metaSpend = parseFloat(card.querySelector('.m-sp').value) || 0;
+        const metaSales = parseFloat(card.querySelector('.m-rev').value) || 0;
+        const metaOrd = parseInt(card.querySelector('.m-ord').value) || 0;
+        const metaClk = parseInt(card.querySelector('.m-clk').value) || 0;
+        const metaImp = parseInt(card.querySelector('.m-imp').value) || 0;
+        
+        const googSpend = parseFloat(card.querySelector('.g-sp').value) || 0;
+        const googSales = parseFloat(card.querySelector('.g-rev').value) || 0;
+        const googOrd = parseInt(card.querySelector('.g-ord').value) || 0;
+        const googClk = parseInt(card.querySelector('.g-clk').value) || 0;
+        const googImp = parseInt(card.querySelector('.g-imp').value) || 0;
+        
+        // Skip dates that weren't filled to allow partial data generation
+        if (metaSpend > 0 || metaSales > 0 || googSpend > 0 || googSales > 0) {
+          missingData.push({
+            date,
+            channels: {
+              meta: { spend: metaSpend, sales: metaSales, clicks: metaClk, impressions: metaImp, conversions: metaOrd },
+              google: { spend: googSpend, sales: googSales, clicks: googClk, impressions: googImp, conversions: googOrd }
+            }
+          });
+        }
+      });
+      
+      if (missingData.length > 0) {
+        await api('/api/reports?action=save_missing', 'POST', { brand_id: activeBrand.id, missing_data: missingData });
+      }
+    }
+    
+    // 2. Request report generation (which runs AI summaries dynamically)
+    const r = await api('/api/reports?action=create', 'POST', {
+      brand_id: activeBrand.id,
+      report_type: type,
+      start_date: start,
+      end_date: end
+    });
+    
+    if (r && r.report_id) {
+      loadReportDetails(r.report_id);
+    } else {
+      alert('Failed to generate report.');
+      generateBtn.disabled = false;
+      generateBtn.textContent = 'Generate Report';
+    }
+  } catch (e) {
+    alert('Error generating report: ' . e.message);
+    generateBtn.disabled = false;
+    generateBtn.textContent = 'Generate Report';
+  }
+}
+
+async function loadReportDetails(reportId) {
+  try {
+    const r = await api(`/api/reports?action=view&id=${reportId}`);
+    if (!r) return;
+    
+    activeReportId = reportId;
+    document.getElementById('reports-create-view').style.display = 'none';
+    document.getElementById('reports-list-view').style.display = 'none';
+    document.getElementById('reports-detail-view').style.display = 'block';
+    
+    const data = r.report_data;
+    
+    // Setup titles
+    const startStr = new Date(r.period_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const endStr = new Date(r.period_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    document.getElementById('rep-detail-title').textContent = `${r.report_type.toUpperCase()} Performance Report`;
+    document.getElementById('rep-detail-meta').textContent = `${r.brand_name} · ${startStr} - ${endStr}`;
+    
+    // Setup KPIs
+    document.getElementById('rep-kpi-spend').textContent = `₹${parseFloat(r.total_spend).toLocaleString('en-IN')}`;
+    document.getElementById('rep-kpi-sales').textContent = `₹${parseFloat(r.total_revenue).toLocaleString('en-IN')}`;
+    document.getElementById('rep-kpi-roas').textContent = `${parseFloat(r.overall_roas).toFixed(2)}x`;
+    document.getElementById('rep-kpi-orders').textContent = parseInt(r.total_conversions).toLocaleString('en-IN');
+    document.getElementById('rep-kpi-cpa').textContent = `₹${parseFloat(r.overall_cpa).toLocaleString('en-IN')}`;
+    document.getElementById('rep-kpi-aov').textContent = `₹${parseFloat(r.overall_aov).toLocaleString('en-IN')}`;
+    
+    // WoW Badges
+    const comps = data.comparisons || {};
+    const formatBadge = (val, id, lowerIsBetter = false) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const num = parseFloat(val);
+      if (isNaN(num) || num === 0) {
+        el.textContent = 'WoW: 0%'; el.className = 'bgt-stat-sub';
+        return;
+      }
+      const sign = num > 0 ? '+' : '';
+      el.textContent = `WoW: ${sign}${num}%`;
+      const isGood = lowerIsBetter ? (num < 0) : (num > 0);
+      el.className = isGood ? 'bgt-stat-sub good' : 'bgt-stat-sub bad';
+    };
+    
+    formatBadge(comps.spend, 'rep-change-spend', true);
+    formatBadge(comps.revenue, 'rep-change-sales');
+    formatBadge(comps.roas, 'rep-change-roas');
+    formatBadge(comps.conversions, 'rep-change-orders');
+    formatBadge(comps.cpa, 'rep-change-cpa', true);
+    formatBadge(comps.aov, 'rep-change-aov');
+    
+    // Notes
+    document.getElementById('rep-notes-hl').value = (r.highlights || '').replace(/<br>/g, '\n').replace(/• /g, '');
+    document.getElementById('rep-notes-bl').value = (r.blockers || '').replace(/<br>/g, '\n').replace(/• /g, '');
+    document.getElementById('rep-notes-ns').value = (r.next_steps || '').replace(/<br>/g, '\n').replace(/• /g, '');
+    
+    // Client Share URL
+    const shareUrl = `${window.location.origin}/report.html?token=${r.unique_token}`;
+    document.getElementById('rep-share-link-input').value = shareUrl;
+    
+    // Populate Channel Table
+    const tbody = document.getElementById('rep-channel-tbody');
+    tbody.innerHTML = Object.entries(data.channels || {}).map(([ch, m]) => `
+      <tr>
+        <td style="font-weight:700;text-transform:capitalize">${ch}</td>
+        <td style="font-family:var(--fm)">₹${parseFloat(m.spend).toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm)">${m.conversions}</td>
+        <td style="font-family:var(--fm)">₹${parseFloat(m.revenue).toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm)">₹${parseFloat(m.cpa).toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm);font-weight:700">${m.roas}x</td>
+        <td style="font-family:var(--fm)">${m.ctr}%</td>
+      </tr>
+    `).join('');
+    
+    // Draw charts
+    setTimeout(() => renderReportCharts(data.channels || {}), 100);
+    
+  } catch (e) {
+    alert('Failed to load report: ' + e.message);
+  }
+}
+
+function renderReportCharts(channels) {
+  const labels = Object.keys(channels).map(c => c.charAt(0).toUpperCase() + c.slice(1));
+  const spendData = Object.values(channels).map(c => c.spend);
+  const revenueData = Object.values(channels).map(c => c.revenue);
+  
+  const colors = ['#2B4EFF', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+  
+  if (reportsChartSpend) reportsChartSpend.destroy();
+  if (reportsChartRevenue) reportsChartRevenue.destroy();
+  
+  const ctxSpend = document.getElementById('rep-spend-chart').getContext('2d');
+  reportsChartSpend = new Chart(ctxSpend, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: spendData,
+        backgroundColor: colors.slice(0, labels.length),
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.05)'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { boxWidth: 10, font: { size: 10 } }
+        }
+      }
+    }
+  });
+  
+  const ctxRev = document.getElementById('rep-revenue-chart').getContext('2d');
+  reportsChartRevenue = new Chart(ctxRev, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: revenueData,
+        backgroundColor: colors.slice(0, labels.length),
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.05)'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { boxWidth: 10, font: { size: 10 } }
+        }
+      }
+    }
+  });
+}
+
+async function saveReportNotes() {
+  if (!activeReportId) return;
+  const hlRaw = document.getElementById('rep-notes-hl').value;
+  const blRaw = document.getElementById('rep-notes-bl').value;
+  const nsRaw = document.getElementById('rep-notes-ns').value;
+  
+  // Format as bullet points
+  const format = str => str.trim().split('\n').filter(s => s).map(s => `• ${s.replace(/^•\s*/, '')}`).join('<br>');
+  
+  const highlights = format(hlRaw);
+  const blockers = format(blRaw);
+  const next_steps = format(nsRaw);
+  
+  try {
+    const r = await api('/api/reports?action=save_notes', 'POST', {
+      id: activeReportId,
+      highlights,
+      blockers,
+      next_steps
+    });
+    if (r && r.ok) {
+      showToast('Client notes saved successfully!', 'success');
+    }
+  } catch (e) {
+    alert('Failed to save notes: ' + e.message);
+  }
+}
+
+function copyReportShareLink() {
+  const input = document.getElementById('rep-share-link-input');
+  input.select();
+  document.execCommand('copy');
+  
+  const btn = document.getElementById('btn-copy-share-link');
+  btn.textContent = '✓ Copied Link';
+  setTimeout(() => { btn.textContent = '🔗 Copy Share Link'; }, 2000);
+  
+  showToast('Link copied to clipboard!', 'success');
+}
+
+function printReportDetail() {
+  window.print();
+}
+
+async function deleteReport(reportId) {
+  if (!confirm('Are you sure you want to delete this report? This will invalidate the client link permanently.')) return;
+  try {
+    const r = await api(`/api/reports?action=delete&id=${reportId}`, 'DELETE');
+    if (r && r.ok) {
+      initReportsPage();
+    }
+  } catch (e) {
+    alert('Failed to delete report: ' + e.message);
+  }
+}
+

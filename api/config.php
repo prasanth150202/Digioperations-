@@ -118,6 +118,55 @@ function db(): PDO {
             }
         } catch (Throwable $migrationErr) {}
 
+        // Self-healing migration for reports table
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `reports` (
+              `id`                VARCHAR(36)   NOT NULL PRIMARY KEY,
+              `brand_id`          VARCHAR(36)   NOT NULL,
+              `report_type`       VARCHAR(20)   NOT NULL,
+              `period_start`      DATE          NOT NULL,
+              `period_end`        DATE          NOT NULL,
+              `total_spend`       DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+              `total_conversions` INT           NOT NULL DEFAULT 0,
+              `total_revenue`     DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+              `overall_cpa`       DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+              `overall_roas`      DECIMAL(6,2)  NOT NULL DEFAULT 0.00,
+              `overall_aov`       DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+              `report_data`       LONGTEXT      NOT NULL,
+              `shared_link`       VARCHAR(100)  DEFAULT NULL UNIQUE,
+              `is_public`         TINYINT(1)    NOT NULL DEFAULT 1,
+              `highlights`        TEXT          DEFAULT NULL,
+              `blockers`          TEXT          DEFAULT NULL,
+              `next_steps`        TEXT          DEFAULT NULL,
+              `created_by`        VARCHAR(255)  NOT NULL DEFAULT '',
+              `created_at`        DATETIME      NOT NULL DEFAULT NOW(),
+              `updated_at`        DATETIME      NOT NULL DEFAULT NOW() ON UPDATE NOW(),
+              KEY `idx_rep_brand` (`brand_id`),
+              CONSTRAINT `fk_rep_brand` FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        } catch (Throwable $migrationErr) {}
+
+        // Self-healing migration for report_links table
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `report_links` (
+              `id`           VARCHAR(36)  NOT NULL PRIMARY KEY,
+              `report_id`    VARCHAR(36)  NOT NULL,
+              `unique_token` VARCHAR(64)  NOT NULL UNIQUE,
+              `client_name`  VARCHAR(255) DEFAULT '',
+              `client_email` VARCHAR(255) DEFAULT '',
+              `view_count`   INT          NOT NULL DEFAULT 0,
+              `last_viewed`  DATETIME     DEFAULT NULL,
+              `created_at`   DATETIME     NOT NULL DEFAULT NOW(),
+              KEY `idx_rl_token` (`unique_token`),
+              CONSTRAINT `fk_rl_report` FOREIGN KEY (`report_id`) REFERENCES `reports`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        } catch (Throwable $migrationErr) {}
+
+        // Run self-cleaning retention policy to delete reports older than 12 weeks
+        try {
+            $pdo->exec("DELETE FROM reports WHERE created_at < DATE_SUB(NOW(), INTERVAL 12 WEEK)");
+        } catch (Throwable $cleaningErr) {}
+
         return $pdo;
     } catch (PDOException $e) {
         json_err('Database connection failed. Did you import install.sql into phpMyAdmin? ' . $e->getMessage(), 500);

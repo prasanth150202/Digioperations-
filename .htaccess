@@ -61,6 +61,10 @@ Options -MultiViews
   RewriteRule ^api/budget/months/([^/]+)/settings/?$               api/budget.php?action=settings&month=$1   [QSA,L]
   RewriteRule ^api/budget/compare/?$                               api/budget.php?action=compare              [QSA,L]
 
+  # Route /api/reports and /api/public-report
+  RewriteRule ^api/reports/?$                                      api/reports.php                            [QSA,L]
+  RewriteRule ^api/public-report/?$                                api/public-report.php                      [QSA,L]
+
   # SPA fallback — serve app.html for non-file, non-api routes
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

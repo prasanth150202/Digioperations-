@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/assets/style.css?v=2">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 @media(max-width:1024px){ #sb-toggle{display:inline-flex!important} }
 </style>
@@ -274,6 +275,215 @@
       </div>
     </div>
 
+    <!-- REPORTS GENERATOR PAGE -->
+    <div class="page hidden" id="page-reports">
+      <!-- 1. REPORTS LIST VIEW -->
+      <div id="reports-list-view">
+        <div class="sec-hd">
+          <div>
+            <div class="sec-title">Performance Reports</div>
+            <div class="sec-sub">Generate and manage weekly and monthly summaries for clients</div>
+          </div>
+          <button class="btn primary" onclick="openCreateReport()">+ Create Report</button>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="overflow-x:auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Report Type</th>
+                  <th>Period</th>
+                  <th>Total Spend</th>
+                  <th>Total Revenue</th>
+                  <th>ROAS</th>
+                  <th>Views</th>
+                  <th>Shared Link</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="reports-tbody">
+                <tr>
+                  <td colspan="8" style="text-align:center;color:var(--mid);padding:24px 0">Select a brand from the sidebar to view reports</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. CREATE REPORT WIZARD VIEW -->
+      <div id="reports-create-view" style="display:none">
+        <div class="calc-hd">
+          <button class="calc-back" onclick="backToReportsList()">← Back to Reports</button>
+          <div>
+            <div class="calc-brand-name">Create Performance Report</div>
+            <div style="font-size:11px;color:var(--mid)" id="reports-create-brand-meta">Brand Name</div>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+            <div class="field">
+              <label>Report Type</label>
+              <div style="display:flex;gap:16px;margin-top:8px">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;color:var(--dark)">
+                  <input type="radio" name="rep-type" value="weekly" checked onchange="handleReportTypeChange()"> Weekly (Mon - Sun)
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;color:var(--dark)">
+                  <input type="radio" name="rep-type" value="monthly" onchange="handleReportTypeChange()"> Monthly (Full Month)
+                </label>
+              </div>
+            </div>
+            <div class="field">
+              <label>Report Period</label>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+                <input type="date" id="rep-start-date" onchange="checkReportMissingData()" style="flex:1">
+                <span style="color:var(--mid)">to</span>
+                <input type="date" id="rep-end-date" onchange="checkReportMissingData()" style="flex:1">
+              </div>
+            </div>
+          </div>
+          
+          <!-- Dynamic Missing Data Section -->
+          <div id="reports-missing-alert" style="display:none;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:12px 16px;margin-bottom:20px">
+            <div style="color:#b45309;font-weight:700;font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+              ⚠️ Missing Daily Data Found
+            </div>
+            <div style="font-size:12px;color:var(--body);line-height:1.4">
+              Daily spend or sales data is missing for the following dates. Fill them below to generate an accurate report, or click "Generate Report" directly to calculate using partial data.
+            </div>
+          </div>
+          
+          <div id="reports-missing-forms" style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px"></div>
+          
+          <div style="display:flex;gap:8px;margin-top:20px">
+            <button class="btn primary" id="btn-generate-report" onclick="submitGenerateReport()">Generate Report</button>
+            <button class="btn" onclick="backToReportsList()">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. REPORT DETAILS DASHBOARD VIEW -->
+      <div id="reports-detail-view" style="display:none">
+        <div class="calc-hd">
+          <button class="calc-back" onclick="backToReportsList()">← Back</button>
+          <div>
+            <div class="calc-brand-name" id="rep-detail-title">Weekly Performance Report</div>
+            <div style="font-size:11px;color:var(--mid)" id="rep-detail-meta">Hapli Earth · June 2026</div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:8px" id="rep-detail-actions">
+            <button class="btn sm" onclick="printReportDetail()">🖨️ Print / Save PDF</button>
+            <button class="btn sm primary" onclick="copyReportShareLink()" id="btn-copy-share-link">🔗 Copy Share Link</button>
+          </div>
+        </div>
+
+        <!-- Premium Glassmorphic Stats Grid -->
+        <div class="bgt-summary-row" style="margin-bottom:20px">
+          <div class="bgt-stat" style="grid-column: span 2">
+            <div class="bgt-stat-label">Spent</div>
+            <div class="bgt-stat-value" id="rep-kpi-spend">₹0</div>
+            <div class="bgt-stat-sub" id="rep-change-spend">-</div>
+          </div>
+          <div class="bgt-stat" style="grid-column: span 2">
+            <div class="bgt-stat-label">Total Sales</div>
+            <div class="bgt-stat-value" id="rep-kpi-sales">₹0</div>
+            <div class="bgt-stat-sub" id="rep-change-sales">-</div>
+          </div>
+          <div class="bgt-stat" style="grid-column: span 2">
+            <div class="bgt-stat-label">ROAS</div>
+            <div class="bgt-stat-value" id="rep-kpi-roas">0.0x</div>
+            <div class="bgt-stat-sub" id="rep-change-roas">-</div>
+          </div>
+          <div class="bgt-stat" style="grid-column: span 2">
+            <div class="bgt-stat-label">Orders</div>
+            <div class="bgt-stat-value" id="rep-kpi-orders">0</div>
+            <div class="bgt-stat-sub" id="rep-change-orders">-</div>
+          </div>
+          <div class="bgt-stat" style="grid-column: span 2">
+            <div class="bgt-stat-label">CPA</div>
+            <div class="bgt-stat-value" id="rep-kpi-cpa">₹0</div>
+            <div class="bgt-stat-sub" id="rep-change-cpa">-</div>
+          </div>
+          <div class="bgt-stat" style="grid-column: span 2">
+            <div class="bgt-stat-label">AOV</div>
+            <div class="bgt-stat-value" id="rep-kpi-aov">₹0</div>
+            <div class="bgt-stat-sub" id="rep-change-aov">-</div>
+          </div>
+        </div>
+
+        <div class="dash-layout" style="margin-top:0">
+          <div class="dash-main-col">
+            <!-- Charts block -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+              <div class="card" style="margin-bottom:0;padding:16px">
+                <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:12px">Spend Share by Channel</div>
+                <div style="height:160px;position:relative"><canvas id="rep-spend-chart"></canvas></div>
+              </div>
+              <div class="card" style="margin-bottom:0;padding:16px">
+                <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:12px">Revenue Share by Channel</div>
+                <div style="height:160px;position:relative"><canvas id="rep-revenue-chart"></canvas></div>
+              </div>
+            </div>
+
+            <!-- Channels performance table -->
+            <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px">
+              <div style="font-size:13px;font-weight:600;color:var(--fg);padding:12px 16px;border-bottom:1px solid var(--border)">Performance by Channel</div>
+              <div style="overflow-x:auto">
+                <table class="bgt-table" id="rep-channel-table">
+                  <thead>
+                    <tr>
+                      <th>Channel</th>
+                      <th>Spend</th>
+                      <th>Conversions</th>
+                      <th>Revenue</th>
+                      <th>CPA</th>
+                      <th>ROAS</th>
+                      <th>CTR %</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rep-channel-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notes / Highlights Col -->
+          <div class="dash-side-col">
+            <div class="card" style="padding:16px;margin-bottom:16px;background:rgba(43,78,255,0.03);border:1px solid rgba(43,78,255,0.1)">
+              <div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:12px;display:flex;align-items:center;gap:6px">
+                🤖 Client Summary (AI Assisted)
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div class="field">
+                  <label>Highlights (What went well)</label>
+                  <textarea id="rep-notes-hl" style="font-size:12px;min-height:90px"></textarea>
+                </div>
+                <div class="field">
+                  <label>Blockers (Underperforming items)</label>
+                  <textarea id="rep-notes-bl" style="font-size:12px;min-height:90px"></textarea>
+                </div>
+                <div class="field">
+                  <label>Action Plan (Next Steps)</label>
+                  <textarea id="rep-notes-ns" style="font-size:12px;min-height:90px"></textarea>
+                </div>
+                <button class="btn primary sm" onclick="saveReportNotes()" style="justify-content:center;margin-top:6px">Save Report Notes</button>
+              </div>
+            </div>
+
+            <!-- Share Info -->
+            <div class="card" style="padding:16px;margin-bottom:0">
+              <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:8px">Client Share Link</div>
+              <input type="text" id="rep-share-link-input" readonly style="width:100%;padding:8px;font-size:11px;font-family:var(--fm);border:1px solid var(--border);border-radius:6px;background:var(--off);outline:none;margin-bottom:10px">
+              <div style="font-size:10px;color:var(--mid);line-height:1.4">
+                Share this link with your client. They can view it on a secure dashboard without logging into the platform. Link expires after 12 weeks.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
     <div class="page hidden" id="page-activity">
       <div class="sec-hd" style="margin-bottom:20px">
         <div><div class="sec-title">Activity Logs</div><div class="sec-sub">Complete database-side operations timeline for all team members</div></div>
@@ -471,6 +681,7 @@
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" id="pg-strategy"> Strategy Builder</label>
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" id="pg-pricing"> Pricing Calculator</label>
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" id="pg-budget"> Budget Tracker</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" id="pg-reports"> Reports Generator</label>
       </div>
     </div>
     <div class="field"><label>Brand Access</label><select id="nu-brands"><option value="*">All Brands</option></select></div>
