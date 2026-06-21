@@ -106,7 +106,9 @@ async function api(methodOrUrl, urlOrBody, body) {
 
   renderSidebar();
   renderDashboard();
-  showPage('dashboard');
+  const _hashPage = window.location.hash.slice(1);
+  const _validPages = ['dashboard','strategy','pricing','catalog','budget','reports','admin','activity'];
+  showPage(_validPages.includes(_hashPage) ? _hashPage : 'dashboard');
 
   // Show add product / new brand buttons for editors
   if (CU.role !== 'user') {
@@ -148,6 +150,7 @@ function showPage(id) {
     id = 'dashboard';
   }
   curPage = id;
+  history.replaceState(null, '', '#' + id);
   // Close sidebar on mobile after clicking
   document.querySelector('.sb')?.classList.remove('open');
   
@@ -2055,11 +2058,19 @@ function addExtra(pid) {
   p.extras.push({ label, amount });
   renderAll(); deferPricingSave();
 }
+async function deleteBrand(slug, name) {
+  if (!confirm(`Delete brand "${name}"?\n\nThis will permanently remove all budget months, daily data, and pricing data for this brand. Reports are kept.\n\nThis cannot be undone.`)) return;
+  const r = await api(`/api/brands/${slug}`, 'DELETE');
+  if (!r || !r.ok) return showToast('Failed to delete brand', 'error');
+  allBrands = allBrands.filter(b => b.slug !== slug);
+  showToast(`Brand "${name}" deleted`, 'success');
+  renderAdminBrands();
+  renderPricingBrands();
+  renderDashboard();
+}
 function deferSaveAndRender() { renderAll(); deferPricingSave(); }
 function toggleGlobals() {
-  globalsOpen = !globalsOpen;
-  document.getElementById('globals-body').classList.toggle('open', globalsOpen);
-  document.getElementById('g-arrow').textContent = globalsOpen ? '▼' : '▶';
+  // Globals are always visible in manager mode
 }
 
 function renderGlobalExtrasList() {
@@ -2247,6 +2258,28 @@ async function submitNewBrand() {
   renderDashboard();
 }
 
+async function renderAdminBrands() {
+  const tbody = document.getElementById('admin-brands-tbody');
+  if (!tbody) return;
+  const brands = await api('/api/brands');
+  if (!brands) return;
+  if (!brands.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--mid);padding:24px">No brands found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = brands.map(b => {
+    const channels = (() => { try { return JSON.parse(b.channels_config || '[]').join(', '); } catch(e) { return '—'; } })();
+    return `<tr>
+      <td><div style="font-weight:700;color:var(--dark)">${b.name}</div><div style="font-size:10px;color:var(--mid);font-family:var(--fm)">${b.slug}</div></td>
+      <td>${b.industry || '—'}</td>
+      <td>${b.platform || '—'}</td>
+      <td style="font-family:var(--fm);font-weight:600">${b.product_count || 0}</td>
+      <td style="font-size:11px;color:var(--mid)">${channels}</td>
+      <td><button class="btn sm danger" onclick="deleteBrand('${b.slug}','${b.name.replace(/'/g,"\\'")}')">🗑 Delete</button></td>
+    </tr>`;
+  }).join('');
+}
+
 // ─── ADMIN ───────────────────────────────────────────────────────────────────
 async function renderAdmin() {
   setAdminTab('users');
@@ -2298,14 +2331,21 @@ function setAdminTab(tab) {
   document.getElementById('admin-page-settings').style.display = tab === 'settings' ? 'block' : 'none';
   const secMonths = document.getElementById('admin-page-months');
   if (secMonths) secMonths.style.display = tab === 'months' ? 'block' : 'none';
-  
+  const secBrands = document.getElementById('admin-page-brands');
+  if (secBrands) secBrands.style.display = tab === 'brands' ? 'block' : 'none';
+
   document.getElementById('tab-admin-users').classList.toggle('active', tab === 'users');
   document.getElementById('tab-admin-settings').classList.toggle('active', tab === 'settings');
   const tabMonths = document.getElementById('tab-admin-months');
   if (tabMonths) tabMonths.classList.toggle('active', tab === 'months');
-  
+  const tabBrands = document.getElementById('tab-admin-brands');
+  if (tabBrands) tabBrands.classList.toggle('active', tab === 'brands');
+
   if (tab === 'months') {
     renderAdminMonths();
+  }
+  if (tab === 'brands') {
+    renderAdminBrands();
   }
 }
 

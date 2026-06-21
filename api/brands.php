@@ -73,4 +73,23 @@ if ($method === 'PUT' && $id) {
     json_out(['ok' => true]);
 }
 
+// DELETE /api/brands.php?id=slug — delete brand (superadmin only)
+if ($method === 'DELETE' && $id) {
+    if ($user['role'] !== 'superadmin') json_err('Only superadmin can delete brands', 403);
+    $brand = dbGet('SELECT * FROM brands WHERE slug=?', [$id]);
+    if (!$brand) json_err('Brand not found', 404);
+    try {
+        dbRun('BEGIN');
+        dbRun('DELETE FROM budget_days WHERE month_id IN (SELECT id FROM budget_months WHERE brand_id=?)', [$brand['id']]);
+        dbRun('DELETE FROM budget_months WHERE brand_id=?', [$brand['id']]);
+        dbRun('DELETE FROM brands WHERE id=?', [$brand['id']]);
+        dbRun('COMMIT');
+        auditLog($user['id'], $user['name'], 'DELETE_BRAND', $brand['name']);
+        json_out(['ok' => true]);
+    } catch (Throwable $e) {
+        dbRun('ROLLBACK');
+        json_err('Delete failed: ' . $e->getMessage(), 500);
+    }
+}
+
 json_err('Not found', 404);

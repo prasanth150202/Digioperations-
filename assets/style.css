@@ -1020,6 +1020,55 @@ html,body{height:100%;font-family:var(--fh);background:var(--off);color:var(--bo
   }
 }
 
+/* ── REDESIGN 2.0 IMPROVEMENTS ── */
+
+/* Globals strip: always visible, no toggle needed */
+.globals-body { display: grid !important; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 14px 16px; border-top: 1px solid var(--border); }
+.globals-hd { cursor: default !important; }
+.globals-hd:hover { background: transparent !important; }
+@media(max-width: 900px) { .globals-body { grid-template-columns: repeat(2, 1fr) !important; } }
+@media(max-width: 480px) { .globals-body { grid-template-columns: 1fr !important; } }
+
+/* Better pricing product blocks */
+.prod-block { border-radius: 14px !important; padding: 20px !important; }
+.prod-hd { padding-bottom: 14px !important; margin-bottom: 14px !important; }
+
+/* Better variant table */
+.vtable th { font-size: 10px; letter-spacing: .08em; padding: 9px 12px; }
+.vtable td { padding: 10px 12px; }
+.vtable input { width: 100%; padding: 4px 6px; border: 1px solid transparent; border-radius: 5px; font-family: var(--fm); font-size: 12px; }
+.vtable input:focus { border-color: var(--blue); background: rgba(43,78,255,.04); outline: none; }
+
+/* Better sum bar */
+.sum-bar { border-radius: 14px !important; padding: 16px 20px !important; }
+.sum-val { font-size: 22px !important; }
+
+/* Dashboard KPI cards */
+.cmd-stat-card { background: rgba(255,255,255,.06) !important; border: 1px solid rgba(255,255,255,.1) !important; border-radius: 12px !important; padding: 16px !important; transition: all .2s; }
+.cmd-stat-card:hover { background: rgba(255,255,255,.09) !important; transform: translateY(-1px); }
+.cmd-stat-v { font-size: 28px !important; font-weight: 800 !important; font-family: var(--fm); }
+.cmd-stat-l { font-size: 10px !important; letter-spacing: .06em; margin-top: 4px !important; }
+
+/* Brand perf cards improvements */
+.brand-perf-card { border-radius: 16px !important; padding: 20px !important; }
+.bp-name { font-size: 16px !important; }
+.bp-pct { font-size: 22px !important; }
+
+/* Admin brands table */
+#admin-brands-tbody tr:hover td { background: var(--off); }
+
+/* Better page hero */
+.dash-hero { border-radius: 0 !important; padding: 20px 24px !important; }
+
+/* Better modal */
+.modal { border-radius: 18px !important; }
+
+/* Topbar brand chip */
+#tb-brand-chip { font-weight: 700; }
+
+/* Input improvements */
+.vtable td input[type="text"] { height: 30px; }
+
 
 
 

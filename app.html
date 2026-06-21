@@ -142,12 +142,11 @@
           </div>
         </div>
         <div class="globals-card">
-          <div class="globals-hd" onclick="toggleGlobals()">
-            <span class="globals-hd-title">âš™ Global Cost Assumptions</span>
-            <span class="globals-hd-note">Applied to all products  &middot;  click to expand</span>
-            <span id="g-arrow" style="color:var(--mid);font-size:11px;margin-left:8px">â–¶</span>
+          <div class="globals-hd">
+            <span class="globals-hd-title">⚙ Global Cost Assumptions</span>
+            <span class="globals-hd-note">Applied to all products · Edit any value to recalculate</span>
           </div>
-          <div class="globals-body" id="globals-body">
+          <div class="globals-body open" id="globals-body">
             <div class="field"><label>Branding (â‚¹)</label><input type="text" inputmode="decimal" id="g-brand" value="30" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
             <div class="field"><label>Photography (â‚¹)</label><input type="text" inputmode="decimal" id="g-photo" value="15" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
             <div class="field"><label>Packaging (â‚¹)</label><input type="text" inputmode="decimal" id="g-pack" value="20" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
@@ -551,6 +550,7 @@
         <button class="bgt-tab active" id="tab-admin-users" onclick="setAdminTab('users')">Users</button>
         <button class="bgt-tab" id="tab-admin-settings" onclick="setAdminTab('settings')">AI Configuration</button>
         <button class="bgt-tab" id="tab-admin-months" onclick="setAdminTab('months')">Budget Months</button>
+        <button class="bgt-tab" id="tab-admin-brands" onclick="setAdminTab('brands')">Brands</button>
       </div>
 
       <div id="admin-page-users">
@@ -570,6 +570,18 @@
             <div style="font-size:11px;color:var(--mid)">Delete accidentally created months</div>
           </div>
           <table class="admin-table"><thead><tr><th>Brand</th><th>Month Label</th><th>Revenue Target</th><th>Actions</th></tr></thead><tbody id="admin-months-tbody"></tbody></table>
+        </div>
+      </div>
+
+      <div id="admin-page-brands" style="display:none">
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-weight:700;font-size:14px;color:var(--dark)">All Brands</div>
+              <div style="font-size:11px;color:var(--mid);margin-top:2px">Delete test or unused brands. This permanently removes all associated budget data.</div>
+            </div>
+          </div>
+          <table class="admin-table"><thead><tr><th>Brand</th><th>Industry</th><th>Platform</th><th>Products</th><th>Channels</th><th>Actions</th></tr></thead><tbody id="admin-brands-tbody"></tbody></table>
         </div>
       </div>
 
