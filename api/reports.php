@@ -227,6 +227,7 @@ function aggregateStats(string $brandId, string $start, string $end): array {
     $cpaDenomTotal  = $totals['customers_acquired'] > 0 ? $totals['customers_acquired'] : $totals['conversions'];
     $totals['cpa']  = $cpaDenomTotal > 0 ? round($totals['spend'] / $cpaDenomTotal, 2) : 0.0;
     $totals['aov']  = $totals['conversions'] > 0 ? round($totals['revenue'] / $totals['conversions'], 2) : 0.0;
+    $totals['ctr']  = $totals['impressions'] > 0 ? round(($totals['clicks'] / $totals['impressions']) * 100, 2) : 0.0;
     
     return [
         'channels' => $channels,

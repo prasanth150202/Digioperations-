@@ -3361,6 +3361,8 @@ function bgtClickDay(dayNum) {
     const spendV = chDay.spendReal != null ? chDay.spendReal : '';
     const ordersV = chDay.conversions != null ? chDay.conversions : '';
     const custV = chDay.customers_acquired != null ? chDay.customers_acquired : '';
+    const impV = chDay.impressions != null ? chDay.impressions : '';
+    const clickV = chDay.clicks != null ? chDay.clicks : '';
     const expSales = chDay.salesExp || 0;
     const expSpend = chDay.spendExp || 0;
     const roasTarget = chDay.roasTarget || 5;
@@ -3370,11 +3372,13 @@ function bgtClickDay(dayNum) {
         <div style="font-size:11px;font-weight:700;color:var(--fg);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em">
           ${name} <span style="font-weight:400;color:var(--mid);text-transform:none">(Pacing Target: ₹${fmtN(expSales)} sales · ₹${fmtN(expSpend)} spend)</span>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px">
           <div class="field"><label>Sales (₹)</label><input type="number" id="bgtd-${ch}-sales" placeholder="0" value="${salesV}" oninput="bgtLiveDiag('${ch}', ${expSales}, ${expSpend}, ${roasTarget})"></div>
           <div class="field"><label>Ad Spend (₹)</label><input type="number" id="bgtd-${ch}-spend" placeholder="0" value="${spendV}" oninput="bgtLiveDiag('${ch}', ${expSales}, ${expSpend}, ${roasTarget})"></div>
           <div class="field"><label>Orders</label><input type="number" id="bgtd-${ch}-orders" placeholder="0" value="${ordersV}"></div>
           <div class="field"><label>Customers Acquired</label><input type="number" id="bgtd-${ch}-customers" placeholder="0" value="${custV}"></div>
+          <div class="field"><label>Sessions</label><input type="number" id="bgtd-${ch}-impressions" placeholder="0" value="${impV}"></div>
+          <div class="field"><label>Clicks</label><input type="number" id="bgtd-${ch}-clicks" placeholder="0" value="${clickV}"></div>
         </div>
         <div id="bgt-live-diag-${ch}" style="margin-top:8px; font-size:11px; font-weight:700; display:none;" class="live-diag-text"></div>
       </div>
@@ -3469,11 +3473,15 @@ async function bgtSaveDay() {
     const spv  = document.getElementById(`bgtd-${ch}-spend`);
     const ordv = document.getElementById(`bgtd-${ch}-orders`);
     const custv = document.getElementById(`bgtd-${ch}-customers`);
+    const impv = document.getElementById(`bgtd-${ch}-impressions`);
+    const clickv = document.getElementById(`bgtd-${ch}-clicks`);
     channelsData[ch] = {
       sales:               sv   && sv.value   !== '' ? parseFloat(sv.value)   : null,
       spend:               spv  && spv.value  !== '' ? parseFloat(spv.value)  : null,
       conversions:         ordv && ordv.value !== '' ? parseInt(ordv.value)   : null,
       customers_acquired:  custv && custv.value !== '' ? parseInt(custv.value) : null,
+      impressions:         impv && impv.value !== '' ? parseInt(impv.value)   : null,
+      clicks:              clickv && clickv.value !== '' ? parseInt(clickv.value)   : null,
     };
   }
 
@@ -4484,7 +4492,7 @@ async function checkReportMissingData() {
                 <div class="field"><label style="font-size:9px">Orders</label><input type="number" class="ch-ord" placeholder="0" style="padding:6px;height:30px"></div>
                 <div class="field"><label style="font-size:9px">Customers Acquired</label><input type="number" class="ch-cust" placeholder="0" style="padding:6px;height:30px"></div>
                 <div class="field"><label style="font-size:9px">Clicks</label><input type="number" class="ch-clk" placeholder="0" style="padding:6px;height:30px"></div>
-                <div class="field"><label style="font-size:9px">Impressions</label><input type="number" class="ch-imp" placeholder="0" style="padding:6px;height:30px"></div>
+                <div class="field"><label style="font-size:9px">Sessions</label><input type="number" class="ch-imp" placeholder="0" style="padding:6px;height:30px"></div>
               </div>
             </div>
             `).join('')}
@@ -4632,7 +4640,6 @@ async function loadReportDetails(reportId) {
     
     // Notes
     document.getElementById('rep-notes-hl').value = (r.highlights || '').replace(/<br>/g, '\n').replace(/• /g, '');
-    document.getElementById('rep-notes-bl').value = (r.blockers || '').replace(/<br>/g, '\n').replace(/• /g, '');
     document.getElementById('rep-notes-ns').value = (r.next_steps || '').replace(/<br>/g, '\n').replace(/• /g, '');
     
     // Client Share URL
@@ -4734,12 +4741,13 @@ function renderReportCharts(channels, totals) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      devicePixelRatio: 2,
       plugins: {
         legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } }
       }
     }
   });
-  
+
   const ctxRev = document.getElementById('rep-revenue-chart').getContext('2d');
   reportsChartRevenue = new Chart(ctxRev, {
     type: 'doughnut',
@@ -4755,13 +4763,14 @@ function renderReportCharts(channels, totals) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      devicePixelRatio: 2,
       plugins: {
         legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } }
       }
     }
   });
 
-  // ROI & Efficiency (Horizontal Bar)
+  // ROI & Efficiency
   const ctxEff = document.getElementById('rep-efficiency-chart').getContext('2d');
   const roasData = Object.values(channels).map(c => parseFloat(c.roas) || 0);
   const cpaData = Object.values(channels).map(c => parseFloat(c.cpa) || 0);
@@ -4775,7 +4784,7 @@ function renderReportCharts(channels, totals) {
       ]
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false, devicePixelRatio: 2,
       scales: {
         y: { type: 'linear', position: 'left', grid: { color: 'rgba(255,255,255,0.05)' } },
         y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } },
@@ -4785,26 +4794,28 @@ function renderReportCharts(channels, totals) {
     }
   });
 
-  // Spend vs Revenue Radar
+  // Spend vs Revenue (Grouped Bar with log scale)
   const ctxRadar = document.getElementById('rep-radar-chart').getContext('2d');
   reportsChartRadar = new Chart(ctxRadar, {
-    type: 'radar',
+    type: 'bar',
     data: {
       labels,
       datasets: [
-        { label: 'Spend', data: spendData, backgroundColor: 'rgba(43, 78, 255, 0.3)', borderColor: '#2B4EFF', borderWidth: 2 },
-        { label: 'Revenue', data: revenueData, backgroundColor: 'rgba(16, 185, 129, 0.3)', borderColor: '#10B981', borderWidth: 2 }
+        { label: 'Spend', data: spendData, backgroundColor: 'rgba(43, 78, 255, 0.7)', borderColor: '#2B4EFF', borderWidth: 1, borderRadius: 4 },
+        { label: 'Revenue', data: revenueData, backgroundColor: 'rgba(16, 185, 129, 0.7)', borderColor: '#10B981', borderWidth: 1, borderRadius: 4 }
       ]
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false, devicePixelRatio: 2,
       scales: {
-        r: {
-          angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
-          grid: { color: 'rgba(255, 255, 255, 0.1)' },
-          pointLabels: { color: '#9ca3af', font: { size: 10 } },
-          ticks: { display: false }
-        }
+        y: {
+          type: 'logarithmic',
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: {
+            callback: function(v) { return '₹' + v.toLocaleString('en-IN'); }
+          }
+        },
+        x: { grid: { color: 'rgba(255,255,255,0.05)' } }
       },
       plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } }
     }
@@ -4845,7 +4856,7 @@ function renderFunnelViz(vizId, containerId, imp, clk, conv, dark) {
     <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding:4px 0">
 
       <div style="width:100%;background:rgba(43,78,255,0.82);border:1px solid rgba(43,78,255,0.9);border-radius:12px;padding:16px 20px;text-align:center">
-        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:${subCol};text-transform:uppercase;margin-bottom:5px">Impressions</div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:${subCol};text-transform:uppercase;margin-bottom:5px">Sessions</div>
         <div style="font-size:26px;font-weight:800;color:#fff;font-family:${mono};line-height:1">${fmt(imp)}</div>
       </div>
 
@@ -4878,14 +4889,12 @@ function renderFunnelViz(vizId, containerId, imp, clk, conv, dark) {
 async function saveReportNotes() {
   if (!activeReportId) return;
   const hlRaw = document.getElementById('rep-notes-hl').value;
-  const blRaw = document.getElementById('rep-notes-bl').value;
   const nsRaw = document.getElementById('rep-notes-ns').value;
-  
-  // Format as bullet points
+
   const format = str => str.trim().split('\n').filter(s => s).map(s => `• ${s.replace(/^•\s*/, '')}`).join('<br>');
-  
+
   const highlights = format(hlRaw);
-  const blockers = format(blRaw);
+  const blockers = '';
   const next_steps = format(nsRaw);
   
   try {
@@ -4959,7 +4968,7 @@ async function openEditReportDataModal() {
       
     brandChannels.forEach(chName => {
       if (!channels[chName]) {
-        const rowHtml = createEditChannelRow(chName, { spend: 0, revenue: 0, conversions: 0, clicks: 0, impressions: 0 });
+        const rowHtml = createEditChannelRow(chName, { spend: 0, revenue: 0, conversions: 0, customers_acquired: 0, clicks: 0, impressions: 0 });
         container.insertAdjacentHTML('beforeend', rowHtml);
       }
     });
@@ -4974,12 +4983,14 @@ function createEditChannelRow(chName, m) {
   const spend = parseFloat(m.spend) || 0;
   const revenue = parseFloat(m.revenue) || 0;
   const conversions = parseInt(m.conversions) || 0;
+  const customersAcquired = parseInt(m.customers_acquired) || 0;
   const clicks = parseInt(m.clicks) || 0;
   const impressions = parseInt(m.impressions) || 0;
-  
+
   const roas = spend > 0 ? (revenue / spend).toFixed(2) : '0.00';
-  const cpa = conversions > 0 ? Math.round(spend / conversions) : 0;
+  const cpa = customersAcquired > 0 ? Math.round(spend / customersAcquired) : (conversions > 0 ? Math.round(spend / conversions) : 0);
   const aov = conversions > 0 ? Math.round(revenue / conversions) : 0;
+  const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '0.00';
 
   return `
     <div class="edit-channel-card" data-edit-channel="${chName}" style="background:var(--off);padding:12px;border-radius:8px;border:1px solid var(--border);margin-bottom:10px;">
@@ -4987,7 +4998,7 @@ function createEditChannelRow(chName, m) {
         <span style="font-weight:700;text-transform:capitalize;font-size:12px;color:var(--dark)">${chName}</span>
         <button class="btn sm danger" onclick="this.closest('.edit-channel-card').remove()" style="padding:2px 6px;font-size:10px">Remove</button>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:8px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(90px, 1fr));gap:8px">
         <div class="field" style="margin-bottom:0">
           <label style="font-size:9px;margin-bottom:2px">Spend (₹)</label>
           <input type="number" class="ch-edit-spend" value="${spend}" style="padding:4px;height:28px;font-size:11px" oninput="recalculateEditRowMetrics('${chName}')">
@@ -5001,18 +5012,23 @@ function createEditChannelRow(chName, m) {
           <input type="number" class="ch-edit-orders" value="${conversions}" style="padding:4px;height:28px;font-size:11px" oninput="recalculateEditRowMetrics('${chName}')">
         </div>
         <div class="field" style="margin-bottom:0">
-          <label style="font-size:9px;margin-bottom:2px">Clicks</label>
-          <input type="number" class="ch-edit-clicks" value="${clicks}" style="padding:4px;height:28px;font-size:11px">
+          <label style="font-size:9px;margin-bottom:2px">Customers</label>
+          <input type="number" class="ch-edit-customers" value="${customersAcquired}" style="padding:4px;height:28px;font-size:11px" oninput="recalculateEditRowMetrics('${chName}')">
         </div>
         <div class="field" style="margin-bottom:0">
-          <label style="font-size:9px;margin-bottom:2px">Impressions</label>
-          <input type="number" class="ch-edit-impressions" value="${impressions}" style="padding:4px;height:28px;font-size:11px">
+          <label style="font-size:9px;margin-bottom:2px">Sessions</label>
+          <input type="number" class="ch-edit-impressions" value="${impressions}" style="padding:4px;height:28px;font-size:11px" oninput="recalculateEditRowMetrics('${chName}')">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:9px;margin-bottom:2px">Clicks</label>
+          <input type="number" class="ch-edit-clicks" value="${clicks}" style="padding:4px;height:28px;font-size:11px" oninput="recalculateEditRowMetrics('${chName}')">
         </div>
       </div>
-      <div style="display:flex;gap:12px;margin-top:8px;font-size:10px;color:var(--mid)">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:10px;color:var(--mid)">
         <span>ROAS: <strong class="ch-edit-roas-lbl">${roas}x</strong></span>
         <span>CPA: <strong class="ch-edit-cpa-lbl">₹${cpa.toLocaleString('en-IN')}</strong></span>
         <span>AOV: <strong class="ch-edit-aov-lbl">₹${aov.toLocaleString('en-IN')}</strong></span>
+        <span>CTR: <strong class="ch-edit-ctr-lbl">${ctr}%</strong></span>
       </div>
     </div>
   `;
@@ -5024,14 +5040,20 @@ function recalculateEditRowMetrics(chName) {
   const spend = parseFloat(row.querySelector('.ch-edit-spend').value) || 0;
   const revenue = parseFloat(row.querySelector('.ch-edit-revenue').value) || 0;
   const orders = parseInt(row.querySelector('.ch-edit-orders').value) || 0;
-  
+  const customers = parseInt(row.querySelector('.ch-edit-customers').value) || 0;
+  const impressions = parseInt(row.querySelector('.ch-edit-impressions').value) || 0;
+  const clicks = parseInt(row.querySelector('.ch-edit-clicks').value) || 0;
+
   const roas = spend > 0 ? (revenue / spend).toFixed(2) : '0.00';
-  const cpa = orders > 0 ? Math.round(spend / orders) : 0;
+  const cpaDenom = customers > 0 ? customers : orders;
+  const cpa = cpaDenom > 0 ? Math.round(spend / cpaDenom) : 0;
   const aov = orders > 0 ? Math.round(revenue / orders) : 0;
-  
+  const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '0.00';
+
   row.querySelector('.ch-edit-roas-lbl').textContent = `${roas}x`;
   row.querySelector('.ch-edit-cpa-lbl').textContent = `₹${cpa.toLocaleString('en-IN')}`;
   row.querySelector('.ch-edit-aov-lbl').textContent = `₹${aov.toLocaleString('en-IN')}`;
+  row.querySelector('.ch-edit-ctr-lbl').textContent = `${ctr}%`;
 }
 
 function addChannelToEditModal() {
@@ -5045,59 +5067,67 @@ function addChannelToEditModal() {
   }
   
   const container = document.getElementById('edit-report-channels-container');
-  const rowHtml = createEditChannelRow(chName, { spend: 0, revenue: 0, conversions: 0, clicks: 0, impressions: 0 });
+  const rowHtml = createEditChannelRow(chName, { spend: 0, revenue: 0, conversions: 0, customers_acquired: 0, clicks: 0, impressions: 0 });
   container.insertAdjacentHTML('beforeend', rowHtml);
 }
 
 async function submitEditReportData() {
   if (!activeReportId || !currentEditReportData) return;
-  
+
   const cards = document.querySelectorAll('.edit-channel-card');
   const updatedChannels = {};
-  
+
   let totalSpend = 0;
   let totalRevenue = 0;
   let totalConversions = 0;
+  let totalCustomers = 0;
   let totalClicks = 0;
   let totalImpressions = 0;
-  
+
   cards.forEach(card => {
     const chName = card.dataset.editChannel;
     const spend = parseFloat(card.querySelector('.ch-edit-spend').value) || 0;
     const revenue = parseFloat(card.querySelector('.ch-edit-revenue').value) || 0;
     const conversions = parseInt(card.querySelector('.ch-edit-orders').value) || 0;
+    const customers_acquired = parseInt(card.querySelector('.ch-edit-customers').value) || 0;
     const clicks = parseInt(card.querySelector('.ch-edit-clicks').value) || 0;
     const impressions = parseInt(card.querySelector('.ch-edit-impressions').value) || 0;
-    
-    if (spend > 0 || revenue > 0 || conversions > 0 || clicks > 0 || impressions > 0) {
+
+    if (spend > 0 || revenue > 0 || conversions > 0 || clicks > 0 || impressions > 0 || customers_acquired > 0) {
+      const cpaDenom = customers_acquired > 0 ? customers_acquired : conversions;
       updatedChannels[chName] = {
         spend,
         revenue,
         conversions,
+        customers_acquired,
         clicks,
         impressions,
         roas: spend > 0 ? parseFloat((revenue / spend).toFixed(2)) : 0.0,
-        cpa: conversions > 0 ? parseFloat((spend / conversions).toFixed(2)) : 0.0,
+        cpa: cpaDenom > 0 ? parseFloat((spend / cpaDenom).toFixed(2)) : 0.0,
         ctr: impressions > 0 ? parseFloat(((clicks / impressions) * 100).toFixed(2)) : 0.0
       };
-      
+
       totalSpend += spend;
       totalRevenue += revenue;
       totalConversions += conversions;
+      totalCustomers += customers_acquired;
       totalClicks += clicks;
       totalImpressions += impressions;
     }
   });
-  
+
+  const totalCpaDenom = totalCustomers > 0 ? totalCustomers : totalConversions;
   const updatedTotals = {
     spend: totalSpend,
     revenue: totalRevenue,
     conversions: totalConversions,
+    customers_acquired: totalCustomers,
     clicks: totalClicks,
     impressions: totalImpressions,
     roas: totalSpend > 0 ? parseFloat((totalRevenue / totalSpend).toFixed(2)) : 0.0,
-    cpa: totalConversions > 0 ? parseFloat((totalSpend / totalConversions).toFixed(2)) : 0.0,
-    aov: totalConversions > 0 ? parseFloat((totalRevenue / totalConversions).toFixed(2)) : 0.0
+    cpa: totalCpaDenom > 0 ? parseFloat((totalSpend / totalCpaDenom).toFixed(2)) : 0.0,
+    aov: totalConversions > 0 ? parseFloat((totalRevenue / totalConversions).toFixed(2)) : 0.0,
+    ctr: totalImpressions > 0 ? parseFloat(((totalClicks / totalImpressions) * 100).toFixed(2)) : 0.0
   };
   
   try {

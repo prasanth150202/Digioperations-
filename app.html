@@ -492,10 +492,6 @@
                   <textarea id="rep-notes-hl" style="font-size:12px;min-height:85px;width:100%;resize:vertical"></textarea>
                 </div>
                 <div>
-                  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);margin-bottom:5px">Blockers (Concerns &amp; Underperformance)</div>
-                  <textarea id="rep-notes-bl" style="font-size:12px;min-height:85px;width:100%;resize:vertical"></textarea>
-                </div>
-                <div>
                   <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);margin-bottom:5px">Action Plan (Next Steps)</div>
                   <textarea id="rep-notes-ns" style="font-size:12px;min-height:85px;width:100%;resize:vertical"></textarea>
                 </div>
@@ -795,10 +791,10 @@
   </div>
 </div></div>
 
-<div class="modal-overlay" id="mo-bgt-day" style="display:none"><div class="modal" style="min-width:400px">
-  <div class="modal-title" id="bgt-day-modal-title">Enter Day Data</div>
-  <div style="display:flex;flex-direction:column;gap:10px" id="bgt-day-modal-fields"></div>
-  <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+<div class="modal-overlay" id="mo-bgt-day" style="display:none"><div class="modal" style="width:100%; max-width:min(600px, 95vw); max-height:90vh; display:flex; flex-direction:column; overflow:hidden;">
+  <div class="modal-title" id="bgt-day-modal-title" style="flex-shrink:0;">Enter Day Data</div>
+  <div style="display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex-grow:1;padding-right:4px;" id="bgt-day-modal-fields"></div>
+  <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;">
     <button class="btn" onclick="closeMo('mo-bgt-day')">Cancel</button>
     <button class="btn primary" onclick="bgtSaveDay()">Save</button>
   </div>
@@ -922,16 +918,16 @@
 
 
 <!-- EDIT REPORT DATA MODAL -->
-<div class="modal-overlay" id="mo-edit-report-data" style="display:none"><div class="modal" style="min-width:620px;max-width:90vw">
-  <div class="modal-title">&#9998; Edit Report Performance Data</div>
-  <div style="font-size:12px;color:var(--mid);margin-bottom:14px;line-height:1.5">
+<div class="modal-overlay" id="mo-edit-report-data" style="display:none"><div class="modal" style="width:100%; max-width:min(750px, 95vw); max-height:85vh; display:flex; flex-direction:column; overflow:hidden;">
+  <div class="modal-title" style="flex-shrink:0;">&#9998; Edit Report Performance Data</div>
+  <div style="font-size:12px;color:var(--mid);margin-bottom:14px;line-height:1.5;flex-shrink:0;">
     Edit channel-level metrics directly. Changes will reflect in both your view and the client-facing report link immediately.
   </div>
-  <div id="edit-report-channels-container" style="max-height:420px;overflow-y:auto;padding-right:4px"></div>
-  <div style="margin-top:12px;display:flex;gap:8px">
+  <div id="edit-report-channels-container" style="flex:1 1 0;min-height:0;overflow-y:auto;padding-right:4px"></div>
+  <div style="margin-top:12px;display:flex;gap:8px;flex-shrink:0;">
     <button class="btn sm" onclick="addChannelToEditModal()">+ Add Channel</button>
   </div>
-  <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+  <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;">
     <button class="btn" onclick="closeMo('mo-edit-report-data')">Cancel</button>
     <button class="btn primary" onclick="submitEditReportData()">Save Changes</button>
   </div>
