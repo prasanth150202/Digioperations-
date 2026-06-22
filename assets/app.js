@@ -4672,7 +4672,6 @@ async function loadReportDetails(reportId) {
       const roas     = parseFloat(m.roas) || (spend > 0 ? (revenue / spend) : 0);
       const cpa      = parseFloat(m.cpa) || (custAcq > 0 ? (spend / custAcq) : (orders > 0 ? (spend / orders) : 0));
       const aov      = orders > 0 ? Math.round(revenue / orders) : 0;
-      const ctr      = parseFloat(m.ctr) || 0;
       return `
       <tr>
         <td style="font-weight:700;text-transform:capitalize">${ch}</td>
@@ -4683,7 +4682,6 @@ async function loadReportDetails(reportId) {
         <td style="font-family:var(--fm)">₹${Math.round(cpa).toLocaleString('en-IN')}</td>
         <td style="font-family:var(--fm)">₹${aov.toLocaleString('en-IN')}</td>
         <td style="font-family:var(--fm);font-weight:700">${roas.toFixed(2)}x</td>
-        <td style="font-family:var(--fm)">${ctr}%</td>
       </tr>
     `;
     }).join('');
