@@ -409,17 +409,21 @@ table.report-table tr:hover td {
   line-height: 1.5;
 }
 
+.print-chart-img {
+  display: none !important;
+}
+
 /* Print View Overrides */
 @page {
   size: A4 portrait;
-  margin: 10mm;
+  margin: 0 !important;
 }
 @media print {
   html, body {
     background: #ffffff !important;
     color: #111827 !important;
     padding: 0 !important;
-    margin: 0 !important;
+    margin: 1.6cm !important;
     font-size: 10px !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -433,6 +437,9 @@ table.report-table tr:hover td {
   }
   .btn-print, .brand-logo-icon, .loading-screen, .error-screen {
     display: none !important;
+  }
+  .print-chart-img {
+    display: block !important;
   }
 
   /* KPI grid: 6 across, compact */
@@ -470,8 +477,9 @@ table.report-table tr:hover td {
     color: #111827 !important;
     font-size: 11px !important;
   }
-  .summary-content {
+  .summary-content, .summary-content li {
     font-size: 10px !important;
+    color: #1f2937 !important;
   }
 
   /* Single-column layout for A4 */
@@ -509,18 +517,21 @@ table.report-table tr:hover td {
   table.report-table {
     font-size: 9px !important;
     width: 100% !important;
+    table-layout: auto !important;
   }
   table.report-table th {
     color: #374151 !important;
     border-bottom: 2px solid #d1d5db !important;
-    padding: 5px 6px !important;
+    padding: 6px 4px !important;
     font-size: 8px !important;
-    white-space: nowrap !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.2 !important;
   }
   table.report-table td {
     color: #111827 !important;
     border-bottom: 1px solid #e5e7eb !important;
-    padding: 5px 6px !important;
+    padding: 6px 4px !important;
     white-space: nowrap !important;
   }
 
@@ -798,7 +809,7 @@ table.report-table tr:hover td {
       const el = document.getElementById(id);
       if (!el) return;
       if (val === null || val === undefined) {
-        el.textContent = 'No prior period';
+        el.textContent = 'N/A (First Report)';
         el.className = 'kpi-change neutral';
         return;
       }
@@ -890,13 +901,14 @@ table.report-table tr:hover td {
     
     const colors = ['#2B4EFF', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
+    const legendPos = labels.length > 4 ? 'bottom' : 'right';
     const chartOptions = {
       responsive: true,
       maintainAspectRatio: false,
       devicePixelRatio: 2,
       plugins: {
         legend: {
-          position: 'right',
+          position: legendPos,
           labels: {
             boxWidth: 10,
             font: { family: 'Plus Jakarta Sans', size: 10 },
@@ -1049,7 +1061,10 @@ table.report-table tr:hover td {
 })();
 
 function prepareChartsForPrint() {
-  document.querySelectorAll('.chart-wrapper canvas').forEach(canvas => {
+  document.querySelectorAll('.chart-wrapper').forEach(wrapper => {
+    if (wrapper.querySelector('.print-chart-img')) return;
+    const canvas = wrapper.querySelector('canvas');
+    if (!canvas) return;
     try {
       const img = document.createElement('img');
       img.src = canvas.toDataURL('image/png', 1.0);
@@ -1057,7 +1072,7 @@ function prepareChartsForPrint() {
       img.style.width = '100%';
       img.style.height = '100%';
       img.style.objectFit = 'contain';
-      canvas.parentNode.appendChild(img);
+      wrapper.appendChild(img);
     } catch (e) {}
   });
 }

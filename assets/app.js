@@ -4617,7 +4617,7 @@ async function loadReportDetails(reportId) {
       const el = document.getElementById(id);
       if (!el) return;
       if (val === null || val === undefined) {
-        el.textContent = 'No prior period'; el.className = 'bgt-stat-sub';
+        el.textContent = 'N/A (First Report)'; el.className = 'bgt-stat-sub';
         return;
       }
       const num = parseFloat(val);
@@ -4981,14 +4981,15 @@ async function openEditReportDataModal() {
 
 function createEditChannelRow(chName, m) {
   const spend = parseFloat(m.spend) || 0;
-  const revenue = parseFloat(m.revenue) || 0;
+  const revenue = parseFloat(m.revenue || m.sales) || 0;
   const conversions = parseInt(m.conversions) || 0;
-  const customersAcquired = parseInt(m.customers_acquired) || 0;
+  const customers_acquired = parseInt(m.customers_acquired) || 0;
   const clicks = parseInt(m.clicks) || 0;
   const impressions = parseInt(m.impressions) || 0;
-
+  
   const roas = spend > 0 ? (revenue / spend).toFixed(2) : '0.00';
-  const cpa = customersAcquired > 0 ? Math.round(spend / customersAcquired) : (conversions > 0 ? Math.round(spend / conversions) : 0);
+  const cpaDenominator = customers_acquired > 0 ? customers_acquired : conversions;
+  const cpa = cpaDenominator > 0 ? Math.round(spend / cpaDenominator) : 0;
   const aov = conversions > 0 ? Math.round(revenue / conversions) : 0;
   const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '0.00';
 
@@ -4998,7 +4999,7 @@ function createEditChannelRow(chName, m) {
         <span style="font-weight:700;text-transform:capitalize;font-size:12px;color:var(--dark)">${chName}</span>
         <button class="btn sm danger" onclick="this.closest('.edit-channel-card').remove()" style="padding:2px 6px;font-size:10px">Remove</button>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(90px, 1fr));gap:8px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(100px, 1fr));gap:8px">
         <div class="field" style="margin-bottom:0">
           <label style="font-size:9px;margin-bottom:2px">Spend (₹)</label>
           <input type="number" class="ch-edit-spend" value="${spend}" style="padding:4px;height:28px;font-size:11px" oninput="recalculateEditRowMetrics('${chName}')">
@@ -5013,7 +5014,7 @@ function createEditChannelRow(chName, m) {
         </div>
         <div class="field" style="margin-bottom:0">
           <label style="font-size:9px;margin-bottom:2px">Customers</label>
-          <input type="number" class="ch-edit-customers" value="${customersAcquired}" style="padding:4px;height:28px;font-size:11px" oninput="recalculateEditRowMetrics('${chName}')">
+          <input type="number" class="ch-edit-customers" value="${customers_acquired}" style="padding:4px;height:28px;font-size:11px" oninput="recalculateEditRowMetrics('${chName}')">
         </div>
         <div class="field" style="margin-bottom:0">
           <label style="font-size:9px;margin-bottom:2px">Sessions</label>
