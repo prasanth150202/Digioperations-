@@ -292,11 +292,28 @@
           </div>
           <button class="btn primary" onclick="openCreateReport()">+ Create Report</button>
         </div>
+        <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+          <div class="field" style="margin-bottom:0;min-width:180px">
+            <label style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:4px">Filter by Brand</label>
+            <select id="reports-filter-brand" onchange="handleReportBrandFilterChange(this.value)" style="width:100%;height:34px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:0 8px;outline:none;background:#fff;color:var(--fg)">
+              <option value="">All Brands</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;min-width:180px">
+            <label style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:4px">Filter by Type</label>
+            <select id="reports-filter-type" onchange="filterReportsList()" style="width:100%;height:34px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:0 8px;outline:none;background:#fff;color:var(--fg)">
+              <option value="">All Types</option>
+              <option value="weekly">Weekly Reports</option>
+              <option value="monthly">Monthly Reports</option>
+            </select>
+          </div>
+        </div>
         <div class="card" style="padding:0;overflow:hidden">
           <div style="overflow-x:auto">
             <table class="admin-table">
               <thead>
                 <tr>
+                  <th>Brand</th>
                   <th>Report Type</th>
                   <th>Period</th>
                   <th>Total Spend</th>
@@ -309,7 +326,7 @@
               </thead>
               <tbody id="reports-tbody">
                 <tr>
-                  <td colspan="8" style="text-align:center;color:var(--mid);padding:24px 0">Select a brand from the sidebar to view reports</td>
+                  <td colspan="9" style="text-align:center;color:var(--mid);padding:24px 0">Select a brand from the sidebar to view reports</td>
                 </tr>
               </tbody>
             </table>
@@ -389,6 +406,7 @@
             <button class="btn sm" onclick="openEditReportDataModal()" style="font-weight:700">&#9998; Edit Data</button>
             <button class="btn sm" onclick="printReportDetail()" style="font-weight:700">&#128424; Print PDF</button>
             <button class="btn sm primary" onclick="copyReportShareLink()" id="btn-copy-share-link" style="font-weight:700">&#128279; Copy Client Link</button>
+            <button class="btn sm" onclick="openClientReport()" style="font-weight:700">🔗 Open Client View</button>
           </div>
         </div>
 
@@ -449,10 +467,6 @@
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:10px;text-align:center">Spend vs Revenue Balance</div>
                 <div style="height:175px;position:relative"><canvas id="rep-radar-chart"></canvas></div>
               </div>
-            </div>
-            <div class="card" id="rep-funnel-chart-container" style="margin-bottom:16px;padding:16px;display:none">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:10px;text-align:center">Conversion Funnel</div>
-              <div id="rep-funnel-viz"></div>
             </div>
             <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px">
               <div style="font-size:13px;font-weight:700;color:var(--fg);padding:14px 16px;border-bottom:1px solid var(--border)">Channel Level Performance</div>

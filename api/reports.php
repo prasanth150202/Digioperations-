@@ -11,18 +11,42 @@ $action = $_GET['action'] ?? '';
 // GET list of reports for a brand
 if ($method === 'GET' && $action === 'list') {
     $brandId = $_GET['brand_id'] ?? '';
-    if (!$brandId) json_err('Brand ID required');
     
-    // Check brand access
-    $brand = dbGet('SELECT slug FROM brands WHERE id=?', [$brandId]);
-    if (!$brand || !canAccessBrand($user, $brand['slug'])) json_err('Access denied', 403);
+    if ($brandId) {
+        // Check brand access
+        $brand = dbGet('SELECT slug FROM brands WHERE id=?', [$brandId]);
+        if (!$brand || !canAccessBrand($user, $brand['slug'])) json_err('Access denied', 403);
+        
+        $reports = dbAll('SELECT r.*, rl.unique_token, rl.view_count, rl.last_viewed, b.name as brand_name 
+                          FROM reports r 
+                          JOIN brands b ON b.id = r.brand_id
+                          LEFT JOIN report_links rl ON rl.report_id = r.id 
+                          WHERE r.brand_id = ? 
+                          ORDER BY r.created_at DESC', [$brandId]);
+    } else {
+        // List all reports that the user has access to
+        if ($user['role'] === 'superadmin' || $user['brands'] === '*') {
+            $reports = dbAll('SELECT r.*, rl.unique_token, rl.view_count, rl.last_viewed, b.name as brand_name 
+                              FROM reports r 
+                              JOIN brands b ON b.id = r.brand_id
+                              LEFT JOIN report_links rl ON rl.report_id = r.id 
+                              ORDER BY r.created_at DESC');
+        } else {
+            $brands = is_array($user['brands']) ? $user['brands'] : json_decode($user['brands'] ?? '[]', true);
+            if (empty($brands)) {
+                $reports = [];
+            } else {
+                $placeholders = implode(',', array_fill(0, count($brands), '?'));
+                $reports = dbAll("SELECT r.*, rl.unique_token, rl.view_count, rl.last_viewed, b.name as brand_name 
+                                  FROM reports r 
+                                  JOIN brands b ON b.id = r.brand_id
+                                  LEFT JOIN report_links rl ON rl.report_id = r.id 
+                                  WHERE b.slug IN ($placeholders) 
+                                  ORDER BY r.created_at DESC", $brands);
+            }
+        }
+    }
     
-    $reports = dbAll('SELECT r.*, rl.unique_token, rl.view_count, rl.last_viewed 
-                      FROM reports r 
-                      LEFT JOIN report_links rl ON rl.report_id = r.id 
-                      WHERE r.brand_id = ? 
-                      ORDER BY r.created_at DESC', [$brandId]);
-                      
     json_out($reports);
 }
 

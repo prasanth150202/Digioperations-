@@ -257,6 +257,13 @@ function selectBrand(id) {
   renderDashboard();
   if (curPage === 'pricing') loadBrandProducts();
   if (curPage === 'strategy') initStrategyPage();
+  if (curPage === 'reports') {
+    const brandFilter = document.getElementById('reports-filter-brand');
+    if (brandFilter) {
+      brandFilter.value = id || '';
+      filterReportsList();
+    }
+  }
 }
 
 function openMo(id)  { document.getElementById(id).style.display = 'flex'; }
@@ -4367,52 +4374,99 @@ let reportsChartRadar = null;
 let reportsChartFunnel = null;
 let activeReportId = null;
 
+let allReportsCache = [];
+
 async function initReportsPage() {
   const list = document.getElementById('reports-tbody');
-  if (!activeBrand) {
-    list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--mid);padding:24px 0">Select a brand from the sidebar dropdown to view reports</td></tr>`;
-    return;
-  }
   
   // Reset subviews
   document.getElementById('reports-list-view').style.display = 'block';
   document.getElementById('reports-create-view').style.display = 'none';
   document.getElementById('reports-detail-view').style.display = 'none';
   
-  list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--mid);padding:24px 0">Loading reports…</td></tr>`;
-  try {
-    const r = await api(`/api/reports?action=list&brand_id=${activeBrand.id}`);
-    if (!r || !r.length) {
-      list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--mid);padding:24px 0">No reports generated yet for ${activeBrand.name}. Click "+ Create Report" to start.</td></tr>`;
-      return;
+  // Initialize brand filter select
+  const brandFilter = document.getElementById('reports-filter-brand');
+  if (brandFilter) {
+    brandFilter.innerHTML = '<option value="">All Brands</option>' + 
+      allBrands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    if (!brandFilter.dataset.initialized) {
+      brandFilter.value = activeBrand ? activeBrand.id : '';
+      brandFilter.dataset.initialized = 'true';
     }
-    
-    list.innerHTML = r.map(h => {
-      const start = new Date(h.period_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-      const end = new Date(h.period_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-      const shareUrl = `${window.location.origin}/report.html?token=${h.unique_token}`;
-      return `
-        <tr>
-          <td style="font-weight:600;text-transform:capitalize">${h.report_type}</td>
-          <td style="font-family:var(--fm)">${start} - ${end}</td>
-          <td style="font-family:var(--fm)">₹${parseFloat(h.total_spend).toLocaleString('en-IN')}</td>
-          <td style="font-family:var(--fm)">₹${parseFloat(h.total_revenue).toLocaleString('en-IN')}</td>
-          <td style="font-family:var(--fm);font-weight:700">${h.overall_roas}x</td>
-          <td style="font-family:var(--fm)">${h.view_count} views</td>
-          <td>
-            <input type="text" value="${shareUrl}" readonly style="width:180px;font-size:10px;padding:3px 6px;border:1px solid var(--border);border-radius:4px" onclick="this.select()">
-          </td>
-          <td>
-            <div style="display:flex;gap:4px">
-              <button class="btn sm" onclick="loadReportDetails('${h.id}')">View</button>
-              <button class="btn sm danger" onclick="deleteReport('${h.id}')">🗑️</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
+  }
+
+  list.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--mid);padding:24px 0">Loading reports…</td></tr>`;
+  try {
+    const r = await api('/api/reports?action=list');
+    allReportsCache = r || [];
+    renderReportsListTable();
   } catch (e) {
-    list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px 0">Failed to load reports: ${e.message}</td></tr>`;
+    list.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--red);padding:24px 0">Failed to load reports: ${e.message}</td></tr>`;
+  }
+}
+
+function filterReportsList() {
+  renderReportsListTable();
+}
+
+function handleReportBrandFilterChange(val) {
+  activeBrand = allBrands.find(b => b.id === val) || null;
+  updateBrandUI();
+  filterReportsList();
+}
+
+function renderReportsListTable() {
+  const list = document.getElementById('reports-tbody');
+  if (!list) return;
+
+  const brandFilterVal = document.getElementById('reports-filter-brand')?.value || '';
+  const typeFilterVal = document.getElementById('reports-filter-type')?.value || '';
+
+  const filtered = allReportsCache.filter(h => {
+    const matchesBrand = !brandFilterVal || h.brand_id === brandFilterVal;
+    const matchesType = !typeFilterVal || h.report_type === typeFilterVal;
+    return matchesBrand && matchesType;
+  });
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--mid);padding:24px 0">No reports found matching the filters.</td></tr>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(h => {
+    const start = new Date(h.period_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    const end = new Date(h.period_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const shareUrl = `${window.location.origin}/report.html?token=${h.unique_token}`;
+    return `
+      <tr>
+        <td style="font-weight:700;color:var(--dark)">${h.brand_name || '—'}</td>
+        <td style="font-weight:600;text-transform:capitalize">${h.report_type}</td>
+        <td style="font-family:var(--fm)">${start} - ${end}</td>
+        <td style="font-family:var(--fm)">₹${parseFloat(h.total_spend).toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm)">₹${parseFloat(h.total_revenue).toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm);font-weight:700">${h.overall_roas}x</td>
+        <td style="font-family:var(--fm)">${h.view_count} views</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="text" value="${shareUrl}" readonly style="width:160px;font-size:10px;padding:3px 6px;border:1px solid var(--border);border-radius:4px" onclick="this.select()">
+            <a href="${shareUrl}" target="_blank" class="btn sm" style="padding:4px 8px;text-decoration:none;display:inline-flex;align-items:center;gap:4px" title="Open client report in new tab">🔗 Open</a>
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="btn sm" onclick="loadReportDetails('${h.id}')">View</button>
+            <button class="btn sm danger" onclick="deleteReport('${h.id}')">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openClientReport() {
+  const shareUrl = document.getElementById('rep-share-link-input')?.value;
+  if (shareUrl) {
+    window.open(shareUrl, '_blank');
   }
 }
 
@@ -4818,70 +4872,6 @@ function renderReportCharts(channels, totals) {
       plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } }
     }
   });
-
-  // Conversion Funnel — HTML log-scale version
-  const imp = totals ? (totals.impressions || 0) : 0;
-  const clk = totals ? (totals.clicks || 0) : 0;
-  const conv = totals ? (totals.conversions || 0) : 0;
-  renderFunnelViz('rep-funnel-viz', 'rep-funnel-chart-container', imp, clk, conv, false);
-}
-
-function renderFunnelViz(vizId, containerId, imp, clk, conv, dark) {
-  const viz = document.getElementById(vizId);
-  const container = document.getElementById(containerId);
-  if (!viz || !container) return;
-
-  if (imp <= 0 || clk <= 0 || conv <= 0) {
-    container.style.display = 'none';
-    return;
-  }
-  container.style.display = dark ? 'block' : 'block';
-
-  // Log scale: all widths relative to impressions (the largest)
-  // Even a 10,000:1 ratio stays visible — orders will never collapse to nothing
-  const logW = v => Math.max(18, Math.round((Math.log(v + 1) / Math.log(imp + 1)) * 100));
-  const clkW = logW(clk);
-  const convW = logW(conv);
-
-  const ctr = ((clk / imp) * 100).toFixed(2);
-  const cvr = ((conv / clk) * 100).toFixed(2);
-  const fmt = n => parseInt(n).toLocaleString('en-IN');
-
-  const subCol = dark ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.65)';
-  const mono = 'var(--fm, monospace)';
-
-  viz.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding:4px 0">
-
-      <div style="width:100%;background:rgba(43,78,255,0.82);border:1px solid rgba(43,78,255,0.9);border-radius:12px;padding:16px 20px;text-align:center">
-        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:${subCol};text-transform:uppercase;margin-bottom:5px">Sessions</div>
-        <div style="font-size:26px;font-weight:800;color:#fff;font-family:${mono};line-height:1">${fmt(imp)}</div>
-      </div>
-
-      <div style="display:flex;flex-direction:column;align-items:center;width:${Math.max(clkW, 28)}%;padding:2px 0">
-        <div style="width:2px;height:10px;background:rgba(139,92,246,0.35)"></div>
-        <div style="background:rgba(139,92,246,0.14);border:1px solid rgba(139,92,246,0.4);border-radius:20px;padding:3px 14px;font-size:11px;font-weight:700;color:#8b5cf6;white-space:nowrap;margin:2px 0">↓ CTR: ${ctr}%</div>
-        <div style="width:2px;height:10px;background:rgba(139,92,246,0.35)"></div>
-      </div>
-
-      <div style="width:${clkW}%;background:rgba(139,92,246,0.82);border:1px solid rgba(139,92,246,0.9);border-radius:12px;padding:16px 20px;text-align:center">
-        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:${subCol};text-transform:uppercase;margin-bottom:5px">Clicks</div>
-        <div style="font-size:26px;font-weight:800;color:#fff;font-family:${mono};line-height:1">${fmt(clk)}</div>
-      </div>
-
-      <div style="display:flex;flex-direction:column;align-items:center;width:${Math.max(convW, 20)}%;padding:2px 0">
-        <div style="width:2px;height:10px;background:rgba(16,185,129,0.35)"></div>
-        <div style="background:rgba(16,185,129,0.14);border:1px solid rgba(16,185,129,0.4);border-radius:20px;padding:3px 14px;font-size:11px;font-weight:700;color:#10B981;white-space:nowrap;margin:2px 0">↓ CVR: ${cvr}%</div>
-        <div style="width:2px;height:10px;background:rgba(16,185,129,0.35)"></div>
-      </div>
-
-      <div style="width:${convW}%;background:rgba(16,185,129,0.82);border:1px solid rgba(16,185,129,0.9);border-radius:12px;padding:16px 20px;text-align:center">
-        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:${subCol};text-transform:uppercase;margin-bottom:5px">Orders</div>
-        <div style="font-size:26px;font-weight:800;color:#fff;font-family:${mono};line-height:1">${fmt(conv)}</div>
-      </div>
-
-    </div>
-  `;
 }
 
 async function saveReportNotes() {
