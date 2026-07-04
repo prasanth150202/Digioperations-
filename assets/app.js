@@ -3456,7 +3456,7 @@ function bgtClickDay(dayNum) {
     const roasTarget = chDay.roasTarget || (isLeads ? 150 : 5);
 
     const targetDesc = isLeads
-      ? `Pacing Target: ${roundVal(expSales)} leads · ₹${fmtN(expSpend)} spend`
+      ? `Pacing Target: ${Math.round(expSales)} leads · ₹${fmtN(expSpend)} spend`
       : `Pacing Target: ₹${fmtN(expSales)} sales · ₹${fmtN(expSpend)} spend`;
 
     fields += `
