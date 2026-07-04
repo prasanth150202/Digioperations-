@@ -22,7 +22,7 @@ if (!$link) {
     json_err('Report not found or link expired', 404);
 }
 
-$report = dbGet('SELECT r.*, b.name as brand_name 
+$report = dbGet('SELECT r.*, b.name as brand_name, b.type as brand_type 
                  FROM reports r 
                  JOIN brands b ON b.id = r.brand_id 
                  WHERE r.id = ?', [$link['report_id']]);

@@ -782,6 +782,7 @@ table.report-table tr:hover td {
     document.getElementById('main-content').style.display = 'block';
 
     const data = r.report_data;
+    const isLeads = r.brand_type === 'leads';
 
     // Titles & metadata
     const startStr = new Date(r.period_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -791,13 +792,26 @@ table.report-table tr:hover td {
     document.getElementById('report-period-dates').textContent = `${startStr} - ${endStr}`;
     document.title = `${r.brand_name} — ${r.report_type.toUpperCase()} Marketing Report (${startStr} - ${endStr})`;
 
+    // Setup KPI Labels
+    document.getElementById('kpi-sales').previousElementSibling.textContent = isLeads ? 'Raw Leads' : 'Total Sales';
+    document.getElementById('kpi-roas').previousElementSibling.textContent = isLeads ? 'Blended CPL' : 'ROAS';
+    document.getElementById('kpi-orders').previousElementSibling.textContent = isLeads ? 'Qualified Leads' : 'Orders';
+    document.getElementById('kpi-cpa').previousElementSibling.textContent = isLeads ? 'Blended CPQL' : 'CPA';
+    document.getElementById('kpi-aov').previousElementSibling.textContent = isLeads ? 'Qual. Rate' : 'AOV';
+
     // KPIs
     document.getElementById('kpi-spend').textContent = `₹${parseFloat(r.total_spend).toLocaleString('en-IN')}`;
-    document.getElementById('kpi-sales').textContent = `₹${parseFloat(r.total_revenue).toLocaleString('en-IN')}`;
-    document.getElementById('kpi-roas').textContent = `${parseFloat(r.overall_roas).toFixed(2)}x`;
+    document.getElementById('kpi-sales').textContent = isLeads
+      ? parseInt(r.total_revenue).toLocaleString('en-IN')
+      : `₹${parseFloat(r.total_revenue).toLocaleString('en-IN')}`;
+    document.getElementById('kpi-roas').textContent = isLeads
+      ? `₹${parseFloat(r.overall_roas).toLocaleString('en-IN')}`
+      : `${parseFloat(r.overall_roas).toFixed(2)}x`;
     document.getElementById('kpi-orders').textContent = parseInt(r.total_conversions).toLocaleString('en-IN');
     document.getElementById('kpi-cpa').textContent = `₹${parseFloat(r.overall_cpa).toLocaleString('en-IN')}`;
-    document.getElementById('kpi-aov').textContent = `₹${parseFloat(r.overall_aov).toLocaleString('en-IN')}`;
+    document.getElementById('kpi-aov').textContent = isLeads
+      ? `${parseFloat(r.overall_aov).toFixed(1)}%`
+      : `₹${parseFloat(r.overall_aov).toLocaleString('en-IN')}`;
 
     // WoW Badges
     const comps = data.comparisons || {};
@@ -824,9 +838,9 @@ table.report-table tr:hover td {
 
     formatBadge(comps.spend, 'kpi-change-spend', true);
     formatBadge(comps.revenue, 'kpi-change-sales');
-    formatBadge(comps.roas, 'kpi-change-roas');
+    formatBadge(comps.roas, 'kpi-change-roas', isLeads ? true : false); // CPL lower is better
     formatBadge(comps.conversions, 'kpi-change-orders');
-    formatBadge(comps.cpa, 'kpi-change-cpa', true);
+    formatBadge(comps.cpa, 'kpi-change-cpa', true); // CPQL lower is better
     formatBadge(comps.aov, 'kpi-change-aov');
 
     // Summaries
@@ -846,6 +860,34 @@ table.report-table tr:hover td {
       }
     });
 
+    // Render table headers dynamically
+    const thead = document.querySelector('.report-table thead');
+    if (thead) {
+      thead.innerHTML = isLeads ? `
+        <tr>
+          <th>Channel</th>
+          <th>Spend</th>
+          <th>Raw Leads</th>
+          <th>Qualified Leads</th>
+          <th>Revenue</th>
+          <th>CPQL</th>
+          <th>Qual. Rate</th>
+          <th>CPL</th>
+        </tr>
+      ` : `
+        <tr>
+          <th>Channel</th>
+          <th>Spend</th>
+          <th>Orders</th>
+          <th>Customers Acquired</th>
+          <th>Revenue</th>
+          <th>CPA</th>
+          <th>AOV</th>
+          <th>ROAS</th>
+        </tr>
+      `;
+    }
+
     const tbody = document.getElementById('channel-tbody');
     tbody.innerHTML = Object.entries(activeChannels).map(([ch, m]) => {
       const spend    = parseFloat(m.spend) || 0;
@@ -854,8 +896,19 @@ table.report-table tr:hover td {
       const custAcq  = parseInt(m.customers_acquired) || 0;
       const roas     = parseFloat(m.roas) || (spend > 0 ? (revenue / spend) : 0);
       const cpa      = parseFloat(m.cpa) || (custAcq > 0 ? (spend / custAcq) : (orders > 0 ? (spend / orders) : 0));
-      const aov      = orders > 0 ? Math.round(revenue / orders) : 0;
-      return `
+      const aov      = parseFloat(m.aov) || (orders > 0 ? (revenue / orders) : 0);
+      return isLeads ? `
+      <tr>
+        <td style="font-weight:700;text-transform:capitalize">${ch}</td>
+        <td style="font-family:var(--font-mono)">₹${spend.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--font-mono)">${orders.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--font-mono)">${custAcq.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--font-mono)">—</td>
+        <td style="font-family:var(--font-mono)">${cpa > 0 ? '₹' + Math.round(cpa).toLocaleString('en-IN') : '—'}</td>
+        <td style="font-family:var(--font-mono)">${aov.toFixed(1)}%</td>
+        <td style="font-family:var(--font-mono);font-weight:700;color:var(--white);">${roas > 0 ? '₹' + Math.round(roas).toLocaleString('en-IN') : '—'}</td>
+      </tr>
+    ` : `
       <tr>
         <td style="font-weight:700;text-transform:capitalize">${ch}</td>
         <td style="font-family:var(--font-mono)">₹${spend.toLocaleString('en-IN')}</td>
@@ -863,7 +916,7 @@ table.report-table tr:hover td {
         <td style="font-family:var(--font-mono)">${custAcq > 0 ? custAcq.toLocaleString('en-IN') : '—'}</td>
         <td style="font-family:var(--font-mono)">₹${revenue.toLocaleString('en-IN')}</td>
         <td style="font-family:var(--font-mono)">₹${Math.round(cpa).toLocaleString('en-IN')}</td>
-        <td style="font-family:var(--font-mono)">₹${aov.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--font-mono)">₹${Math.round(aov).toLocaleString('en-IN')}</td>
         <td style="font-family:var(--font-mono);font-weight:700;color:var(--white);">${roas.toFixed(2)}x</td>
       </tr>
     `;
@@ -876,7 +929,7 @@ table.report-table tr:hover td {
         untappedContainer.innerHTML = Object.keys(untappedChannels).map(ch => `
           <div style="background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); padding:16px; border-radius:12px; margin-top:12px;">
             <div style="color:var(--green); font-weight:700; text-transform:capitalize; margin-bottom:6px; display:flex; align-items:center; gap:6px;">✨ ${ch} Ads</div>
-            <div style="color:var(--text-secondary); font-size:13px; line-height:1.5;">No spend was allocated to ${ch} this period. Activating this channel could be a strong opportunity to scale reach and acquire net-new customers.</div>
+            <div style="color:var(--text-secondary); font-size:13px; line-height:1.5;">No spend was allocated to ${ch} this period. Activating this channel could be a strong opportunity to scale reach and acquire net-new contacts.</div>
           </div>
         `).join('');
       } else {
@@ -884,14 +937,24 @@ table.report-table tr:hover td {
       }
     }
 
+    // Set Chart titles dynamically
+    const revShareLabel = document.getElementById('revenue-chart').parentElement.previousElementSibling;
+    if (revShareLabel) revShareLabel.textContent = isLeads ? 'Leads Share by Channel' : 'Revenue Share by Channel';
+    
+    const roiLabel = document.getElementById('efficiency-chart').parentElement.previousElementSibling;
+    if (roiLabel) roiLabel.textContent = isLeads ? 'Channel CPL & Efficiency' : 'Channel ROI & Efficiency';
+    
+    const balLabel = document.getElementById('radar-chart').parentElement.previousElementSibling;
+    if (balLabel) balLabel.textContent = isLeads ? 'Spend vs Leads Balance' : 'Spend vs Revenue Balance';
+
     // Charts
-    renderCharts(activeChannels, data.totals);
+    renderCharts(activeChannels, data.totals, isLeads);
   }
 
-  function renderCharts(channels, totals) {
+  function renderCharts(channels, totals, isLeads = false) {
     const labels = Object.keys(channels).map(c => c.charAt(0).toUpperCase() + c.slice(1));
     const spendData = Object.values(channels).map(c => c.spend);
-    const revenueData = Object.values(channels).map(c => c.revenue);
+    const revenueData = isLeads ? Object.values(channels).map(c => c.conversions || 0) : Object.values(channels).map(c => c.revenue || 0);
     
     const colors = ['#2B4EFF', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
@@ -946,15 +1009,15 @@ table.report-table tr:hover td {
       data: {
         labels,
         datasets: [
-          { label: 'ROAS', data: Object.values(channels).map(c => parseFloat(c.roas) || 0), backgroundColor: 'rgba(16, 185, 129, 0.7)', yAxisID: 'y' },
-          { label: 'CPA (₹)', data: Object.values(channels).map(c => parseFloat(c.cpa) || 0), backgroundColor: 'rgba(245, 158, 11, 0.7)', yAxisID: 'y1' }
+          { label: isLeads ? 'CPL (₹)' : 'ROAS', data: Object.values(channels).map(c => parseFloat(c.roas) || 0), backgroundColor: 'rgba(16, 185, 129, 0.7)', yAxisID: 'y' },
+          { label: isLeads ? 'CPQL (₹)' : 'CPA (₹)', data: Object.values(channels).map(c => parseFloat(c.cpa) || 0), backgroundColor: 'rgba(245, 158, 11, 0.7)', yAxisID: 'y1' }
         ]
       },
       options: {
         responsive: true, maintainAspectRatio: false, devicePixelRatio: 2,
         scales: {
-          y: { type: 'linear', position: 'left', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
-          y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#9ca3af' } },
+          y: { type: 'linear', position: 'left', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', callback: function(v) { return isLeads ? '₹' + v : v; } } },
+          y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#9ca3af', callback: function(v) { return '₹' + v; } } },
           x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
         },
         plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 }, color: '#9ca3af' } } }
@@ -968,7 +1031,7 @@ table.report-table tr:hover td {
         labels,
         datasets: [
           { label: 'Spend', data: spendData, backgroundColor: 'rgba(43, 78, 255, 0.7)', borderColor: '#2B4EFF', borderWidth: 1, borderRadius: 4 },
-          { label: 'Revenue', data: revenueData, backgroundColor: 'rgba(16, 185, 129, 0.7)', borderColor: '#10B981', borderWidth: 1, borderRadius: 4 }
+          { label: isLeads ? 'Leads' : 'Revenue', data: revenueData, backgroundColor: 'rgba(16, 185, 129, 0.7)', borderColor: '#10B981', borderWidth: 1, borderRadius: 4 }
         ]
       },
       options: {
@@ -979,7 +1042,7 @@ table.report-table tr:hover td {
             grid: { color: 'rgba(255,255,255,0.05)' },
             ticks: {
               color: '#9ca3af',
-              callback: function(v) { return '₹' + v.toLocaleString('en-IN'); }
+              callback: function(v) { return isLeads ? v.toLocaleString('en-IN') : '₹' + v.toLocaleString('en-IN'); }
             }
           },
           x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }

@@ -192,6 +192,9 @@ if ($method === 'POST' && $action === 'save_missing') {
 
 // Helper to sum and compile performance statistics from a date range
 function aggregateStats(string $brandId, string $start, string $end): array {
+    $brand = dbGet('SELECT type FROM brands WHERE id=?', [$brandId]);
+    $brandType = $brand['type'] ?? 'sales';
+
     $rows = dbAll('SELECT * FROM budget_days WHERE brand_id = ? AND day_date BETWEEN ? AND ?', [$brandId, $start, $end]);
     
     $channels = [];
@@ -240,17 +243,29 @@ function aggregateStats(string $brandId, string $start, string $end): array {
 
     // Add derived rates
     foreach ($channels as $chName => &$cMetrics) {
-        $cMetrics['roas'] = $cMetrics['spend'] > 0 ? round($cMetrics['revenue'] / $cMetrics['spend'], 2) : 0.0;
-        // CPA = cost per customer acquired; fall back to cost per order if no customers_acquired data
-        $cpaDenominator = $cMetrics['customers_acquired'] > 0 ? $cMetrics['customers_acquired'] : $cMetrics['conversions'];
-        $cMetrics['cpa'] = $cpaDenominator > 0 ? round($cMetrics['spend'] / $cpaDenominator, 2) : 0.0;
+        if ($brandType === 'leads') {
+            $cMetrics['roas'] = $cMetrics['conversions'] > 0 ? round($cMetrics['spend'] / $cMetrics['conversions'], 2) : 0.0; // CPL = Spend / Raw Leads
+            $cMetrics['cpa']  = $cMetrics['customers_acquired'] > 0 ? round($cMetrics['spend'] / $cMetrics['customers_acquired'], 2) : 0.0; // CPQL = Spend / Qualified Leads
+            $cMetrics['aov']  = $cMetrics['conversions'] > 0 ? round(($cMetrics['customers_acquired'] / $cMetrics['conversions']) * 100, 2) : 0.0; // Qualification Rate (%)
+        } else {
+            $cMetrics['roas'] = $cMetrics['spend'] > 0 ? round($cMetrics['revenue'] / $cMetrics['spend'], 2) : 0.0;
+            $cpaDenominator = $cMetrics['customers_acquired'] > 0 ? $cMetrics['customers_acquired'] : $cMetrics['conversions'];
+            $cMetrics['cpa'] = $cpaDenominator > 0 ? round($cMetrics['spend'] / $cpaDenominator, 2) : 0.0;
+            $cMetrics['aov'] = $cMetrics['conversions'] > 0 ? round($cMetrics['revenue'] / $cMetrics['conversions'], 2) : 0.0;
+        }
         $cMetrics['ctr'] = $cMetrics['impressions'] > 0 ? round(($cMetrics['clicks'] / $cMetrics['impressions']) * 100, 2) : 0.0;
     }
 
-    $totals['roas'] = $totals['spend'] > 0 ? round($totals['revenue'] / $totals['spend'], 2) : 0.0;
-    $cpaDenomTotal  = $totals['customers_acquired'] > 0 ? $totals['customers_acquired'] : $totals['conversions'];
-    $totals['cpa']  = $cpaDenomTotal > 0 ? round($totals['spend'] / $cpaDenomTotal, 2) : 0.0;
-    $totals['aov']  = $totals['conversions'] > 0 ? round($totals['revenue'] / $totals['conversions'], 2) : 0.0;
+    if ($brandType === 'leads') {
+        $totals['roas'] = $totals['conversions'] > 0 ? round($totals['spend'] / $totals['conversions'], 2) : 0.0; // Blended CPL
+        $totals['cpa']  = $totals['customers_acquired'] > 0 ? round($totals['spend'] / $totals['customers_acquired'], 2) : 0.0; // Blended CPQL
+        $totals['aov']  = $totals['conversions'] > 0 ? round(($totals['customers_acquired'] / $totals['conversions']) * 100, 2) : 0.0; // Blended Qualification Rate (%)
+    } else {
+        $totals['roas'] = $totals['spend'] > 0 ? round($totals['revenue'] / $totals['spend'], 2) : 0.0;
+        $cpaDenomTotal  = $totals['customers_acquired'] > 0 ? $totals['customers_acquired'] : $totals['conversions'];
+        $totals['cpa']  = $cpaDenomTotal > 0 ? round($totals['spend'] / $cpaDenomTotal, 2) : 0.0;
+        $totals['aov']  = $totals['conversions'] > 0 ? round($totals['revenue'] / $totals['conversions'], 2) : 0.0;
+    }
     $totals['ctr']  = $totals['impressions'] > 0 ? round(($totals['clicks'] / $totals['impressions']) * 100, 2) : 0.0;
     
     return [
@@ -271,8 +286,10 @@ if ($method === 'POST' && $action === 'create') {
         json_err('brand_id, report_type, start_date, and end_date required');
     }
     
-    $brand = dbGet('SELECT name, slug FROM brands WHERE id=?', [$brandId]);
+    $brand = dbGet('SELECT name, slug, type FROM brands WHERE id=?', [$brandId]);
     if (!$brand || !canAccessBrand($user, $brand['slug'])) json_err('Access denied', 403);
+    
+    $brandType = $brand['type'] ?? 'sales';
     
     // 1. Aggregate stats for the current period
     $currentStats = aggregateStats($brandId, $startDate, $endDate);
@@ -309,21 +326,40 @@ if ($method === 'POST' && $action === 'create') {
     // 3. Query AI to generate highlights summary
     $aiHighlights = ['highlights' => '', 'blockers' => '', 'next_steps' => ''];
     try {
-        $systemMsg = "You are a professional performance marketing dashboard. Analyze the data and generate short summary notes. Respond ONLY in valid JSON format matching this schema: {\"highlights\": \"HTML bullet points of what went well\", \"blockers\": \"HTML bullet points of performance blockers or concerns\", \"next_steps\": \"HTML bullet points of next actions\"}. Do not write any markdown fences or surrounding text, just the raw JSON.";
-        
-        $userMsg = "Brand: {$brand['name']}\n";
-        $userMsg .= "Report Type: " . ucfirst($reportType) . "\n";
-        $userMsg .= "Period: {$startDate} to {$endDate}\n\n";
-        $userMsg .= "Current Period Stats:\n";
-        $userMsg .= "- Total Spend: ₹" . number_format($currentStats['totals']['spend']) . " (WoW: {$comparisons['spend']}%)\n";
-        $userMsg .= "- Total Revenue: ₹" . number_format($currentStats['totals']['revenue']) . " (WoW: {$comparisons['revenue']}%)\n";
-        $userMsg .= "- Blended ROAS: {$currentStats['totals']['roas']}x (WoW: {$comparisons['roas']}%)\n";
-        $userMsg .= "- No of Orders: {$currentStats['totals']['conversions']} (WoW: {$comparisons['conversions']}%)\n";
-        $userMsg .= "- Blended CPA: ₹{$currentStats['totals']['cpa']} (WoW: {$comparisons['cpa']}%)\n";
-        $userMsg .= "- Blended AOV: ₹{$currentStats['totals']['aov']} (WoW: {$comparisons['aov']}%)\n\n";
-        $userMsg .= "Channel Metrics:\n";
-        foreach ($currentStats['channels'] as $cName => $metrics) {
-            $userMsg .= "- " . ucfirst($cName) . ": Spend ₹" . number_format($metrics['spend']) . ", Revenue ₹" . number_format($metrics['revenue']) . ", ROAS {$metrics['roas']}x, Orders {$metrics['conversions']}, CPA ₹{$metrics['cpa']}\n";
+        if ($brandType === 'leads') {
+            $systemMsg = "You are a professional lead generation performance marketing dashboard. Analyze the data and generate short summary notes. Respond ONLY in valid JSON format matching this schema: {\"highlights\": \"HTML bullet points of what went well\", \"blockers\": \"HTML bullet points of performance blockers or concerns\", \"next_steps\": \"HTML bullet points of next actions\"}. Do not write any markdown fences or surrounding text, just the raw JSON.";
+            
+            $userMsg = "Brand: {$brand['name']}\n";
+            $userMsg .= "Report Type: " . ucfirst($reportType) . "\n";
+            $userMsg .= "Period: {$startDate} to {$endDate}\n\n";
+            $userMsg .= "Current Period Stats:\n";
+            $userMsg .= "- Total Spend: ₹" . number_format($currentStats['totals']['spend']) . " (WoW: {$comparisons['spend']}%)\n";
+            $userMsg .= "- Raw Leads: " . number_format($currentStats['totals']['conversions']) . " (WoW: {$comparisons['conversions']}%)\n";
+            $userMsg .= "- Blended CPL (Cost per Lead): ₹" . number_format($currentStats['totals']['roas']) . " (WoW: {$comparisons['roas']}%)\n";
+            $userMsg .= "- Qualified Leads: " . number_format($currentStats['totals']['customers_acquired']) . " (WoW: {$comparisons['customers_acquired']}%)\n";
+            $userMsg .= "- Blended CPQL (Cost per Qualified Lead): ₹" . number_format($currentStats['totals']['cpa']) . " (WoW: {$comparisons['cpa']}%)\n";
+            $userMsg .= "- Qualification Rate: {$currentStats['totals']['aov']}% (WoW: {$comparisons['aov']}%)\n\n";
+            $userMsg .= "Channel Metrics:\n";
+            foreach ($currentStats['channels'] as $cName => $metrics) {
+                $userMsg .= "- " . ucfirst($cName) . ": Spend ₹" . number_format($metrics['spend']) . ", Raw Leads " . number_format($metrics['conversions']) . ", CPL ₹" . number_format($metrics['roas']) . ", Qualified Leads " . number_format($metrics['customers_acquired']) . ", CPQL ₹" . number_format($metrics['cpa']) . ", Qual. Rate {$metrics['aov']}%\n";
+            }
+        } else {
+            $systemMsg = "You are a professional performance marketing dashboard. Analyze the data and generate short summary notes. Respond ONLY in valid JSON format matching this schema: {\"highlights\": \"HTML bullet points of what went well\", \"blockers\": \"HTML bullet points of performance blockers or concerns\", \"next_steps\": \"HTML bullet points of next actions\"}. Do not write any markdown fences or surrounding text, just the raw JSON.";
+            
+            $userMsg = "Brand: {$brand['name']}\n";
+            $userMsg .= "Report Type: " . ucfirst($reportType) . "\n";
+            $userMsg .= "Period: {$startDate} to {$endDate}\n\n";
+            $userMsg .= "Current Period Stats:\n";
+            $userMsg .= "- Total Spend: ₹" . number_format($currentStats['totals']['spend']) . " (WoW: {$comparisons['spend']}%)\n";
+            $userMsg .= "- Total Revenue: ₹" . number_format($currentStats['totals']['revenue']) . " (WoW: {$comparisons['revenue']}%)\n";
+            $userMsg .= "- Blended ROAS: {$currentStats['totals']['roas']}x (WoW: {$comparisons['roas']}%)\n";
+            $userMsg .= "- No of Orders: {$currentStats['totals']['conversions']} (WoW: {$comparisons['conversions']}%)\n";
+            $userMsg .= "- Blended CPA: ₹{$currentStats['totals']['cpa']} (WoW: {$comparisons['cpa']}%)\n";
+            $userMsg .= "- Blended AOV: ₹{$currentStats['totals']['aov']} (WoW: {$comparisons['aov']}%)\n\n";
+            $userMsg .= "Channel Metrics:\n";
+            foreach ($currentStats['channels'] as $cName => $metrics) {
+                $userMsg .= "- " . ucfirst($cName) . ": Spend ₹" . number_format($metrics['spend']) . ", Revenue ₹" . number_format($metrics['revenue']) . ", ROAS {$metrics['roas']}x, Orders {$metrics['conversions']}, CPA ₹{$metrics['cpa']}\n";
+            }
         }
         
         $aiResult = callJSON($systemMsg, $userMsg);
@@ -332,9 +368,15 @@ if ($method === 'POST' && $action === 'create') {
         if (isset($aiResult['next_steps'])) $aiHighlights['next_steps'] = $aiResult['next_steps'];
     } catch (Throwable $e) {
         // Fallback default summaries if AI fails or key is missing
-        $aiHighlights['highlights'] = "• Campaign generated total revenue of ₹" . number_format($currentStats['totals']['revenue']) . " with a blended ROAS of {$currentStats['totals']['roas']}x.<br>• Ad spend was managed at ₹" . number_format($currentStats['totals']['spend']) . ".";
-        $aiHighlights['blockers'] = "• No significant blockers identified in the automated scan.";
-        $aiHighlights['next_steps'] = "• Monitor blended CPA (currently ₹" . number_format($currentStats['totals']['cpa']) . ") to optimize audience targets.<br>• Adjust high-performing channel budgets.";
+        if ($brandType === 'leads') {
+            $aiHighlights['highlights'] = "• Generated " . number_format($currentStats['totals']['conversions']) . " raw leads with a blended CPL of ₹" . number_format($currentStats['totals']['roas']) . ".<br>• Qualified leads count reached " . number_format($currentStats['totals']['customers_acquired']) . " with a qualification rate of {$currentStats['totals']['aov']}%.";
+            $aiHighlights['blockers'] = "• No significant blockers identified in the automated scan.";
+            $aiHighlights['next_steps'] = "• Monitor blended CPL (currently ₹" . number_format($currentStats['totals']['roas']) . ") and qualification rate to optimize creative targets.<br>• Adjust spend on high-performing lead sources.";
+        } else {
+            $aiHighlights['highlights'] = "• Campaign generated total revenue of ₹" . number_format($currentStats['totals']['revenue']) . " with a blended ROAS of {$currentStats['totals']['roas']}x.<br>• Ad spend was managed at ₹" . number_format($currentStats['totals']['spend']) . ".";
+            $aiHighlights['blockers'] = "• No significant blockers identified in the automated scan.";
+            $aiHighlights['next_steps'] = "• Monitor blended CPA (currently ₹" . number_format($currentStats['totals']['cpa']) . ") to optimize audience targets.<br>• Adjust high-performing channel budgets.";
+        }
     }
     
     // 4. Generate unique client token
@@ -368,6 +410,18 @@ if ($method === 'POST' && $action === 'create') {
     ];
     
     // UPSERT LOGIC
+    $rSpend = $currentStats['totals']['spend'];
+    if ($brandType === 'leads') {
+        $rConversions = $currentStats['totals']['customers_acquired']; // Qualified Leads
+        $rRevenue = $currentStats['totals']['conversions']; // Raw Leads
+    } else {
+        $rConversions = $currentStats['totals']['conversions']; // Orders
+        $rRevenue = $currentStats['totals']['revenue']; // Sales ₹
+    }
+    $rCpa = $currentStats['totals']['cpa'];
+    $rRoas = $currentStats['totals']['roas'];
+    $rAov = $currentStats['totals']['aov'];
+
     // Check if report already exists for this exact period and type
     $existing = dbGet('SELECT id FROM reports WHERE brand_id=? AND period_start=? AND period_end=? AND report_type=?', 
         [$brandId, $startDate, $endDate, $reportType]);
@@ -376,12 +430,12 @@ if ($method === 'POST' && $action === 'create') {
         $reportId = $existing['id'];
         dbRun('UPDATE reports SET total_spend=?, total_conversions=?, total_revenue=?, overall_cpa=?, overall_roas=?, overall_aov=?, report_data=?, shared_link=?, highlights=?, blockers=?, next_steps=? WHERE id=?',
             [
-                $currentStats['totals']['spend'],
-                $currentStats['totals']['conversions'],
-                $currentStats['totals']['revenue'],
-                $currentStats['totals']['cpa'],
-                $currentStats['totals']['roas'],
-                $currentStats['totals']['aov'],
+                $rSpend,
+                $rConversions,
+                $rRevenue,
+                $rCpa,
+                $rRoas,
+                $rAov,
                 json_encode($reportData),
                 $sharedLink,
                 $aiHighlights['highlights'],
@@ -406,12 +460,12 @@ if ($method === 'POST' && $action === 'create') {
                 $reportType,
                 $startDate,
                 $endDate,
-                $currentStats['totals']['spend'],
-                $currentStats['totals']['conversions'],
-                $currentStats['totals']['revenue'],
-                $currentStats['totals']['cpa'],
-                $currentStats['totals']['roas'],
-                $currentStats['totals']['aov'],
+                $rSpend,
+                $rConversions,
+                $rRevenue,
+                $rCpa,
+                $rRoas,
+                $rAov,
                 json_encode($reportData),
                 $sharedLink,
                 $aiHighlights['highlights'],
@@ -434,7 +488,7 @@ if ($method === 'GET' && $action === 'view') {
     $id = $_GET['id'] ?? '';
     if (!$id) json_err('Report ID required');
     
-    $report = dbGet('SELECT r.*, rl.unique_token, rl.view_count, b.name as brand_name, b.slug as brand_slug 
+    $report = dbGet('SELECT r.*, rl.unique_token, rl.view_count, b.name as brand_name, b.slug as brand_slug, b.type as brand_type 
                     FROM reports r 
                     JOIN brands b ON b.id = r.brand_id
                     LEFT JOIN report_links rl ON rl.report_id = r.id 

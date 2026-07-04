@@ -2685,6 +2685,7 @@ function renderBgtDashboard(data) {
     const hasErr = flags.some(f => f.level === 'error');
     const hasWrn = flags.some(f => f.level === 'warn');
     const cls = hasErr ? 'has-errors' : hasWrn ? 'has-warns' : '';
+    const isLeads = item.brand.type === 'leads';
     return `<div class="bgt-agency-card ${cls}" onclick="bgtOpenMonth('${item.brand.id}','${item.month.id}')">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div><div class="bgt-card-brand">${item.brand.name}</div><div class="bgt-card-month">${item.month.label} · ${s.daysLeft}d left</div></div>
@@ -2692,9 +2693,9 @@ function renderBgtDashboard(data) {
       </div>
       <div class="bgt-card-prog"><div class="bgt-card-prog-fill" style="width:${pct}%;background:${pct>=100?'var(--green)':pct>=70?'var(--blue)':'var(--red)'}"></div></div>
       <div class="bgt-card-stats">
-        <span>₹${fmt(s.totalSalesReal)} actual</span>
-        <span>Proj: ₹${fmt(s.projectedSales)} (${projPct.toFixed(0)}%)</span>
-        <span>ROAS ${s.totalROAS || '—'}</span>
+        <span>${isLeads ? '' : '₹'}${fmt(s.totalSalesReal)}${isLeads ? ' leads' : ' actual'}</span>
+        <span>Proj: ${isLeads ? '' : '₹'}${fmt(s.projectedSales)}${isLeads ? ' leads' : ''} (${projPct.toFixed(0)}%)</span>
+        <span>${isLeads ? 'CPL ₹' : 'ROAS '}${s.totalROAS || '—'}</span>
       </div>
       ${flags.length ? `<div class="bgt-card-flag-row">${flags.slice(0,3).map(f=>`<span class="bgt-flag-pill ${f.level}">${f.msg}</span>`).join('')}${flags.length>3?`<span style="font-size:10px;color:var(--mid)">+${flags.length-3} more</span>`:''}</div>` : ''}
     </div>`;
@@ -2716,6 +2717,7 @@ async function bgtOpenBrand(brandId) {
 
   if (!months.length) { el.innerHTML = '<div style="color:var(--mid);font-size:13px;padding:16px">No months yet. Click "New Month" to create one.</div>'; return; }
 
+  const isLeads = bgtState.currentBrand.type === 'leads';
   el.innerHTML = months.map(m => {
     const salesReal = parseFloat(m.total_sales_real) || 0;
     const target = parseFloat(m.revenue_target) || 0;
@@ -2726,8 +2728,8 @@ async function bgtOpenBrand(brandId) {
         <div style="font-size:11px;color:var(--mid)">${m.total_days} days · ${m.days_entered} entries</div>
       </div>
       <div style="text-align:right">
-        <div style="font-weight:700;color:var(--blue)">₹${fmt(salesReal)}</div>
-        <div style="font-size:11px;color:var(--mid)">${pct}% of ₹${fmt(target)}</div>
+        <div style="font-weight:700;color:var(--blue)">${isLeads ? '' : '₹'}${fmt(salesReal)}${isLeads ? ' leads' : ''}</div>
+        <div style="font-size:11px;color:var(--mid)">${pct}% of ${isLeads ? '' : '₹'}${fmt(target)}${isLeads ? ' leads' : ''}</div>
       </div>
     </div>`;
   }).join('');
@@ -2846,9 +2848,10 @@ function renderBgtFlags(data) {
 }
 
 function renderBgtSummary(data) {
+  const isLeads = bgtState.currentBrand.type === 'leads';
   const s = data.summary;
   const target = parseFloat(s.target) || 0;
-  const roas = parseFloat(s.roas) || 5;
+  const roas = parseFloat(s.roas) || (isLeads ? 150 : 5);
   const budget = parseFloat(s.monthlyBudget) || 0;
   
   const achieved = parseFloat(s.totalSalesReal) || 0;
@@ -2857,9 +2860,14 @@ function renderBgtSummary(data) {
   const salesLeft = parseFloat(s.revenueLeft) || 0;
   const spendLeft = parseFloat(s.spendLeft) || 0;
   
-  // Required ROAS to reach target with remaining budget
-  const reqRoas = spendLeft > 0 ? (salesLeft / spendLeft) : 0;
-  const reqRoasStr = reqRoas > 0 ? reqRoas.toFixed(1) + 'x' : 'Target Met ✓';
+  // Required ROAS/CPL to reach target with remaining budget
+  const reqRoas = isLeads
+    ? (salesLeft > 0 ? spendLeft / salesLeft : 0)
+    : (spendLeft > 0 ? salesLeft / spendLeft : 0);
+
+  const reqRoasStr = reqRoas > 0
+    ? (isLeads ? '₹' + reqRoas.toFixed(0) : reqRoas.toFixed(1) + 'x')
+    : 'Target Met ✓';
 
   const daysEntered = parseInt(s.enteredDays) || 0;
   const totalDays = parseInt(s.totalDays) || 30;
@@ -2873,23 +2881,36 @@ function renderBgtSummary(data) {
     const spendVal = cs.spendReal || 0;
     const targetVal = cs.target || 0;
     const roasVal = cs.roas || 0;
-    const roasTarget = cs.roasTarget || 5;
+    const roasTarget = cs.roasTarget || (isLeads ? 150 : 5);
 
     let score = 0;
     let rankText = 'No Spend';
     let statusColor = 'var(--mid)';
 
     if (spendVal > 0) {
-      score = roasVal / roasTarget;
-      if (score >= 1.0) {
-        rankText = `Leader 🏆 (${roasVal.toFixed(1)}x ROAS)`;
-        statusColor = 'var(--green)';
-      } else if (score >= 0.85) {
-        rankText = `On Track 🟢 (${roasVal.toFixed(1)}x ROAS)`;
-        statusColor = 'var(--blue)';
+      score = isLeads ? (roasTarget / roasVal) : (roasVal / roasTarget);
+      if (isLeads) {
+        if (score >= 1.0) {
+          rankText = `Leader 🏆 (₹${roasVal.toFixed(0)} CPL)`;
+          statusColor = 'var(--green)';
+        } else if (score >= 0.85) {
+          rankText = `On Track 🟢 (₹${roasVal.toFixed(0)} CPL)`;
+          statusColor = 'var(--blue)';
+        } else {
+          rankText = `Lagging ⚠️ (₹${roasVal.toFixed(0)} CPL)`;
+          statusColor = 'var(--amber)';
+        }
       } else {
-        rankText = `Lagging ⚠️ (${roasVal.toFixed(1)}x ROAS)`;
-        statusColor = 'var(--amber)';
+        if (score >= 1.0) {
+          rankText = `Leader 🏆 (${roasVal.toFixed(1)}x ROAS)`;
+          statusColor = 'var(--green)';
+        } else if (score >= 0.85) {
+          rankText = `On Track 🟢 (${roasVal.toFixed(1)}x ROAS)`;
+          statusColor = 'var(--blue)';
+        } else {
+          rankText = `Lagging ⚠️ (${roasVal.toFixed(1)}x ROAS)`;
+          statusColor = 'var(--amber)';
+        }
       }
     } else if (targetVal > 0 && salesVal > 0) {
       score = salesVal / targetVal;
@@ -2962,20 +2983,36 @@ function renderBgtSummary(data) {
       borderL = 'var(--amber)';
     }
     
-    // Target ROAS Performance
+    // Target ROAS/CPL Performance
     let roasClass = 'good';
     let roasText = 'Healthy';
     if (cs.roas !== null) {
-      if (cs.roas < cs.roasTarget * 0.9) {
-        roasText = `Lagging (-${Math.round((1 - cs.roas/cs.roasTarget)*100)}%)`;
-        roasClass = 'bad';
-        if (statusClass === 'good') {
-          paceStatus = '🔴 ROAS Alert';
-          statusClass = 'bad';
-          borderL = 'var(--red)';
+      if (isLeads) {
+        if (cs.roas > cs.roasTarget * 1.1) {
+          roasText = `Over (+${Math.round((cs.roas/cs.roasTarget - 1)*100)}%)`;
+          roasClass = 'bad';
+          if (statusClass === 'good') {
+            paceStatus = '🔴 CPL Alert';
+            statusClass = 'bad';
+            borderL = 'var(--red)';
+          }
+        }
+      } else {
+        if (cs.roas < cs.roasTarget * 0.9) {
+          roasText = `Lagging (-${Math.round((1 - cs.roas/cs.roasTarget)*100)}%)`;
+          roasClass = 'bad';
+          if (statusClass === 'good') {
+            paceStatus = '🔴 ROAS Alert';
+            statusClass = 'bad';
+            borderL = 'var(--red)';
+          }
         }
       }
     }
+
+    const targetLabel = isLeads ? 'Leads' : 'Sales';
+    const valFmt = isLeads ? fmt(salesVal) : '₹' + fmt(salesVal);
+    const tarFmt = isLeads ? fmt(cs.target) : '₹' + fmt(cs.target);
 
     channelsHtml += `
       <div class="cmd-stat-card" style="grid-column: span 4; display:flex; flex-direction:column; gap:12px; border-left: 4px solid ${borderL}; background: #fff; padding:18px; border-radius:12px; box-shadow: var(--sh)">
@@ -2989,8 +3026,8 @@ function renderBgtSummary(data) {
         
         <div style="font-size:11.5px; color:var(--mid); display:flex; flex-direction:column; gap:6px">
           <div style="display:flex; justify-content:space-between">
-            <span>Sales Attained:</span>
-            <span style="font-weight:700; color:var(--dark)">₹${fmtN(salesVal)} / ₹${fmtN(cs.target)}</span>
+            <span>${targetLabel} Attained:</span>
+            <span style="font-weight:700; color:var(--dark)">${valFmt} / ${tarFmt}</span>
           </div>
           <div style="height:6px; background:var(--border); border-radius:3px; overflow:hidden">
             <div style="width:${Math.min(100, salesPct)}%; height:100%; background:var(--blue); border-radius:3px"></div>
@@ -3006,8 +3043,8 @@ function renderBgtSummary(data) {
         </div>
         
         <div style="margin-top:6px; padding-top:8px; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center">
-          <span style="font-size:10.5px; color:var(--mid)">ROAS Target: <strong>${cs.roasTarget}x</strong></span>
-          <span style="font-size:11.5px; font-weight:800; color:${roasClass==='good'?'var(--green)':'var(--red)'}">${cs.roas !== null ? cs.roas.toFixed(2) + 'x (' + roasText + ')' : 'No Spend'}</span>
+          <span style="font-size:10.5px; color:var(--mid)">${isLeads ? 'CPL Target' : 'ROAS Target'}: <strong>${isLeads ? '₹' + cs.roasTarget : cs.roasTarget + 'x'}</strong></span>
+          <span style="font-size:11.5px; font-weight:800; color:${roasClass==='good'?'var(--green)':'var(--red)'}">${cs.roas !== null ? (isLeads ? '₹' + cs.roas.toFixed(0) : cs.roas.toFixed(2) + 'x') + ' (' + roasText + ')' : 'No Spend'}</span>
         </div>
       </div>
     `;
@@ -3023,17 +3060,19 @@ function renderBgtSummary(data) {
 
   const categoryHeadline = tab === 'overview' ? 'All Active Channels' : BGT_CATEGORY_LABELS[tab] || 'Channels';
 
+  const isGreen = isLeads ? (reqRoas >= roas) : (reqRoas <= roas);
+
   document.getElementById('bgt-summary-row').innerHTML = `
-    <!-- Card 1: Revenue Targets -->
+    <!-- Card 1: Targets -->
     <div class="cmd-stat-card" style="grid-column: span 4; display:flex; flex-direction:column; gap:12px; background: #fff; padding:18px; border-radius:12px; box-shadow: var(--sh)">
-      <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--mid);letter-spacing:0.04em">Month Revenue Target</div>
+      <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--mid);letter-spacing:0.04em">${isLeads ? 'Month Leads Target' : 'Month Revenue Target'}</div>
       <div style="display:flex; justify-content:space-between; align-items:center; flex:1">
         <div>
-          <div style="font-size:20px;font-weight:800;color:var(--fg)">₹${fmtN(target)}</div>
+          <div style="font-size:20px;font-weight:800;color:var(--fg)">${isLeads ? '' : '₹'}${fmtN(target)}</div>
           <div style="font-size:10.5px;color:var(--mid);margin-top:2px">Target Expectations</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:20px;font-weight:800;color:var(--blue)">₹${fmtN(achieved)}</div>
+          <div style="font-size:20px;font-weight:800;color:var(--blue)">${isLeads ? '' : '₹'}${fmtN(achieved)}</div>
           <div style="font-size:10.5px;color:var(--mid);margin-top:2px">Achieved (${((achieved/target)*100).toFixed(1)}%)</div>
         </div>
       </div>
@@ -3045,9 +3084,9 @@ function renderBgtSummary(data) {
       <div style="display:flex; justify-content:space-between; align-items:center; flex:1; gap:6px">
         <div>
           <div style="font-size:15px;font-weight:800;color:${salesLeft>0?'var(--fg)':'var(--green)'}">
-            ${salesLeft > 0 ? '₹' + fmt(salesLeft) : 'Met ✓'}
+            ${salesLeft > 0 ? (isLeads ? fmt(salesLeft) : '₹' + fmt(salesLeft)) : 'Met ✓'}
           </div>
-          <div style="font-size:9.5px;color:var(--mid);margin-top:2px">Left Sales</div>
+          <div style="font-size:9.5px;color:var(--mid);margin-top:2px">${isLeads ? 'Left Leads' : 'Left Sales'}</div>
         </div>
         <div style="text-align:center">
           <div style="font-size:15px;font-weight:800;color:${spendLeft>0?'var(--blue)':'var(--red)'}">
@@ -3056,8 +3095,8 @@ function renderBgtSummary(data) {
           <div style="font-size:9.5px;color:var(--mid);margin-top:2px">Left Budget</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:15px;font-weight:800;color:${reqRoas<=roas?'var(--green)':'var(--red)'}">${reqRoasStr}</div>
-          <div style="font-size:9.5px;color:var(--mid);margin-top:2px">Req. ROAS</div>
+          <div style="font-size:15px;font-weight:800;color:${isGreen?'var(--green)':'var(--red)'}">${reqRoasStr}</div>
+          <div style="font-size:9.5px;color:var(--mid);margin-top:2px">${isLeads ? 'Req. CPL' : 'Req. ROAS'}</div>
         </div>
       </div>
     </div>
@@ -3116,15 +3155,21 @@ function renderBgtTable(data) {
     }
   }
 
+  const isLeads = bgtState.currentBrand.type === 'leads';
+
   let th = '<tr><th>Day</th><th>Date</th>';
   if (tab === 'overview') {
-    th += '<th>Exp. Sales</th><th>Actual Sales</th><th>Exp. Spend</th><th>Actual Spend</th><th>ROAS</th>';
+    th += isLeads
+      ? '<th>Exp. Leads</th><th>Actual Leads</th><th>Exp. Spend</th><th>Actual Spend</th><th>CPL</th>'
+      : '<th>Exp. Sales</th><th>Actual Sales</th><th>Exp. Spend</th><th>Actual Spend</th><th>ROAS</th>';
   } else if (tab === 'social') {
     th += '<th>Followers</th><th>Posts</th>';
   } else {
     for (const [ch, name] of Object.entries(categoryChannels)) {
-      th += `<th style="background:rgba(43,78,255,0.02)">${name} Exp. Sales</th><th style="background:rgba(43,78,255,0.02)">${name} Sales</th>`;
-      th += `<th>${name} Exp. Spend</th><th>${name} Spend</th><th style="font-weight:700">ROAS</th>`;
+      th += isLeads
+        ? `<th style="background:rgba(43,78,255,0.02)">${name} Exp. Leads</th><th style="background:rgba(43,78,255,0.02)">${name} Leads</th>`
+        : `<th style="background:rgba(43,78,255,0.02)">${name} Exp. Sales</th><th style="background:rgba(43,78,255,0.02)">${name} Sales</th>`;
+      th += `<th>${name} Exp. Spend</th><th>${name} Spend</th><th style="font-weight:700">${isLeads ? 'CPL' : 'ROAS'}</th>`;
     }
   }
   th += '</tr>';
@@ -3142,22 +3187,22 @@ function renderBgtTable(data) {
     td += `<td>${dateStr}</td>`;
 
     if (tab === 'overview') {
-      td += `<td style="color:var(--mid)">₹${fmtN(day.total_sales_exp)}</td>`;
-      td += `<td style="font-weight:700;color:var(--blue)">${day.total_sales_real != null ? '₹' + fmtN(day.total_sales_real) : '—'}</td>`;
+      td += `<td style="color:var(--mid)">${isLeads ? '' : '₹'}${fmtN(day.total_sales_exp)}</td>`;
+      td += `<td style="font-weight:700;color:var(--blue)">${day.total_sales_real != null ? (isLeads ? '' : '₹') + fmtN(day.total_sales_real) : '—'}</td>`;
       td += `<td style="color:var(--mid)">₹${fmtN(day.total_spend_exp)}</td>`;
       td += `<td>${day.total_spend_real != null ? '₹' + fmtN(day.total_spend_real) : '—'}</td>`;
-      td += `<td style="font-weight:600">${day.total_roas != null ? day.total_roas + 'x' : '—'}</td>`;
+      td += `<td style="font-weight:600">${day.total_roas != null ? (isLeads ? '₹' + day.total_roas : day.total_roas + 'x') : '—'}</td>`;
     } else if (tab === 'social') {
       td += `<td>${day.followers_real != null ? day.followers_real.toLocaleString() : '—'}</td>`;
       td += `<td>${day.posts_real != null ? day.posts_real : '—'}</td>`;
     } else {
       for (const ch of Object.keys(categoryChannels)) {
         const chDay = day.channels[ch] || {};
-        td += `<td style="color:var(--mid)">₹${fmtN(chDay.salesExp)}</td>`;
-        td += `<td style="font-weight:700;color:var(--blue)">${chDay.salesReal != null ? '₹' + fmtN(chDay.salesReal) : '—'}</td>`;
+        td += `<td style="color:var(--mid)">${isLeads ? '' : '₹'}${fmtN(chDay.salesExp)}</td>`;
+        td += `<td style="font-weight:700;color:var(--blue)">${chDay.salesReal != null ? (isLeads ? '' : '₹') + fmtN(chDay.salesReal) : '—'}</td>`;
         td += `<td style="color:var(--mid)">₹${fmtN(chDay.spendExp)}</td>`;
         td += `<td>${chDay.spendReal != null ? '₹' + fmtN(chDay.spendReal) : '—'}</td>`;
-        td += `<td style="font-weight:600">${chDay.roas != null ? chDay.roas + 'x' : '—'}</td>`;
+        td += `<td style="font-weight:600">${chDay.roas != null ? (isLeads ? '₹' + chDay.roas : chDay.roas + 'x') : '—'}</td>`;
       }
     }
 
@@ -3393,6 +3438,7 @@ function bgtClickDay(dayNum) {
   const data = bgtState.currentMonthData;
   const day = data.days.find(d => d.day_number === dayNum);
   const activeChannels = data.summary.activeChannels || {};
+  const isLeads = bgtState.currentBrand.type === 'leads';
 
   document.getElementById('bgt-day-modal-title').textContent = `Day ${dayNum} — Enter Performance Data`;
 
@@ -3407,18 +3453,28 @@ function bgtClickDay(dayNum) {
     const clickV = chDay.clicks != null ? chDay.clicks : '';
     const expSales = chDay.salesExp || 0;
     const expSpend = chDay.spendExp || 0;
-    const roasTarget = chDay.roasTarget || 5;
+    const roasTarget = chDay.roasTarget || (isLeads ? 150 : 5);
+
+    const targetDesc = isLeads
+      ? `Pacing Target: ${roundVal(expSales)} leads · ₹${fmtN(expSpend)} spend`
+      : `Pacing Target: ₹${fmtN(expSales)} sales · ₹${fmtN(expSpend)} spend`;
 
     fields += `
       <div style="border:1px solid var(--border);border-radius:12px;padding:12px;background:rgba(255,255,255,0.01);margin-bottom:10px">
         <div style="font-size:11px;font-weight:700;color:var(--fg);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em">
-          ${name} <span style="font-weight:400;color:var(--mid);text-transform:none">(Pacing Target: ₹${fmtN(expSales)} sales · ₹${fmtN(expSpend)} spend)</span>
+          ${name} <span style="font-weight:400;color:var(--mid);text-transform:none">(${targetDesc})</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px">
-          <div class="field"><label>Sales (₹)</label><input type="number" id="bgtd-${ch}-sales" placeholder="0" value="${salesV}" oninput="bgtLiveDiag('${ch}', ${expSales}, ${expSpend}, ${roasTarget})"></div>
+          ${isLeads ? `
+            <div class="field"><label>Raw Leads</label><input type="number" id="bgtd-${ch}-orders" placeholder="0" value="${ordersV}" oninput="bgtLiveDiag('${ch}', ${expSales}, ${expSpend}, ${roasTarget})"></div>
+          ` : `
+            <div class="field"><label>Sales (₹)</label><input type="number" id="bgtd-${ch}-sales" placeholder="0" value="${salesV}" oninput="bgtLiveDiag('${ch}', ${expSales}, ${expSpend}, ${roasTarget})"></div>
+          `}
           <div class="field"><label>Ad Spend (₹)</label><input type="number" id="bgtd-${ch}-spend" placeholder="0" value="${spendV}" oninput="bgtLiveDiag('${ch}', ${expSales}, ${expSpend}, ${roasTarget})"></div>
-          <div class="field"><label>Orders</label><input type="number" id="bgtd-${ch}-orders" placeholder="0" value="${ordersV}"></div>
-          <div class="field"><label>Customers Acquired</label><input type="number" id="bgtd-${ch}-customers" placeholder="0" value="${custV}"></div>
+          ${isLeads ? '' : `
+            <div class="field"><label>Orders</label><input type="number" id="bgtd-${ch}-orders" placeholder="0" value="${ordersV}"></div>
+          `}
+          <div class="field"><label>${isLeads ? 'Qualified Leads' : 'Customers Acquired'}</label><input type="number" id="bgtd-${ch}-customers" placeholder="0" value="${custV}"></div>
           <div class="field"><label>Sessions</label><input type="number" id="bgtd-${ch}-impressions" placeholder="0" value="${impV}"></div>
           <div class="field"><label>Clicks</label><input type="number" id="bgtd-${ch}-clicks" placeholder="0" value="${clickV}"></div>
         </div>
@@ -3443,7 +3499,7 @@ function bgtClickDay(dayNum) {
     const chDay = day ? day.channels[ch] || {} : {};
     const expSales = chDay.salesExp || 0;
     const expSpend = chDay.spendExp || 0;
-    const roasTarget = chDay.roasTarget || 5;
+    const roasTarget = chDay.roasTarget || (isLeads ? 150 : 5);
     bgtLiveDiag(ch, expSales, expSpend, roasTarget);
   }
 
@@ -3451,7 +3507,10 @@ function bgtClickDay(dayNum) {
 }
 
 function bgtLiveDiag(ch, expSales, expSpend, roasTarget) {
-  const salesInput = document.getElementById(`bgtd-${ch}-sales`);
+  const isLeads = bgtState.currentBrand && bgtState.currentBrand.type === 'leads';
+  const salesInput = isLeads
+    ? document.getElementById(`bgtd-${ch}-orders`)
+    : document.getElementById(`bgtd-${ch}-sales`);
   const spendInput = document.getElementById(`bgtd-${ch}-spend`);
   const diagEl = document.getElementById(`bgt-live-diag-${ch}`);
   if (!salesInput || !spendInput || !diagEl) return;
@@ -3477,20 +3536,31 @@ function bgtLiveDiag(ch, expSales, expSpend, roasTarget) {
     }
   }
 
-  // 2. Sales Miss
-  if (salesVal > 0 && expSales > 100) {
-    const diffPct = Math.round(((expSales - salesVal) / expSales) * 100);
-    if (diffPct >= 20) {
-      warnings.push(`<span style="color:var(--amber)">⚠️ Sales lagging target (-${diffPct}%)</span>`);
+  // 2. Sales/Leads Miss
+  if (salesVal > 0 && expSales > 0) {
+    const salesLimit = isLeads ? 2 : 100;
+    if (expSales > salesLimit) {
+      const diffPct = Math.round(((expSales - salesVal) / expSales) * 100);
+      if (diffPct >= 20) {
+        warnings.push(`<span style="color:var(--amber)">⚠️ ${isLeads ? 'Leads' : 'Sales'} lagging target (-${diffPct}%)</span>`);
+      }
     }
   }
 
-  // 3. ROAS Miss
+  // 3. ROAS/CPL Miss
   if (spendVal > 0 && salesVal > 0) {
-    const roas = salesVal / spendVal;
-    if (roas < roasTarget * 0.9) {
-      const diffPct = Math.round(((roasTarget - roas) / roasTarget) * 100);
-      warnings.push(`<span style="color:var(--red)">🚨 ROAS Lagging: ${roas.toFixed(2)}x vs Target ${roasTarget}x (-${diffPct}%)</span>`);
+    if (isLeads) {
+      const cpl = spendVal / salesVal;
+      if (cpl > roasTarget * 1.1) {
+        const diffPct = Math.round(((cpl - roasTarget) / roasTarget) * 100);
+        warnings.push(`<span style="color:var(--red)">🚨 CPL Over Target: ₹${cpl.toFixed(0)} vs Target ₹${roasTarget} (+${diffPct}%)</span>`);
+      }
+    } else {
+      const roas = salesVal / spendVal;
+      if (roas < roasTarget * 0.9) {
+        const diffPct = Math.round(((roasTarget - roas) / roasTarget) * 100);
+        warnings.push(`<span style="color:var(--red)">🚨 ROAS Lagging: ${roas.toFixed(2)}x vs Target ${roasTarget}x (-${diffPct}%)</span>`);
+      }
     }
   }
 
@@ -3561,9 +3631,16 @@ function bgtOpenNewBrand() { openMo('mo-bgt-brand'); }
 async function bgtSubmitNewBrand() {
   const name = document.getElementById('bgtb-name').value.trim();
   const industry = document.getElementById('bgtb-industry').value.trim();
+  const type = document.getElementById('bgtb-type').value;
   if (!name) return alert('Brand name required');
-  const r = await api('/api/budget/brands', 'POST', { name, industry });
-  if (r && r.ok) { closeMo('mo-bgt-brand'); await bgtLoadDashboard(); }
+  const r = await api('/api/budget/brands', 'POST', { name, industry, type });
+  if (r && r.ok) { 
+    closeMo('mo-bgt-brand'); 
+    document.getElementById('bgtb-name').value = '';
+    document.getElementById('bgtb-industry').value = '';
+    document.getElementById('bgtb-type').value = 'sales';
+    await bgtLoadDashboard(); 
+  }
 }// ── New Month ────────────────────────────────────────────────
 function bgtOpenNewMonth() {
   const container = document.getElementById('bgt-new-month-channels') || document.querySelector('#mo-bgt-month .g2').nextElementSibling.nextElementSibling.nextElementSibling;
@@ -3593,6 +3670,25 @@ function bgtOpenNewMonth() {
     }
   }
   
+  const isLeads = bgtState.currentBrand.type === 'leads';
+  
+  // Dynamically update labels in the New Month modal
+  const targetLabel = document.getElementById('bgtm-target').previousElementSibling;
+  if (targetLabel) targetLabel.textContent = isLeads ? 'Leads Target (Count)' : 'Revenue Target (₹)';
+  
+  const roasLabel = document.getElementById('bgtm-roas').previousElementSibling;
+  if (roasLabel) roasLabel.textContent = isLeads ? 'Overall Target CPL (₹)' : 'Overall Target ROAS';
+  
+  const targetInput = document.getElementById('bgtm-target');
+  if (targetInput) targetInput.placeholder = isLeads ? 'e.g. 500' : 'e.g. 2500000';
+  
+  const roasInput = document.getElementById('bgtm-roas');
+  if (roasInput) roasInput.value = isLeads ? '150' : '5';
+  
+  const pctLabel = isLeads ? '% of Leads' : '% of Revenue';
+  const roasLabelText = isLeads ? 'Target CPL (₹)' : 'Target ROAS';
+  const roasVal = isLeads ? '150' : '5';
+  
   let html = '';
   for (const [ch, info] of Object.entries(defaultChannels)) {
     html += `
@@ -3600,8 +3696,8 @@ function bgtOpenNewMonth() {
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;margin-bottom:8px">
           <input type="checkbox" id="bgtc-${ch}-active" checked onchange="bgtToggleChannel('${ch}')"> ${info.name}
         </label>
-        <div class="field" style="margin-bottom:6px"><label>% of Revenue</label><input type="number" id="bgtc-${ch}-pct" value="${ch === 'meta' || ch === 'google' ? '15' : '5'}" min="0" max="100"></div>
-        <div class="field" style="margin-bottom:6px"><label>Target ROAS</label><input type="number" id="bgtc-${ch}-roas" value="5" step="0.1"></div>
+        <div class="field" style="margin-bottom:6px"><label>${pctLabel}</label><input type="number" id="bgtc-${ch}-pct" value="${ch === 'meta' || ch === 'google' ? '15' : '5'}" min="0" max="100"></div>
+        <div class="field" style="margin-bottom:6px"><label>${roasLabelText}</label><input type="number" id="bgtc-${ch}-roas" value="${roasVal}" step="0.1"></div>
         <div class="field" style="margin-bottom:6px"><label>Start Day</label><input type="number" id="bgtc-${ch}-start" value="1" min="1" max="31"></div>
         <div class="field">
           <label>Category</label>
@@ -3640,6 +3736,11 @@ function bgtAddCustomChannel() {
   const container = document.getElementById('bgt-new-month-channels');
   if (!container) return;
   
+  const isLeads = bgtState.currentBrand && bgtState.currentBrand.type === 'leads';
+  const pctLabel = isLeads ? '% of Leads' : '% of Revenue';
+  const roasLabelText = isLeads ? 'Target CPL (₹)' : 'Target ROAS';
+  const roasVal = isLeads ? '150' : '5';
+
   const div = document.createElement('div');
   div.style.cssText = "border:1px solid var(--border);border-radius:8px;padding:10px";
   div.id = `bgtc-wrap-${ch}`;
@@ -3647,8 +3748,8 @@ function bgtAddCustomChannel() {
     <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;margin-bottom:8px">
       <input type="checkbox" id="bgtc-${ch}-active" checked onchange="bgtToggleChannel('${ch}')"> ${name}
     </label>
-    <div class="field" style="margin-bottom:6px"><label>% of Revenue</label><input type="number" id="bgtc-${ch}-pct" value="10"></div>
-    <div class="field" style="margin-bottom:6px"><label>Target ROAS</label><input type="number" id="bgtc-${ch}-roas" value="5" step="0.1"></div>
+    <div class="field" style="margin-bottom:6px"><label>${pctLabel}</label><input type="number" id="bgtc-${ch}-pct" value="10"></div>
+    <div class="field" style="margin-bottom:6px"><label>${roasLabelText}</label><input type="number" id="bgtc-${ch}-roas" value="${roasVal}" step="0.1"></div>
     <div class="field" style="margin-bottom:6px"><label>Start Day</label><input type="number" id="bgtc-${ch}-start" value="1" min="1" max="31"></div>
     <div class="field">
       <label>Category</label>
@@ -3666,13 +3767,14 @@ function bgtAddCustomChannel() {
 
 async function bgtSubmitNewMonth() {
   if (!bgtState.currentBrand) return;
+  const isLeads = bgtState.currentBrand.type === 'leads';
   const month  = parseInt(document.getElementById('bgtm-month').value);
   const year   = parseInt(document.getElementById('bgtm-year').value);
   const days   = new Date(year, month, 0).getDate();
   const target = parseFloat(document.getElementById('bgtm-target').value);
-  const roas   = parseFloat(document.getElementById('bgtm-roas').value) || 5;
+  const roas   = parseFloat(document.getElementById('bgtm-roas').value) || (isLeads ? 150 : 5);
 
-  if (!target) return alert('Revenue target is required');
+  if (!target) return alert(isLeads ? 'Leads target is required' : 'Revenue target is required');
 
   const monthNames = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
   const label = `${monthNames[month]} ${year}`;
@@ -4684,6 +4786,7 @@ async function loadReportDetails(reportId) {
     document.getElementById('reports-detail-view').style.display = 'block';
     
     const data = r.report_data;
+    const isLeads = r.brand_type === 'leads';
     
     // Setup titles
     const startStr = new Date(r.period_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -4691,13 +4794,26 @@ async function loadReportDetails(reportId) {
     document.getElementById('rep-detail-title').textContent = `${r.report_type.toUpperCase()} Performance Report`;
     document.getElementById('rep-detail-meta').textContent = `${r.brand_name} · ${startStr} - ${endStr}`;
     
+    // Setup labels
+    document.getElementById('rep-kpi-sales').previousElementSibling.textContent = isLeads ? 'Raw Leads' : 'Total Sales';
+    document.getElementById('rep-kpi-roas').previousElementSibling.textContent = isLeads ? 'Blended CPL' : 'ROAS';
+    document.getElementById('rep-kpi-orders').previousElementSibling.textContent = isLeads ? 'Qualified Leads' : 'Orders';
+    document.getElementById('rep-kpi-cpa').previousElementSibling.textContent = isLeads ? 'Blended CPQL' : 'CPA';
+    document.getElementById('rep-kpi-aov').previousElementSibling.textContent = isLeads ? 'Qual. Rate' : 'AOV';
+
     // Setup KPIs
     document.getElementById('rep-kpi-spend').textContent = `₹${parseFloat(r.total_spend).toLocaleString('en-IN')}`;
-    document.getElementById('rep-kpi-sales').textContent = `₹${parseFloat(r.total_revenue).toLocaleString('en-IN')}`;
-    document.getElementById('rep-kpi-roas').textContent = `${parseFloat(r.overall_roas).toFixed(2)}x`;
+    document.getElementById('rep-kpi-sales').textContent = isLeads
+      ? parseInt(r.total_revenue).toLocaleString('en-IN')
+      : `₹${parseFloat(r.total_revenue).toLocaleString('en-IN')}`;
+    document.getElementById('rep-kpi-roas').textContent = isLeads
+      ? `₹${parseFloat(r.overall_roas).toLocaleString('en-IN')}`
+      : `${parseFloat(r.overall_roas).toFixed(2)}x`;
     document.getElementById('rep-kpi-orders').textContent = parseInt(r.total_conversions).toLocaleString('en-IN');
     document.getElementById('rep-kpi-cpa').textContent = `₹${parseFloat(r.overall_cpa).toLocaleString('en-IN')}`;
-    document.getElementById('rep-kpi-aov').textContent = `₹${parseFloat(r.overall_aov).toLocaleString('en-IN')}`;
+    document.getElementById('rep-kpi-aov').textContent = isLeads
+      ? `${parseFloat(r.overall_aov).toFixed(1)}%`
+      : `₹${parseFloat(r.overall_aov).toLocaleString('en-IN')}`;
     
     // WoW Badges
     const comps = data.comparisons || {};
@@ -4720,11 +4836,11 @@ async function loadReportDetails(reportId) {
     };
     
     formatBadge(comps.spend, 'rep-change-spend', true);
-    formatBadge(comps.revenue, 'rep-change-sales');
-    formatBadge(comps.roas, 'rep-change-roas');
+    formatBadge(comps.revenue, 'rep-change-sales', isLeads ? false : false);
+    formatBadge(comps.roas, 'rep-change-roas', isLeads ? true : false); // CPL is lower is better
     formatBadge(comps.conversions, 'rep-change-orders');
-    formatBadge(comps.cpa, 'rep-change-cpa', true);
-    formatBadge(comps.aov, 'rep-change-aov');
+    formatBadge(comps.cpa, 'rep-change-cpa', true); // CPQL is lower is better
+    formatBadge(comps.aov, 'rep-change-aov'); // Qual. rate is higher is better
     
     // Notes
     document.getElementById('rep-notes-hl').value = (r.highlights || '').replace(/<br>/g, '\n').replace(/• /g, '');
@@ -4751,6 +4867,34 @@ async function loadReportDetails(reportId) {
     const brandPill = document.getElementById('rep-detail-brand-pill');
     if (brandPill) brandPill.textContent = r.brand_name || '';
 
+    // Render table headers dynamically
+    const thead = document.querySelector('#rep-channel-table thead');
+    if (thead) {
+      thead.innerHTML = isLeads ? `
+        <tr>
+          <th>Channel</th>
+          <th>Spend</th>
+          <th>Raw Leads</th>
+          <th>Qualified Leads</th>
+          <th>Revenue</th>
+          <th>CPQL</th>
+          <th>Qual. Rate</th>
+          <th>CPL</th>
+        </tr>
+      ` : `
+        <tr>
+          <th>Channel</th>
+          <th>Spend</th>
+          <th>Orders</th>
+          <th>Customers Acquired</th>
+          <th>Revenue</th>
+          <th>CPA</th>
+          <th>AOV</th>
+          <th>ROAS</th>
+        </tr>
+      `;
+    }
+
     const tbody = document.getElementById('rep-channel-tbody');
     tbody.innerHTML = Object.entries(activeChannels).map(([ch, m]) => {
       const spend    = parseFloat(m.spend) || 0;
@@ -4759,8 +4903,19 @@ async function loadReportDetails(reportId) {
       const custAcq  = parseInt(m.customers_acquired) || 0;
       const roas     = parseFloat(m.roas) || (spend > 0 ? (revenue / spend) : 0);
       const cpa      = parseFloat(m.cpa) || (custAcq > 0 ? (spend / custAcq) : (orders > 0 ? (spend / orders) : 0));
-      const aov      = orders > 0 ? Math.round(revenue / orders) : 0;
-      return `
+      const aov      = parseFloat(m.aov) || (orders > 0 ? (revenue / orders) : 0);
+      return isLeads ? `
+      <tr>
+        <td style="font-weight:700;text-transform:capitalize">${ch}</td>
+        <td style="font-family:var(--fm)">₹${spend.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm)">${orders.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm)">${custAcq.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm)">—</td>
+        <td style="font-family:var(--fm)">${cpa > 0 ? '₹' + Math.round(cpa).toLocaleString('en-IN') : '—'}</td>
+        <td style="font-family:var(--fm)">${aov.toFixed(1)}%</td>
+        <td style="font-family:var(--fm);font-weight:700">${roas > 0 ? '₹' + Math.round(roas).toLocaleString('en-IN') : '—'}</td>
+      </tr>
+    ` : `
       <tr>
         <td style="font-weight:700;text-transform:capitalize">${ch}</td>
         <td style="font-family:var(--fm)">₹${spend.toLocaleString('en-IN')}</td>
@@ -4768,7 +4923,7 @@ async function loadReportDetails(reportId) {
         <td style="font-family:var(--fm)">${custAcq > 0 ? custAcq.toLocaleString('en-IN') : '—'}</td>
         <td style="font-family:var(--fm)">₹${revenue.toLocaleString('en-IN')}</td>
         <td style="font-family:var(--fm)">₹${Math.round(cpa).toLocaleString('en-IN')}</td>
-        <td style="font-family:var(--fm)">₹${aov.toLocaleString('en-IN')}</td>
+        <td style="font-family:var(--fm)">₹${Math.round(aov).toLocaleString('en-IN')}</td>
         <td style="font-family:var(--fm);font-weight:700">${roas.toFixed(2)}x</td>
       </tr>
     `;

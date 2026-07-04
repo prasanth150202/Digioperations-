@@ -104,6 +104,13 @@ function db(): PDO {
         } catch (Throwable $migrationErr) {}
 
         try {
+            $cols = $pdo->query("SHOW COLUMNS FROM `brands` LIKE 'type'")->fetchAll();
+            if (empty($cols)) {
+                $pdo->exec("ALTER TABLE `brands` ADD COLUMN `type` VARCHAR(50) NOT NULL DEFAULT 'sales' AFTER `platform`");
+            }
+        } catch (Throwable $migrationErr) {}
+
+        try {
             $cols = $pdo->query("SHOW COLUMNS FROM `budget_days` LIKE 'channels_json'")->fetchAll();
             if (empty($cols)) {
                 $pdo->exec("ALTER TABLE `budget_days` ADD COLUMN `channels_json` TEXT DEFAULT NULL AFTER `posts_real`");

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS `brands` (
   `name`        VARCHAR(255) NOT NULL,
   `industry`    VARCHAR(255) NOT NULL DEFAULT '',
   `platform`    VARCHAR(255) NOT NULL DEFAULT '',
+  `type`        VARCHAR(50)  NOT NULL DEFAULT 'sales',
   `memory_json` MEDIUMTEXT   NOT NULL,
   `created_at`  DATETIME     NOT NULL DEFAULT NOW(),
   `updated_at`  DATETIME     NOT NULL DEFAULT NOW() ON UPDATE NOW(),

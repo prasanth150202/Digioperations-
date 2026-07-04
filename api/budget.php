@@ -18,9 +18,16 @@ const CH_LABELS = ['meta'=>'META','google'=>'Google','mp'=>'Marketplace','ret'=>
 
 // ── Core calculation engine ──────────────────────────────────
 function computeMonth(array $month, array $dayRows): array {
+    $brand = dbGet('SELECT type FROM brands WHERE id=?', [$month['brand_id']]);
+    $brandType = $brand['type'] ?? 'sales';
+
     $target        = (float)$month['revenue_target'];
-    $roas          = (float)($month['overall_roas'] ?: 5);
-    $monthlyBudget = $roas > 0 ? $target / $roas : 0;
+    $roas          = (float)($month['overall_roas'] ?: ($brandType === 'leads' ? 150 : 5));
+    if ($brandType === 'leads') {
+        $monthlyBudget = $target * $roas;
+    } else {
+        $monthlyBudget = $roas > 0 ? $target / $roas : 0;
+    }
     $totalDays     = (int)$month['total_days'];
     $today         = new DateTime('today');
 
@@ -167,9 +174,11 @@ function computeMonth(array $month, array $dayRows): array {
     // ── Phase 1: Sum up actuals to date ───────────────────────
     $totalSalesReal = 0;
     $totalSpendReal = 0;
+    $totalQualifiedReal = 0;
     $daysEntered = 0;
     $channelActualSales = array_fill_keys(array_keys($activeChannels), 0);
     $channelActualSpend = array_fill_keys(array_keys($activeChannels), 0);
+    $channelActualQualified = array_fill_keys(array_keys($activeChannels), 0);
 
     for ($d = 1; $d <= $totalDays; $d++) {
         $e = $entered[$d] ?? null;
@@ -177,14 +186,21 @@ function computeMonth(array $month, array $dayRows): array {
             $daysEntered++;
             $daySales = 0;
             $daySpend = 0;
+            $dayQualified = 0;
             $chData = json_decode($e['channels_json'] ?? '{}', true);
 
             foreach (array_keys($activeChannels) as $ch) {
                 $sales = null;
                 $spend = null;
+                $qualified = null;
 
                 if (isset($chData[$ch])) {
-                    $sales = $chData[$ch]['sales'] !== null ? (float)$chData[$ch]['sales'] : null;
+                    if ($brandType === 'leads') {
+                        $sales = $chData[$ch]['conversions'] !== null ? (float)$chData[$ch]['conversions'] : null;
+                        $qualified = $chData[$ch]['customers_acquired'] !== null ? (float)$chData[$ch]['customers_acquired'] : null;
+                    } else {
+                        $sales = $chData[$ch]['sales'] !== null ? (float)$chData[$ch]['sales'] : null;
+                    }
                     $spend = $chData[$ch]['spend'] !== null ? (float)$chData[$ch]['spend'] : null;
                 } else {
                     // Legacy column fallbacks
@@ -202,9 +218,14 @@ function computeMonth(array $month, array $dayRows): array {
                     $channelActualSpend[$ch] += $spend;
                     $daySpend += $spend;
                 }
+                if ($qualified !== null) {
+                    $channelActualQualified[$ch] += $qualified;
+                    $dayQualified += $qualified;
+                }
             }
             $totalSalesReal += $daySales;
             $totalSpendReal += $daySpend;
+            $totalQualifiedReal += $dayQualified;
         }
     }
 
@@ -243,13 +264,17 @@ function computeMonth(array $month, array $dayRows): array {
         $chData = $e ? json_decode($e['channels_json'] ?? '{}', true) : [];
 
         foreach (array_keys($activeChannels) as $ch) {
-            $cfg = $configuredChannels[$ch] ?? ['pct' => 0, 'roas' => 5];
+            $cfg = $configuredChannels[$ch] ?? ['pct' => 0, 'roas' => ($brandType === 'leads' ? 150 : 5)];
             $chPct = (float)($cfg['pct'] ?? 0);
-            $chROAS = (float)($cfg['roas'] ?? 5);
+            $chROAS = (float)($cfg['roas'] ?? ($brandType === 'leads' ? 150 : 5));
 
             // Channel monthly budget allocations
             $chTarget = $target * ($chPct / 100);
-            $chBudget = $chROAS > 0 ? $chTarget / $chROAS : 0;
+            if ($brandType === 'leads') {
+                $chBudget = $chTarget * $chROAS;
+            } else {
+                $chBudget = $chROAS > 0 ? $chTarget / $chROAS : 0;
+            }
 
             if ($e) {
                 // Actual values entered
@@ -261,10 +286,15 @@ function computeMonth(array $month, array $dayRows): array {
                 $clicks = null;
 
                 if (isset($chData[$ch])) {
-                    $salesReal = $chData[$ch]['sales'] !== null ? (float)$chData[$ch]['sales'] : null;
+                    if ($brandType === 'leads') {
+                        $salesReal = $chData[$ch]['conversions'] !== null ? (float)$chData[$ch]['conversions'] : null;
+                        $customersAcquired = $chData[$ch]['customers_acquired'] !== null ? (int)$chData[$ch]['customers_acquired'] : null;
+                    } else {
+                        $salesReal = $chData[$ch]['sales'] !== null ? (float)$chData[$ch]['sales'] : null;
+                        $customersAcquired = isset($chData[$ch]['customers_acquired']) && $chData[$ch]['customers_acquired'] !== null ? (int)$chData[$ch]['customers_acquired'] : null;
+                    }
                     $spendReal = $chData[$ch]['spend'] !== null ? (float)$chData[$ch]['spend'] : null;
                     $conversions = isset($chData[$ch]['conversions']) && $chData[$ch]['conversions'] !== null ? (int)$chData[$ch]['conversions'] : null;
-                    $customersAcquired = isset($chData[$ch]['customers_acquired']) && $chData[$ch]['customers_acquired'] !== null ? (int)$chData[$ch]['customers_acquired'] : null;
                     $impressions = isset($chData[$ch]['impressions']) && $chData[$ch]['impressions'] !== null ? (int)$chData[$ch]['impressions'] : null;
                     $clicks = isset($chData[$ch]['clicks']) && $chData[$ch]['clicks'] !== null ? (int)$chData[$ch]['clicks'] : null;
                 } else {
@@ -288,7 +318,12 @@ function computeMonth(array $month, array $dayRows): array {
                     $runningChannelSpend[$ch] += $spendReal;
                 }
 
-                $roas = ($salesReal !== null && $spendReal !== null && $spendReal > 0) ? round($salesReal / $spendReal, 2) : null;
+                if ($brandType === 'leads') {
+                    $roas = ($salesReal !== null && $spendReal !== null && $salesReal > 0) ? round($spendReal / $salesReal, 2) : null;
+                } else {
+                    $roas = ($salesReal !== null && $spendReal !== null && $spendReal > 0) ? round($salesReal / $spendReal, 2) : null;
+                }
+
                 $row['channels'][$ch] = [
                     'salesExp'           => round($salesExp, 2),
                     'spendExp'           => round($spendExp, 2),
@@ -330,31 +365,48 @@ function computeMonth(array $month, array $dayRows): array {
                     }
                 }
 
-                if ($salesReal !== null && $salesExp > 100) {
-                    // Sales Miss (Actual sales < Target sales by > 20%)
-                    if ($salesReal < $salesExp * 0.8) {
-                        $diffPct = round((($salesExp - $salesReal) / $salesExp) * 100);
-                        $row['flags'][] = [
-                            'level' => 'warn',
-                            'msg' => "{$name} Sales Lagging: Actual ₹" . number_format($salesReal) . " vs Target ₹" . number_format($salesExp) . " (-{$diffPct}%)",
-                            'channel' => $ch,
-                            'type' => 'sales_miss',
-                            'diff' => $salesExp - $salesReal
-                        ];
+                if ($salesReal !== null && $salesExp > 0) {
+                    $salesExpLimit = $brandType === 'leads' ? 2 : 100;
+                    if ($salesExp > $salesExpLimit) {
+                        // Sales Miss (Actual sales < Target sales by > 20%)
+                        if ($salesReal < $salesExp * 0.8) {
+                            $diffPct = round((($salesExp - $salesReal) / $salesExp) * 100);
+                            $labelName = $brandType === 'leads' ? 'Leads' : 'Sales';
+                            $row['flags'][] = [
+                                'level' => 'warn',
+                                'msg' => "{$name} {$labelName} Lagging: Actual " . ($brandType==='leads'?$salesReal:"₹".number_format($salesReal)) . " vs Target " . ($brandType==='leads'?round($salesExp):"₹".number_format($salesExp)) . " (-{$diffPct}%)",
+                                'channel' => $ch,
+                                'type' => 'sales_miss',
+                                'diff' => $salesExp - $salesReal
+                            ];
+                        }
                     }
                 }
 
                 if ($roas !== null && $chROAS > 0) {
-                    // Target ROAS Miss (Actual ROAS < Target ROAS by > 10%)
-                    if ($roas < $chROAS * 0.9) {
-                        $diffPct = round((($chROAS - $roas) / $chROAS) * 100);
-                        $row['flags'][] = [
-                            'level' => 'error',
-                            'msg' => "{$name} ROAS Miss: Actual {$roas}x vs Target {$chROAS}x (-{$diffPct}%)",
-                            'channel' => $ch,
-                            'type' => 'roas_miss',
-                            'diff' => $chROAS - $roas
-                        ];
+                    if ($brandType === 'leads') {
+                        if ($roas > $chROAS * 1.1) {
+                            $diffPct = round((($roas - $chROAS) / $chROAS) * 100);
+                            $row['flags'][] = [
+                                'level' => 'error',
+                                'msg' => "{$name} CPL Over Target: Actual ₹" . number_format($roas) . " vs Target ₹" . number_format($chROAS) . " (+{$diffPct}%)",
+                                'channel' => $ch,
+                                'type' => 'cpl_over_target',
+                                'diff' => $roas - $chROAS
+                            ];
+                        }
+                    } else {
+                        // Target ROAS Miss (Actual ROAS < Target ROAS by > 10%)
+                        if ($roas < $chROAS * 0.9) {
+                            $diffPct = round((($chROAS - $roas) / $chROAS) * 100);
+                            $row['flags'][] = [
+                                'level' => 'error',
+                                'msg' => "{$name} ROAS Miss: Actual {$roas}x vs Target {$chROAS}x (-{$diffPct}%)",
+                                'channel' => $ch,
+                                'type' => 'roas_miss',
+                                'diff' => $chROAS - $roas
+                            ];
+                        }
                     }
                 }
                 
@@ -400,8 +452,12 @@ function computeMonth(array $month, array $dayRows): array {
                 $row['total_spend_real'] = round($daySpendReal, 2);
                 $runningActualSpend += $daySpendReal;
             }
-            if ($hasSales && $hasSpend && $daySpendReal > 0) {
-                $row['total_roas'] = round($daySalesReal / $daySpendReal, 2);
+            if ($hasSales && $hasSpend && $daySalesReal > 0) {
+                if ($brandType === 'leads') {
+                    $row['total_roas'] = round($daySpendReal / $daySalesReal, 2);
+                } else {
+                    $row['total_roas'] = round($daySalesReal / $daySpendReal, 2);
+                }
             }
         }
 
@@ -416,7 +472,14 @@ function computeMonth(array $month, array $dayRows): array {
 
     $projSales = round($totalSalesReal + ($avgDailySales * $remainingDays), 2);
     $projSpend = round($totalSpendReal + ($avgDailySpend * $remainingDays), 2);
-    $projROAS  = $projSpend > 0 ? round($projSales / $projSpend, 2) : null;
+    
+    if ($brandType === 'leads') {
+        $projROAS = $projSales > 0 ? round($projSpend / $projSales, 2) : null; // projected CPL
+        $totalROAS = $totalSalesReal > 0 ? round($totalSpendReal / $totalSalesReal, 2) : null; // actual CPL
+    } else {
+        $projROAS = $projSpend > 0 ? round($projSales / $projSpend, 2) : null; // projected ROAS
+        $totalROAS = $totalSpendReal > 0 ? round($totalSalesReal / $totalSpendReal, 2) : null; // actual ROAS
+    }
 
     $spendLeft   = round($monthlyBudget - $totalSpendReal, 2);
     $revenueLeft = round($target - $totalSalesReal, 2);
@@ -431,16 +494,31 @@ function computeMonth(array $month, array $dayRows): array {
     // Per-channel summaries
     $chSummary = [];
     foreach ($activeChannels as $ch => $name) {
-        $cfg = $configuredChannels[$ch] ?? ['pct' => 0, 'roas' => 5];
+        $cfg = $configuredChannels[$ch] ?? ['pct' => 0, 'roas' => ($brandType === 'leads' ? 150 : 5)];
         $chPct = (float)($cfg['pct'] ?? 0);
-        $chROAS = (float)($cfg['roas'] ?? 5);
+        $chROAS = (float)($cfg['roas'] ?? ($brandType === 'leads' ? 150 : 5));
         $chCategory = $cfg['category'] ?? 'push';
 
         $chTarget = $target * ($chPct / 100);
-        $chBudget = $chROAS > 0 ? $chTarget / $chROAS : 0;
+        if ($brandType === 'leads') {
+            $chBudget = $chTarget * $chROAS;
+        } else {
+            $chBudget = $chROAS > 0 ? $chTarget / $chROAS : 0;
+        }
 
         $cSalesR = $channelActualSales[$ch] ?? 0;
         $cSpendR = $channelActualSpend[$ch] ?? 0;
+        $cQualifiedR = $channelActualQualified[$ch] ?? 0;
+
+        if ($brandType === 'leads') {
+            $chActualROAS = $cSalesR > 0 ? round($cSpendR / $cSalesR, 2) : null; // CPL = Spend / Leads
+            $qualRate = $cSalesR > 0 ? round(($cQualifiedR / $cSalesR) * 100, 1) : 0;
+            $cpql = $cQualifiedR > 0 ? round($cSpendR / $cQualifiedR, 2) : null;
+        } else {
+            $chActualROAS = $cSpendR > 0 ? round($cSalesR / $cSpendR, 2) : null; // ROAS = Sales / Spend
+            $qualRate = null;
+            $cpql = null;
+        }
 
         $chSummary[$ch] = [
             'name'            => $name,
@@ -449,9 +527,12 @@ function computeMonth(array $month, array $dayRows): array {
             'budget'          => round($chBudget, 2),
             'salesReal'       => round($cSalesR, 2),
             'spendReal'       => round($cSpendR, 2),
+            'qualifiedReal'   => $cQualifiedR,
+            'qualRate'        => $qualRate,
+            'cpql'            => $cpql,
             'remaining'       => round($chTarget - $cSalesR, 2),
             'budgetRemaining' => round($chBudget - $cSpendR, 2),
-            'roas'            => $cSpendR > 0 ? round($cSalesR / $cSpendR, 2) : null,
+            'roas'            => $chActualROAS,
             'roasTarget'      => $chROAS,
             'category'        => $chCategory
         ];
@@ -469,7 +550,10 @@ function computeMonth(array $month, array $dayRows): array {
             'remainingDays'   => $remainingDays,
             'totalSalesReal'  => round($totalSalesReal, 2),
             'totalSpendReal'  => round($totalSpendReal, 2),
-            'totalROAS'       => $totalSpendReal > 0 ? round($totalSalesReal / $totalSpendReal, 2) : null,
+            'totalROAS'       => $totalROAS,
+            'totalQualifiedReal' => $totalQualifiedReal,
+            'qualRate'        => $totalSalesReal > 0 ? round(($totalQualifiedReal / $totalSalesReal) * 100, 1) : 0,
+            'totalCPQL'       => $totalQualifiedReal > 0 ? round($totalSpendReal / $totalQualifiedReal, 2) : null,
             'targetPct'       => $targetPct,
             'projectedSales'  => $projSales,
             'projectedSpend'  => $projSpend,
@@ -573,7 +657,7 @@ function getAggregatedPeriod(string $brandId, array $yearMonths): array {
 if ($method === 'GET' && $action === 'dashboard') {
     $filterMonth = $_GET['month'] ?? ''; // Format: "YYYY-MM"
     
-    $brands = dbAll('SELECT id,slug,name,industry FROM brands ORDER BY name');
+    $brands = dbAll('SELECT id,slug,name,industry,type FROM brands ORDER BY name');
     if ($user['role'] !== 'superadmin' && $user['brands'] !== '*') {
         $allowed = is_array($user['brands']) ? $user['brands'] : json_decode($user['brands']??'[]',true);
         $brands = array_values(array_filter($brands, fn($b) => in_array($b['slug'],$allowed)));
@@ -622,7 +706,7 @@ if ($method === 'GET' && $action === 'dashboard') {
 
 // GET brands list
 if ($method === 'GET' && $action === 'brands') {
-    $brands = dbAll('SELECT b.id,b.slug,b.name,b.industry FROM brands b ORDER BY b.name');
+    $brands = dbAll('SELECT b.id,b.slug,b.name,b.industry,b.type FROM brands b ORDER BY b.name');
     if ($user['role'] !== 'superadmin' && $user['brands'] !== '*') {
         $allowed = is_array($user['brands']) ? $user['brands'] : json_decode($user['brands']??'[]',true);
         $brands = array_values(array_filter($brands, fn($b) => in_array($b['slug'],$allowed)));
@@ -640,11 +724,13 @@ if ($method === 'POST' && $action === 'brands') {
     if (!canManage($user)) json_err('Insufficient permissions', 403);
     $name     = trim(bodyGet('name',''));
     $industry = trim(bodyGet('industry',''));
+    $type     = trim(bodyGet('type','sales'));
+    if ($type !== 'leads') $type = 'sales';
     if (!$name) json_err('Brand name required');
     $slug = trim(strtolower(preg_replace('/[^a-z0-9]+/','-',$name)),'-');
     if (dbGet('SELECT id FROM brands WHERE slug=?',[$slug])) json_err('Brand already exists',409);
     $id = uuid4();
-    dbRun("INSERT INTO brands (id,slug,name,industry,memory_json) VALUES (?,?,?,?,'{}')",[$id,$slug,$name,$industry]);
+    dbRun("INSERT INTO brands (id,slug,name,industry,type,memory_json) VALUES (?,?,?,?,?,'{}')",[$id,$slug,$name,$industry,$type]);
     auditLog($user['id'],$user['name'],'BUDGET_CREATE_BRAND',$name);
     json_out(['ok'=>true,'id'=>$id,'slug'=>$slug]);
 }
