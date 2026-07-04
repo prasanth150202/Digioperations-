@@ -189,7 +189,12 @@
       <div id="bgt-dashboard-view">
         <div class="page-hd" style="margin-bottom:18px">
           <div><div class="page-title">Budget Tracker</div><div class="page-sub">Monthly performance across all brands</div></div>
-          <div style="display:flex;gap:8px"><button class="btn sm" id="bgt-new-brand-btn" onclick="bgtOpenNewBrand()" style="display:none">+ New Brand</button></div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="bgt-dash-month-filter" onchange="bgtLoadDashboard(this.value)" style="height:32px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:0 8px;outline:none;background:#fff;color:var(--fg);min-width:140px">
+              <option value="">Latest Month</option>
+            </select>
+            <button class="btn sm" id="bgt-new-brand-btn" onclick="bgtOpenNewBrand()" style="display:none">+ New Brand</button>
+          </div>
         </div>
         <div id="bgt-agency-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px"></div>
       </div>

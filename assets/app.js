@@ -2636,12 +2636,33 @@ async function initBudget() {
   await bgtLoadDashboard();
 }
 
-async function bgtLoadDashboard() {
+async function bgtLoadDashboard(selectedMonth = undefined) {
   showBgtView('dashboard');
-  const r = await api('/api/budget/dashboard');
+  
+  if (selectedMonth === undefined) {
+    selectedMonth = bgtState.selectedMonth || '';
+  } else {
+    bgtState.selectedMonth = selectedMonth;
+  }
+  
+  const url = selectedMonth ? `/api/budget/dashboard?month=${selectedMonth}` : '/api/budget/dashboard';
+  const r = await api(url);
   if (!r) return;
+  
   bgtState.brands = r.brands || [];
   renderBgtDashboard(r.brands || []);
+
+  // Populate the month filter dropdown
+  const filter = document.getElementById('bgt-dash-month-filter');
+  if (filter) {
+    let html = '<option value="">Latest Month</option>';
+    const months = r.availableMonths || [];
+    months.forEach(m => {
+      const key = `${m.year}-${String(m.month).padStart(2, '0')}`;
+      html += `<option value="${key}" ${selectedMonth === key ? 'selected' : ''}>${m.label}</option>`;
+    });
+    filter.innerHTML = html;
+  }
 
   // Show new brand button for managers+
   const u = window.currentUser;
