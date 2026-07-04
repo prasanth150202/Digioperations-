@@ -739,7 +739,30 @@ if ($method === 'POST' && $action === 'brands') {
 if ($method === 'GET' && $action === 'months' && $brandId) {
     $brand = dbGet('SELECT * FROM brands WHERE id=?',[$brandId]);
     if (!$brand || !canAccessBrand($user,$brand['slug'])) json_err('Access denied',403);
-    $months = dbAll('SELECT bm.*,COUNT(bd.id) as days_entered,COALESCE(SUM(bd.meta_sales),0)+COALESCE(SUM(bd.google_sales),0)+COALESCE(SUM(bd.mp_sales),0)+COALESCE(SUM(bd.ret_sales),0) as total_sales_real FROM budget_months bm LEFT JOIN budget_days bd ON bd.month_id=bm.id WHERE bm.brand_id=? GROUP BY bm.id ORDER BY bm.year DESC,bm.month DESC',[$brandId]);
+    $brandType = $brand['type'] ?? 'sales';
+    $months = dbAll('SELECT bm.*, b.type as brand_type, COUNT(bd.id) as days_entered FROM budget_months bm JOIN brands b ON b.id=bm.brand_id LEFT JOIN budget_days bd ON bd.month_id=bm.id WHERE bm.brand_id=? GROUP BY bm.id ORDER BY bm.year DESC,bm.month DESC', [$brandId]);
+    
+    foreach ($months as &$m) {
+        $dayRows = dbAll('SELECT * FROM budget_days WHERE month_id=?', [$m['id']]);
+        $totalSales = 0;
+        foreach ($dayRows as $dr) {
+            $chData = json_decode($dr['channels_json'] ?? '{}', true);
+            if ($brandType === 'leads') {
+                foreach ($chData as $ch) {
+                    $totalSales += isset($ch['conversions']) ? (float)$ch['conversions'] : 0;
+                }
+            } else {
+                foreach ($chData as $ch) {
+                    $totalSales += isset($ch['sales']) ? (float)$ch['sales'] : 0;
+                }
+                // Fallback to legacy columns if channels_json is empty
+                if (empty($chData)) {
+                    $totalSales += (float)$dr['meta_sales'] + (float)$dr['google_sales'] + (float)$dr['mp_sales'] + (float)$dr['ret_sales'];
+                }
+            }
+        }
+        $m['total_sales_real'] = $totalSales;
+    }
     json_out($months);
 }
 
@@ -782,7 +805,7 @@ if ($method === 'PUT' && $action === 'settings' && $monthId) {
 }
 // GET full month data with computed values
 if ($method === 'GET' && $action === 'month' && $monthId) {
-    $month = dbGet('SELECT bm.*,b.slug,b.name as brand_name FROM budget_months bm JOIN brands b ON b.id=bm.brand_id WHERE bm.id=?',[$monthId]);
+    $month = dbGet('SELECT bm.*,b.slug,b.name as brand_name,b.type as brand_type FROM budget_months bm JOIN brands b ON b.id=bm.brand_id WHERE bm.id=?',[$monthId]);
     if (!$month||!canAccessBrand($user,$month['slug'])) json_err('Access denied',403);
     $dayRows  = dbAll('SELECT * FROM budget_days WHERE month_id=? ORDER BY day_number',[$monthId]);
     $computed = computeMonth($month,$dayRows);

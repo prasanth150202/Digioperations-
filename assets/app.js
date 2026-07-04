@@ -2717,6 +2717,16 @@ async function bgtOpenBrand(brandId) {
 
   if (!months.length) { el.innerHTML = '<div style="color:var(--mid);font-size:13px;padding:16px">No months yet. Click "New Month" to create one.</div>'; return; }
 
+  if (months[0]) {
+    if (!bgtState.currentBrand.name) {
+      bgtState.currentBrand.name = months[0].brand_name;
+      document.getElementById('bgt-brand-name').textContent = bgtState.currentBrand.name || '—';
+    }
+    if (bgtState.currentBrand.type === undefined) {
+      bgtState.currentBrand.type = months[0].brand_type;
+    }
+  }
+
   const isLeads = bgtState.currentBrand.type === 'leads';
   el.innerHTML = months.map(m => {
     const salesReal = parseFloat(m.total_sales_real) || 0;
@@ -2751,8 +2761,11 @@ async function bgtLoadMonth(monthId) {
   bgtState.currentMonthData = data;
   bgtState.currentMonth = data.month;
 
+  const isLeads = (bgtState.currentBrand && bgtState.currentBrand.type === 'leads') || (data.month && data.month.brand_type === 'leads');
   document.getElementById('bgt-month-title').textContent = `${data.month.brand_name} — ${data.month.label}`;
-  document.getElementById('bgt-month-sub').textContent = `Target: ₹${fmt(data.month.revenue_target)} · ${data.month.total_days} days`;
+  document.getElementById('bgt-month-sub').textContent = isLeads
+    ? `Target: ${fmt(data.month.revenue_target)} leads · ${data.month.total_days} days`
+    : `Target: ₹${fmt(data.month.revenue_target)} · ${data.month.total_days} days`;
   
   const editBtn = document.getElementById('bgt-edit-btn');
   if (editBtn) editBtn.style.display = (window.currentUser && window.currentUser.role !== 'user') ? '' : 'none';
