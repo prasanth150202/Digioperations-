@@ -1829,17 +1829,25 @@ function calcVariant(v, p, globals) {
   };
 }
 
+const DEFAULT_GLOBALS = {
+  brand: 30,
+  photo: 15,
+  pack: 20,
+  ship: 70,
+  ops: 25,
+  gw: 0,
+  rto: 5,
+  roas: 3,
+  cod_rate: 50,
+  cod_fee: 35,
+  pg_fee: 1.8,
+  discType: 'pct',
+  disc: 0
+};
+
 function gv(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
 function getGlobals() {
-  return {
-    brand:gv('g-brand'), photo:gv('g-photo'), pack:gv('g-pack'),
-    ship:gv('g-ship'),   ops:gv('g-ops'),     gw:gv('g-gw'),
-    rto:gv('g-rto'),     roas:gv('g-roas'),
-    cod_rate:gv('g-cod-rate'), cod_fee:gv('g-cod-fee'), pg_fee:gv('g-pg-fee'),
-    discType: document.getElementById('g-disc-type')?.value || 'pct',
-    disc:gv('g-disc'),
-    extra_charges: globalExtras
-  };
+  return { ...DEFAULT_GLOBALS };
 }
 
 function renderPricingBrands() {
@@ -1880,30 +1888,28 @@ async function loadBrandProducts() {
   const r = await api(`/api/pricing/${activeBrand.slug}/products`);
   if (!r) return;
   
-  const g = r.globals || {};
-  
-  // Load and migrate global extra charges first so they are available for calculation comparison
-  globalExtras = Array.isArray(g.extra_charges) ? g.extra_charges : [];
-  if (globalExtras.length === 0 && g.addl && parseFloat(g.addl) > 0) {
-    globalExtras.push({
-      id: 'ge_' + Date.now(),
-      label: 'Extra Charge',
-      type: g.addlType || 'flat',
-      amount: parseFloat(g.addl)
-    });
-  }
-  g.extra_charges = globalExtras; // Sync to globals object
-  
   // Map API field names (variants_json/extras_json) to local names (variants/extras)
   prods = (r.products || []).map(p => {
     const extras = Array.isArray(p.extras_json) ? p.extras_json : [];
-    const tempP = { ...p, extras };
+    
+    // Fallback logic for legacy products without individual cost parameters
+    const prodGlobals = (p.globals_json && Object.keys(p.globals_json).length > 0) 
+      ? p.globals_json 
+      : { ...DEFAULT_GLOBALS };
+      
+    // Migrate legacy addl / extra charges if they exist in brand globals
+    if (r.globals && Array.isArray(r.globals.extra_charges)) {
+      prodGlobals.extra_charges = r.globals.extra_charges;
+    }
+    
+    const tempP = { ...p, extras, globals: prodGlobals };
     return {
       ...p,
+      globals: prodGlobals,
       extras,
       variants: Array.isArray(p.variants_json) ? p.variants_json.map(v => {
-        // Calculate what the price would be without overrides based on loaded globals
-        const calc = calcVariant({ ...v, sellingO: null, compO: null }, tempP, g);
+        // Calculate what the price would be without overrides based on this product's globals
+        const calc = calcVariant({ ...v, sellingO: null, compO: null }, tempP, prodGlobals);
         
         // If saved price equals calculated price, it was not manually overridden (Auto mode)
         const isSellingCalc = v.selling == null || parseFloat(v.selling) === calc.selling;
@@ -1918,45 +1924,23 @@ async function loadBrandProducts() {
     };
   });
   
-  // Restore saved globals into the input fields
-  const sv = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
-  sv('g-brand', g.brand); sv('g-photo', g.photo); sv('g-pack', g.pack);
-  sv('g-ship',  g.ship);  sv('g-ops',  g.ops);   sv('g-gw',   g.gw);
-  sv('g-rto',   g.rto);   sv('g-roas', g.roas);  sv('g-disc', g.disc);
-  sv('g-cod-rate', g.cod_rate); sv('g-cod-fee', g.cod_fee); sv('g-pg-fee', g.pg_fee);
-  if (document.getElementById('g-disc-type') && g.discType != null) {
-    document.getElementById('g-disc-type').value = g.discType;
-  }
-  
-  renderGlobalExtrasList();
   renderAll();
 }
 
 function renderAll() {
   if (!activeBrand) return;
   const canEdit = CU.role !== 'user';
-  const globals = getGlobals();
   let totalVars = 0, totalMargin = 0, totalROAS = 0;
 
-  // Disable global inputs for standard executionist users
-  const inputs = ['g-brand','g-photo','g-pack','g-ship','g-ops','g-gw','g-rto','g-roas','g-cod-rate','g-cod-fee','g-pg-fee','g-disc-type','g-disc'];
-  inputs.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.disabled = !canEdit;
-  });
-
-  // Hide globals card in standard view mode to simplify interface
-  const gc = document.querySelector('.globals-card');
-  if (gc) gc.style.display = pricingViewMode === 'std' ? 'none' : 'block';
-  
   const isAdv = pricingViewMode === 'adv';
   const tableHeaders = isAdv
     ? `<tr><th>Variant</th><th>Mfg/pc</th><th>Pack/pc</th><th>Total Cost</th><th>Selling</th><th>Gross</th><th>Net Profit</th><th>Comp</th>${canEdit?'<th></th>':''}</tr>`
     : `<tr><th>Variant</th><th>Mfg/pc</th><th>Pack/pc</th><th>Selling</th><th>Gross Margin</th><th>Net Profit</th>${canEdit?'<th></th>':''}</tr>`;
 
   document.getElementById('products-container').innerHTML = prods.map(p => {
+    const pg = p.globals || { ...DEFAULT_GLOBALS };
     let rows = (p.variants || []).map(v => {
-      const r = calcVariant(v, p, globals);
+      const r = calcVariant(v, p, pg);
       totalVars++; totalMargin += r.margin; totalROAS += r.roas;
       const mc = r.margin >= 0.35 ? 'good' : r.margin >= 0.25 ? 'warn' : 'bad';
       const mColor = r.margin >= 0.35 ? 'var(--green)' : r.margin >= 0.25 ? 'var(--amber)' : 'var(--red)';
@@ -1965,7 +1949,7 @@ function renderAll() {
         ? `<input type="text" inputmode="decimal" value="${v.mfgO != null ? v.mfgO : p.mfg_per_pc}" style="width:65px${v.mfgO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','mfgO',this.value)">`
         : `<span style="font-family:var(--fm)">₹${v.mfgO != null ? v.mfgO : p.mfg_per_pc}</span>`;
 
-      const packDefault = globals.pack || 20;
+      const packDefault = pg.pack || 20;
       const packInput = canEdit
         ? `<input type="text" inputmode="decimal" value="${v.packO != null ? v.packO : packDefault}" style="width:55px${v.packO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','packO',this.value)">`
         : `<span style="font-family:var(--fm)">₹${v.packO != null ? v.packO : packDefault}</span>`;
@@ -2002,14 +1986,67 @@ function renderAll() {
     }).join('');
 
     const extraSum = (p.extras || []).reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
+
+    let extrasHtml = '';
+    if (p.extras && p.extras.length > 0) {
+      extrasHtml = `
+        <div style="grid-column:1/-1;border-top:1px dashed var(--border);padding-top:10px;margin-top:6px">
+          <div style="font-weight:700;font-size:11px;color:var(--dark);margin-bottom:6px">Product Extra Charges</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${p.extras.map((ext, extIdx) => `
+              <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.02);padding:6px 10px;border-radius:6px;border:1px solid var(--border)">
+                <span style="font-size:11.5px;font-weight:600">${ext.label}</span>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-family:var(--fm);font-size:11.5px;font-weight:700">₹${ext.amount}</span>
+                  ${canEdit ? `<button class="btn sm danger" onclick="removeProductExtra('${p.id}', ${extIdx})" style="padding:2px 6px;font-size:10px;height:20px;display:flex;align-items:center;justify-content:center">✕</button>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    const isVisible = p.showSettings ? 'grid' : 'none';
+    const settingsHtml = `
+      <div id="prod-settings-${p.id}" class="prod-settings-grid" style="display:${isVisible}">
+        <div style="grid-column:1/-1;font-weight:700;font-size:12px;color:var(--dark);margin-bottom:4px;display:flex;justify-content:space-between">
+          <span>⚙️ Cost & Pricing Settings</span>
+          <span style="font-size:10px;color:var(--mid);font-weight:normal">Edits here recalculate all variants of this product</span>
+        </div>
+        <div class="field"><label style="font-size:10.5px">Branding (₹)</label><input type="text" inputmode="decimal" value="${pg.brand ?? 30}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateProductGlobal('${p.id}', 'brand', this.value)" style="height:32px;font-size:12px"${!canEdit ? ' disabled' : ''}></div>
+        <div class="field"><label style="font-size:10.5px">Photography (₹)</label><input type="text" inputmode="decimal" value="${pg.photo ?? 15}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateProductGlobal('${p.id}', 'photo', this.value)" style="height:32px;font-size:12px"${!canEdit ? ' disabled' : ''}></div>
+        <div class="field"><label style="font-size:10.5px">Packaging (₹)</label><input type="text" inputmode="decimal" value="${pg.pack ?? 20}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateProductGlobal('${p.id}', 'pack', this.value)" style="height:32px;font-size:12px"${!canEdit ? ' disabled' : ''}></div>
+        <div class="field"><label style="font-size:10.5px">Shipping (₹)</label><input type="text" inputmode="decimal" value="${pg.ship ?? 70}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateProductGlobal('${p.id}', 'ship', this.value)" style="height:32px;font-size:12px"${!canEdit ? ' disabled' : ''}></div>
+        <div class="field"><label style="font-size:10.5px">Operations (₹)</label><input type="text" inputmode="decimal" value="${pg.ops ?? 25}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateProductGlobal('${p.id}', 'ops', this.value)" style="height:32px;font-size:12px"${!canEdit ? ' disabled' : ''}></div>
+        <div class="field"><label style="font-size:10.5px">Gift Wrap (₹)</label><input type="text" inputmode="decimal" value="${pg.gw ?? 0}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateProductGlobal('${p.id}', 'gw', this.value)" style="height:32px;font-size:12px"${!canEdit ? ' disabled' : ''}></div>
+        <div class="field"><label style="font-size:10.5px">RTO Rate (%)</label><input type="text" inputmode="decimal" value="${pg.rto ?? 5}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateProductGlobal('${p.id}', 'rto', this.value)" style="height:32px;font-size:12px"${!canEdit ? ' disabled' : ''}></div>
+        <div class="field"><label style="font-size:10.5px">COD Rate (%)</label><input type="text" inputmode="decimal" value="${pg.cod_rate ?? 50}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateProductGlobal('${p.id}', 'cod_rate', this.value)" style="height:32px;font-size:12px"${!canEdit ? ' disabled' : ''}></div>
+        <div class="field"><label style="font-size:10.5px">COD Fee (₹)</label><input type="text" inputmode="decimal" value="${pg.cod_fee ?? 35}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateProductGlobal('${p.id}', 'cod_fee', this.value)" style="height:32px;font-size:12px"${!canEdit ? ' disabled' : ''}></div>
+        <div class="field"><label style="font-size:10.5px">PG Fee (%)</label><input type="text" inputmode="decimal" value="${pg.pg_fee ?? 1.8}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateProductGlobal('${p.id}', 'pg_fee', this.value)" style="height:32px;font-size:12px"${!canEdit ? ' disabled' : ''}></div>
+        <div class="field"><label style="font-size:10.5px">Target ROAS</label><input type="text" inputmode="decimal" value="${pg.roas ?? 3}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateProductGlobal('${p.id}', 'roas', this.value)" style="height:32px;font-size:12px"${!canEdit ? ' disabled' : ''}></div>
+        <div class="field">
+          <label style="font-size:10.5px">Discount Type</label>
+          <select onchange="updateProductGlobal('${p.id}', 'discType', this.value)" style="width:100%;height:32px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:0 8px;outline:none;background:#fff;color:var(--fg)"${!canEdit ? ' disabled' : ''}>
+            <option value="pct" ${pg.discType === 'pct' ? 'selected' : ''}>Percentage (%)</option>
+            <option value="flat" ${pg.discType === 'flat' ? 'selected' : ''}>Flat ₹</option>
+          </select>
+        </div>
+        <div class="field"><label style="font-size:10.5px">Discount Value</label><input type="text" inputmode="decimal" value="${pg.disc ?? 0}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateProductGlobal('${p.id}', 'disc', this.value)" style="height:32px;font-size:12px"${!canEdit ? ' disabled' : ''}></div>
+        ${extrasHtml}
+      </div>
+    `;
+
     return `<div class="prod-block" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">
       <div class="prod-hd" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         ${canEdit ? `<input class="prod-name-inp" value="${p.name}" onchange="setProdName('${p.id}',this.value)" style="font-weight:800;font-size:14px;border:none;border-bottom:1px dashed var(--border);outline:none;background:transparent;padding:2px 4px">` : `<div class="prod-name-inp" style="pointer-events:none;font-weight:800;font-size:14px">${p.name}</div>`}
         <div style="display:flex;align-items:center;gap:6px">
+          ${canEdit ? `<button class="btn sm" onclick="toggleProdSettings('${p.id}')" style="padding:4px 8px;font-size:11px">⚙️ Cost Settings</button>` : ''}
           ${extraSum > 0 ? `<span class="pill warn" style="font-size:10px">+₹${extraSum} extras</span>` : ''}
           ${canEdit ? `<button class="btn sm danger" onclick="removeProduct('${p.id}')" style="padding:4px 8px;font-size:11px">✕ Remove</button>` : ''}
         </div>
       </div>
+      ${settingsHtml}
       <div style="overflow-x:auto"><table class="vtable">
         <thead>${tableHeaders}</thead>
         <tbody>${rows}</tbody>
@@ -2029,6 +2066,36 @@ function renderAll() {
   mv.textContent = (avgM * 100).toFixed(1) + '%';
   mv.style.color = avgM >= 0.35 ? 'var(--green)' : avgM >= 0.25 ? 'var(--amber)' : 'var(--red)';
   document.getElementById('sum-roas').textContent = avgR.toFixed(1) + 'x';
+}
+
+function toggleProdSettings(pid) {
+  const p = prods.find(p => p.id === pid);
+  if (p) {
+    p.showSettings = !p.showSettings;
+    renderAll();
+  }
+}
+
+function updateProductGlobal(pid, key, val) {
+  const p = prods.find(p => p.id === pid);
+  if (!p) return;
+  if (!p.globals) p.globals = { ...DEFAULT_GLOBALS };
+  if (key === 'discType') {
+    p.globals[key] = val;
+  } else {
+    p.globals[key] = parseFloat(val) || 0;
+  }
+  renderAll();
+  deferPricingSave();
+}
+
+function removeProductExtra(pid, idx) {
+  const p = prods.find(p => p.id === pid);
+  if (p && p.extras) {
+    p.extras.splice(idx, 1);
+    renderAll();
+    deferPricingSave();
+  }
 }
 
 function setVF(pid, vid, k, val) {
@@ -2081,62 +2148,9 @@ function toggleGlobals() {
 }
 
 function renderGlobalExtrasList() {
-  const container = document.getElementById('global-extras-list');
-  if (!container) return;
-  const canEdit = CU.role !== 'user';
-  
-  if (globalExtras.length === 0) {
-    container.innerHTML = `<div style="font-size:12px;color:var(--mid);padding:4px 0">No global extra charges added yet.</div>`;
-    return;
-  }
-  
-  container.innerHTML = globalExtras.map((ge, idx) => {
-    return `<div style="display:flex;gap:8px;align-items:center;background:var(--off);padding:8px;border-radius:6px;border:1px solid var(--border);margin-bottom:6px">
-      <div style="flex:2;min-width:120px">
-        ${canEdit ? `<input type="text" class="form-control" value="${ge.label}" placeholder="e.g. Payment Gateway Fee" onchange="updateGlobalExtra('${ge.id}', 'label', this.value)" style="width:100%;height:32px;font-size:12px;padding:0 8px;border:1px solid var(--border);border-radius:6px;outline:none">` : `<span style="font-weight:600;font-size:12px">${ge.label}</span>`}
-      </div>
-      <div style="flex:1;min-width:80px">
-        ${canEdit ? `
-        <select onchange="updateGlobalExtra('${ge.id}', 'type', this.value)" style="width:100%;height:32px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:0 4px;outline:none;background:#fff;color:var(--fg)">
-          <option value="flat" ${ge.type === 'flat' ? 'selected' : ''}>Flat (₹)</option>
-          <option value="pct" ${ge.type === 'pct' ? 'selected' : ''}>Percentage (%)</option>
-        </select>` : `<span style="font-size:12px;color:var(--mid)">${ge.type === 'flat' ? 'Flat (₹)' : 'Percentage (%)'}</span>`}
-      </div>
-      <div style="flex:1;min-width:60px">
-        ${canEdit ? `<input type="text" class="form-control" inputmode="decimal" value="${ge.amount}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="updateGlobalExtra('${ge.id}', 'amount', this.value)" style="width:100%;height:32px;font-size:12px;padding:0 8px;border:1px solid var(--border);border-radius:6px;outline:none">` : `<span style="font-weight:600;font-size:12px">${ge.type === 'flat' ? '₹' : ''}${ge.amount}${ge.type === 'pct' ? '%' : ''}</span>`}
-      </div>
-      ${canEdit ? `<button class="btn sm danger" onclick="removeGlobalExtra('${ge.id}')" style="height:32px;width:32px;padding:0;display:flex;align-items:center;justify-content:center;font-size:14px;border-radius:6px">✕</button>` : ''}
-    </div>`;
-  }).join('');
+  // No-op - removed global extras
 }
 
-function addGlobalExtra() {
-  globalExtras.push({
-    id: 'ge_' + Date.now() + Math.random().toString(36).substr(2, 5),
-    label: 'New Extra Charge',
-    type: 'flat',
-    amount: 0
-  });
-  renderGlobalExtrasList();
-  deferSaveAndRender();
-}
-
-function updateGlobalExtra(id, field, val) {
-  const ge = globalExtras.find(x => x.id === id);
-  if (!ge) return;
-  if (field === 'amount') {
-    ge[field] = parseFloat(val) || 0;
-  } else {
-    ge[field] = val;
-  }
-  deferSaveAndRender();
-}
-
-function removeGlobalExtra(id) {
-  globalExtras = globalExtras.filter(x => x.id !== id);
-  renderGlobalExtrasList();
-  deferSaveAndRender();
-}
 
 function deferPricingSave() {
   const chip = document.getElementById('save-chip');
@@ -2147,11 +2161,10 @@ function deferPricingSave() {
 
 async function executePricingSave(chip) {
   if (!activeBrand) return;
-  const globals = getGlobals();
   const prodsToSave = prods.map(p => ({
     ...p,
     variants_json: (p.variants || []).map(v => {
-      const calc = calcVariant(v, p, globals);
+      const calc = calcVariant(v, p, p.globals || DEFAULT_GLOBALS);
       return {
         ...v,
         // Persist all display values so the catalogue reads them directly — no recalculation
@@ -2168,10 +2181,11 @@ async function executePricingSave(chip) {
         roas:      calc.roas,
       };
     }),
+    globals_json: p.globals || DEFAULT_GLOBALS,
     extras_json: p.extras || [],
   }));
   try {
-    await api(`/api/pricing/${activeBrand.slug}/products`, 'PUT', { products: prodsToSave, globals });
+    await api(`/api/pricing/${activeBrand.slug}/products`, 'PUT', { products: prodsToSave, globals: {} });
     if (chip) { chip.textContent = '✓ Saved'; chip.className = 'chip save'; }
     return true;
   } catch (err) {
@@ -3947,9 +3961,8 @@ async function openBrandCatalog(id) {
   const r = await api(`/api/pricing/${b.slug}/products`);
   if (!r) return;
 
-  const savedGlobals = r.globals || {};
-
   catalogProds = (r.products || []).map(p => {
+    const prodGlobals = (p.globals_json && Object.keys(p.globals_json).length > 0) ? p.globals_json : { ...DEFAULT_GLOBALS };
     const extras = Array.isArray(p.extras_json) ? p.extras_json : [];
     const variants = Array.isArray(p.variants_json) ? p.variants_json.map(v => {
       // --- Pre-compute all display values here, once ---
@@ -3971,7 +3984,7 @@ async function openBrandCatalog(id) {
         // Legacy: no saved price — fall back to calcVariant with saved globals
         const fallbackP = { ...p, extras };
         const fallbackV = { ...v, sellingO: null, compO: null };
-        const calc = calcVariant(fallbackV, fallbackP, savedGlobals);
+        const calc = calcVariant(fallbackV, fallbackP, prodGlobals);
         selling   = calc.selling;
         comp      = calc.comp;
         margin    = calc.margin;
@@ -3991,7 +4004,7 @@ async function openBrandCatalog(id) {
       };
     }) : [];
 
-    return { ...p, extras, variants, globals: savedGlobals };
+    return { ...p, extras, variants, globals: prodGlobals };
   });
 
   document.getElementById('catalog-brands-view').style.display = 'none';

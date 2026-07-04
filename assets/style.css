@@ -1069,6 +1069,21 @@ html,body{height:100%;font-family:var(--fh);background:var(--off);color:var(--bo
 /* Input improvements */
 .vtable td input[type="text"] { height: 30px; }
 
+/* Product cost settings inline panel */
+.prod-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--off);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-top: 10px;
+  margin-bottom: 16px;
+}
+@media(max-width: 900px) { .prod-settings-grid { grid-template-columns: repeat(2, 1fr) !important; } }
+@media(max-width: 480px) { .prod-settings-grid { grid-template-columns: 1fr !important; } }
+
 
 
 

@@ -117,7 +117,7 @@ if ($method === 'PUT' && $action === 'products') {
         dbRun(
             'INSERT INTO pricing_products (id,brand_id,name,mfg_per_pc,variant_type,extras_json,variants_json,globals_json) VALUES (?,?,?,?,?,?,?,?)',
             [$pid, $brand['id'], $pName, $pMfg, $p['variant_type'] ?? 'single',
-             json_encode($p['extras_json'] ?? []), json_encode($p['variants_json'] ?? []), json_encode($globals)]
+             json_encode($p['extras_json'] ?? []), json_encode($p['variants_json'] ?? []), json_encode($p['globals_json'] ?? [])]
         );
     }
     json_out(['ok' => true]);
