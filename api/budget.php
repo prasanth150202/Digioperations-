@@ -671,6 +671,7 @@ if ($method === 'GET' && $action === 'dashboard') {
         $allowed = is_array($user['brands']) ? $user['brands'] : json_decode($user['brands']??'[]',true);
         $brands = array_values(array_filter($brands, fn($b) => in_array($b['slug'],$allowed)));
     }
+    file_put_contents(dirname(__DIR__) . '/scratch/bgt_debug.log', "IP: " . ($_SERVER['REMOTE_ADDR'] ?? '') . " | User ID: " . ($user['id'] ?? '') . " | Email: " . ($user['email'] ?? '') . " | Role: " . ($user['role'] ?? '') . " | Brands Config: " . json_encode($user['brands'] ?? '') . " | Brands Count: " . count($brands) . "\n", FILE_APPEND);
     
     // Get distinct months for the dropdown filter
     $availableMonths = dbAll('SELECT DISTINCT year, month, label FROM budget_months ORDER BY year DESC, month DESC');
