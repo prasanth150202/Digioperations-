@@ -660,6 +660,7 @@ function getAggregatedPeriod(string $brandId, array $yearMonths): array {
 // ════════════════════════════════════════════════════════════
 // ROUTES
 // ════════════════════════════════════════════════════════════
+try {
 
 // GET dashboard — all brands latest month summary (filtered by month if provided)
 if ($method === 'GET' && $action === 'dashboard') {
@@ -916,3 +917,10 @@ if ($method === 'GET' && $action === 'compare') {
 }
 
 json_err('Not found', 404);
+
+} catch (Throwable $e) {
+    http_response_code(500);
+    json_out([
+        'error' => "PHP Exception: " . $e->getMessage() . " in " . basename($e->getFile()) . " on line " . $e->getLine()
+    ]);
+}
