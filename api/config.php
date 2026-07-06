@@ -230,6 +230,9 @@ function dbLastId(): string { return db()->lastInsertId(); }
 function json_out(mixed $data, int $code = 200): never {
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Cache-Control: post-check=0, pre-check=0', false);
+    header('Pragma: no-cache');
     $out = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
     if ($out === false) {
         $out = json_encode(['error' => 'Response encoding failed: ' . json_last_error_msg()]);

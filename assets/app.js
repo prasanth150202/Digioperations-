@@ -282,7 +282,7 @@ function closeMo(id) { document.getElementById(id).style.display = 'none'; }
 let dashDataCache = null;
 
 async function fetchDashboardData(month = '') {
-  const url = month ? `/api/budget/dashboard?month=${month}` : '/api/budget/dashboard';
+  const url = month ? `/api/budget/dashboard?month=${month}&_t=${Date.now()}` : `/api/budget/dashboard?_t=${Date.now()}`;
   const [bgtRes, auditRes] = await Promise.all([
     api(url),
     CU.role === 'superadmin' ? api('/api/admin/audit?limit=20') : Promise.resolve(null)
@@ -2654,7 +2654,7 @@ async function bgtLoadDashboard(selectedMonth = undefined) {
     bgtState.selectedMonth = selectedMonth;
   }
   
-  const url = selectedMonth ? `/api/budget/dashboard?month=${selectedMonth}` : '/api/budget/dashboard';
+  const url = selectedMonth ? `/api/budget/dashboard?month=${selectedMonth}&_t=${Date.now()}` : `/api/budget/dashboard?_t=${Date.now()}`;
   const r = await api(url);
   if (!r) return;
   

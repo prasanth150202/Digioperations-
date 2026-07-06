@@ -448,7 +448,7 @@ html,body{height:100%;font-family:var(--fh);background:var(--off);color:var(--bo
   }
 
   /* Strategy Page: Turn vertical sidebar into horizontal premium indicator */
-  #page-strategy {
+  #page-strategy:not(.hidden) {
     height: auto !important;
     overflow: visible !important;
     display: block !important;
