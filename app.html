@@ -3,6 +3,20 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Digifyce Platform</title>
+<script>
+window.addEventListener('error', function(e) {
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#fde8e8;color:#9b1c1c;padding:12px;z-index:99999;font-family:monospace;border-bottom:2px solid #f8b4b4;font-size:12px';
+  d.innerHTML = '<strong>Frontend Error:</strong> ' + e.message + ' at ' + e.filename + ':' + e.lineno;
+  document.body.appendChild(d);
+});
+window.addEventListener('unhandledrejection', function(e) {
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#fde8e8;color:#9b1c1c;padding:12px;z-index:99999;font-family:monospace;border-bottom:2px solid #f8b4b4;font-size:12px';
+  d.innerHTML = '<strong>Unhandled Promise Rejection:</strong> ' + e.reason;
+  document.body.appendChild(d);
+});
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="/assets/style.css?v=24">
