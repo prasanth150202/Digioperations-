@@ -160,7 +160,9 @@ function computeMonth(array $month, array $dayRows): array {
     foreach ($dayRows as $r) {
         $chData = json_decode($r['channels_json'] ?? '{}', true);
         foreach ($chData as $ch => $vals) {
-            if (($vals['sales'] !== null || $vals['spend'] !== null) && !isset($activeChannels[$ch])) {
+            $vSales = $vals['sales'] ?? ($vals['conversions'] ?? null);
+            $vSpend = $vals['spend'] ?? null;
+            if (($vSales !== null || $vSpend !== null) && !isset($activeChannels[$ch])) {
                 $activeChannels[$ch] = ucfirst($ch);
             }
         }
@@ -196,12 +198,12 @@ function computeMonth(array $month, array $dayRows): array {
 
                 if (isset($chData[$ch])) {
                     if ($brandType === 'leads') {
-                        $sales = $chData[$ch]['conversions'] !== null ? (float)$chData[$ch]['conversions'] : null;
-                        $qualified = $chData[$ch]['customers_acquired'] !== null ? (float)$chData[$ch]['customers_acquired'] : null;
+                        $sales = isset($chData[$ch]['conversions']) && $chData[$ch]['conversions'] !== null ? (float)$chData[$ch]['conversions'] : null;
+                        $qualified = isset($chData[$ch]['customers_acquired']) && $chData[$ch]['customers_acquired'] !== null ? (float)$chData[$ch]['customers_acquired'] : null;
                     } else {
-                        $sales = $chData[$ch]['sales'] !== null ? (float)$chData[$ch]['sales'] : null;
+                        $sales = isset($chData[$ch]['sales']) && $chData[$ch]['sales'] !== null ? (float)$chData[$ch]['sales'] : null;
                     }
-                    $spend = $chData[$ch]['spend'] !== null ? (float)$chData[$ch]['spend'] : null;
+                    $spend = isset($chData[$ch]['spend']) && $chData[$ch]['spend'] !== null ? (float)$chData[$ch]['spend'] : null;
                 } else {
                     // Legacy column fallbacks
                     if ($ch === 'meta') { $sales = $e['meta_sales'] !== null ? (float)$e['meta_sales'] : null; $spend = $e['meta_spend'] !== null ? (float)$e['meta_spend'] : null; }
@@ -287,13 +289,13 @@ function computeMonth(array $month, array $dayRows): array {
 
                 if (isset($chData[$ch])) {
                     if ($brandType === 'leads') {
-                        $salesReal = $chData[$ch]['conversions'] !== null ? (float)$chData[$ch]['conversions'] : null;
-                        $customersAcquired = $chData[$ch]['customers_acquired'] !== null ? (int)$chData[$ch]['customers_acquired'] : null;
+                        $salesReal = isset($chData[$ch]['conversions']) && $chData[$ch]['conversions'] !== null ? (float)$chData[$ch]['conversions'] : null;
+                        $customersAcquired = isset($chData[$ch]['customers_acquired']) && $chData[$ch]['customers_acquired'] !== null ? (int)$chData[$ch]['customers_acquired'] : null;
                     } else {
-                        $salesReal = $chData[$ch]['sales'] !== null ? (float)$chData[$ch]['sales'] : null;
+                        $salesReal = isset($chData[$ch]['sales']) && $chData[$ch]['sales'] !== null ? (float)$chData[$ch]['sales'] : null;
                         $customersAcquired = isset($chData[$ch]['customers_acquired']) && $chData[$ch]['customers_acquired'] !== null ? (int)$chData[$ch]['customers_acquired'] : null;
                     }
-                    $spendReal = $chData[$ch]['spend'] !== null ? (float)$chData[$ch]['spend'] : null;
+                    $spendReal = isset($chData[$ch]['spend']) && $chData[$ch]['spend'] !== null ? (float)$chData[$ch]['spend'] : null;
                     $conversions = isset($chData[$ch]['conversions']) && $chData[$ch]['conversions'] !== null ? (int)$chData[$ch]['conversions'] : null;
                     $impressions = isset($chData[$ch]['impressions']) && $chData[$ch]['impressions'] !== null ? (int)$chData[$ch]['impressions'] : null;
                     $clicks = isset($chData[$ch]['clicks']) && $chData[$ch]['clicks'] !== null ? (int)$chData[$ch]['clicks'] : null;
