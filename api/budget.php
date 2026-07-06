@@ -34,6 +34,7 @@ function computeMonth(array $month, array $dayRows): array {
     // On-the-fly legacy day columns migration to channels_json
     foreach ($dayRows as $idx => $r) {
         $chData = json_decode($r['channels_json'] ?? '{}', true);
+        if (!is_array($chData)) $chData = [];
         if ($r['mp_sales'] !== null || $r['mp_spend'] !== null) {
             if (!isset($chData['amazon'])) {
                 $chData['amazon'] = [
@@ -83,6 +84,7 @@ function computeMonth(array $month, array $dayRows): array {
 
     // Determine which channels are active (configured in month, or have data in any day)
     $configuredChannels = json_decode($month['channels'] ?? '{}', true);
+    if (!is_array($configuredChannels)) $configuredChannels = [];
     $activeChannels = [];
 
     // Pre-populate with standard channels if empty
@@ -159,6 +161,7 @@ function computeMonth(array $month, array $dayRows): array {
     // Scan day rows to find any other channels that have entered data (even if not configured active)
     foreach ($dayRows as $r) {
         $chData = json_decode($r['channels_json'] ?? '{}', true);
+        if (!is_array($chData)) $chData = [];
         foreach ($chData as $ch => $vals) {
             $vSales = $vals['sales'] ?? ($vals['conversions'] ?? null);
             $vSpend = $vals['spend'] ?? null;
@@ -190,6 +193,7 @@ function computeMonth(array $month, array $dayRows): array {
             $daySpend = 0;
             $dayQualified = 0;
             $chData = json_decode($e['channels_json'] ?? '{}', true);
+            if (!is_array($chData)) $chData = [];
 
             foreach (array_keys($activeChannels) as $ch) {
                 $sales = null;
@@ -264,6 +268,7 @@ function computeMonth(array $month, array $dayRows): array {
         $hasSpend = false;
 
         $chData = $e ? json_decode($e['channels_json'] ?? '{}', true) : [];
+        if (!is_array($chData)) $chData = [];
 
         foreach (array_keys($activeChannels) as $ch) {
             $cfg = $configuredChannels[$ch] ?? ['pct' => 0, 'roas' => ($brandType === 'leads' ? 150 : 5)];
@@ -627,6 +632,7 @@ function getAggregatedPeriod(string $brandId, array $yearMonths): array {
         $totalBudget += $mBudget;
         
         $mChannels = json_decode($m['channels'] ?? '{}', true);
+        if (!is_array($mChannels)) $mChannels = [];
         foreach ($mChannels as $ch => $cfg) {
             if (!isset($aggregatedChannels[$ch])) {
                 $aggregatedChannels[$ch] = $cfg;
@@ -749,6 +755,7 @@ if ($method === 'GET' && $action === 'months' && $brandId) {
         $totalSales = 0;
         foreach ($dayRows as $dr) {
             $chData = json_decode($dr['channels_json'] ?? '{}', true);
+            if (!is_array($chData)) $chData = [];
             if ($brandType === 'leads') {
                 foreach ($chData as $ch) {
                     $totalSales += isset($ch['conversions']) ? (float)$ch['conversions'] : 0;
