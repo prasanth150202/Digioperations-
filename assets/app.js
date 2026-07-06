@@ -74,8 +74,17 @@ async function api(methodOrUrl, urlOrBody, body) {
   const r = await fetch(finalUrl, opts);
   if (r.status === 401) { window.location.href = './'; return null; }
   if (!r.ok) { 
-    const t = await r.json().catch(() => ({ error: 'Unknown server error' }));
-    throw new Error(t.error || 'Request failed');
+    let errMsg = 'Request failed';
+    try {
+      const t = await r.json();
+      errMsg = t.error || errMsg;
+    } catch (_) {
+      try {
+        const text = await r.text();
+        errMsg = text.slice(0, 300) || errMsg;
+      } catch (__) {}
+    }
+    throw new Error(errMsg);
   }
   let text = '';
   try {
