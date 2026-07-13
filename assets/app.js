@@ -57,7 +57,7 @@ let stratStep = 0, stratForm = {}, stratDone = new Set(), stratSaveTimer = null;
 
 // Pricing state
 let prods = [], pricingSaveTimer = null, globalsOpen = false, globalExtras = [];
-let pricingViewMode = 'std';
+let pricingViewMode = 'adv';
 let catalogProds = [], catalogActiveBrand = null;
 
 // ─── API HELPER ──────────────────────────────────────────────────────────────
@@ -1817,16 +1817,27 @@ function calcVariant(v, p, globals) {
 
   const mfgPc = (v.mfgO != null) ? parseFloat(v.mfgO) : (parseFloat(p.mfg_per_pc) || 0);
   const qty   = p.variant_type === 'bundle' ? (v.qty || 1) : 1;
-  const extras = (p.extras || []).reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
 
-  const cogsBase = mfgPc * qty + extras;
+  let F_cogs = 0;
+  let extra_P_mfg = 0;
+  (p.extras || []).forEach(e => {
+    const val = (v.extraO && v.extraO[e.label] != null) ? parseFloat(v.extraO[e.label]) : (parseFloat(e.amount) || 0);
+    if (e.type === 'pct') {
+      extra_P_mfg += val / 100;
+    } else {
+      F_cogs += val;
+    }
+  });
+
+  const cogsBase = mfgPc * qty + F_cogs;
 
   let F = 0;
   let P_mfg = 0;
   let P_sell = 0;
 
   components.forEach(c => {
-    const val = parseFloat(c.value) || 0;
+    let val = parseFloat(c.value) || 0;
+    if (/pack/i.test(c.name) && v.packO != null) val = parseFloat(v.packO);
     if (c.type === 'flat') {
       F += val;
     } else if (c.type === 'pct') {
@@ -1840,12 +1851,12 @@ function calcVariant(v, p, globals) {
     }
   });
 
-  const denom = 1 - P_sell - (targetMargin / 100);
-  const totalBaseCost = cogsBase * (1 + P_mfg) + F;
-  const suggested = denom > 0 ? totalBaseCost / denom : totalBaseCost * 4;
+  const denom = Math.max(0.05, 1 - P_sell - (targetMargin / 100));
+  const totalBaseCost = cogsBase * (1 + P_mfg + extra_P_mfg) + F;
+  const suggested = totalBaseCost / denom;
 
   const selling = v.sellingO != null ? parseFloat(v.sellingO) : cleanPrice(suggested);
-  const totalCost = cogsBase * (1 + P_mfg) + F + selling * P_sell;
+  const totalCost = cogsBase * (1 + P_mfg + extra_P_mfg) + F + selling * P_sell;
 
   const netProfit = selling - totalCost;
   const netMargin = selling > 0 ? netProfit / selling : 0;
@@ -1876,7 +1887,8 @@ function calcVariant(v, p, globals) {
     roas: roasCalc,
     adSpend,
     pgCost,
-    codCost: 0
+    codCost: 0,
+    suggested
   };
 }
 
@@ -1989,11 +2001,6 @@ function renderAll() {
   const canEdit = CU.role !== 'user';
   let totalVars = 0, totalMargin = 0, totalROAS = 0;
 
-  const isAdv = pricingViewMode === 'adv';
-  const tableHeaders = isAdv
-    ? `<tr><th>Variant</th><th>Mfg/pc</th><th>Pack/pc</th><th>Total Cost</th><th>Suggested</th><th>Selling Price</th><th>Margin</th><th>Net Profit</th><th>Comp</th>${canEdit?'<th></th>':''}</tr>`
-    : `<tr><th>Variant</th><th>Mfg/pc</th><th>Suggested</th><th>Selling Price</th><th>Margin</th><th>Net Profit</th>${canEdit?'<th></th>':''}</tr>`;
-
   document.getElementById('products-container').innerHTML = prods.map(p => {
     // Ensure product globals are initialized
     p.globals = migrateOrGetGlobals(p.globals_json);
@@ -2001,8 +2008,24 @@ function renderAll() {
     const packComp = p.globals.components.find(c => /pack/i.test(c.name));
     const packDefault = packComp ? parseFloat(packComp.value) || 0 : 0;
 
+    const extrasList = p.extras || [];
+    const extraHeadersHtml = extrasList.map(e => `<th style="background:#fff3bf;color:#495057;border-bottom:1px solid #ffe066">${e.label} (${e.type === 'pct' ? '%' : '₹'})</th>`).join('');
+
+    const tableHeaders = `<tr>
+      <th>Variant</th>
+      <th>Mfg/pc</th>
+      <th>Pack/pc</th>
+      ${extraHeadersHtml}
+      <th>Total Cost</th>
+      <th>Suggested</th>
+      <th>Selling Price</th>
+      <th>Margin</th>
+      <th>Net Profit</th>
+      <th>Comp</th>
+      ${canEdit?'<th></th>':''}
+    </tr>`;
+
     let rows = (p.variants || []).map(v => {
-      // Temporarily compute calculations to get Suggested Price before cleanPrice
       const r = calcVariant(v, p, p.globals);
       totalVars++; totalMargin += r.margin; totalROAS += r.roas;
       const mc = r.margin >= 0.35 ? 'good' : r.margin >= 0.25 ? 'warn' : 'bad';
@@ -2015,6 +2038,13 @@ function renderAll() {
         ? `<input type="text" inputmode="decimal" value="${v.packO != null ? v.packO : packDefault}" style="width:55px${v.packO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','packO',this.value)">`
         : `<span style="font-family:var(--fm)">₹${v.packO != null ? v.packO : packDefault}</span>`;
 
+      const extraCells = extrasList.map(e => {
+        const val = (v.extraO && v.extraO[e.label] != null) ? v.extraO[e.label] : e.amount;
+        return canEdit
+          ? `<td><input type="text" inputmode="decimal" value="${val}" style="width:55px;${v.extraO && v.extraO[e.label] != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVariantExtraOverride('${p.id}','${v.id}','${e.label}',this.value)"></td>`
+          : `<td><span style="font-family:var(--fm)">${e.type === 'pct' ? '' : '₹'}${val}${e.type === 'pct' ? '%' : ''}</span></td>`;
+      }).join('');
+
       const sellingInput = canEdit
         ? `<input type="text" inputmode="decimal" value="${v.sellingO != null ? v.sellingO : r.selling}" style="width:65px${v.sellingO != null ? ';border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','sellingO',this.value)">`
         : `<span class="pill ${mc}">₹${r.selling.toLocaleString('en-IN')}</span>`;
@@ -2024,35 +2054,13 @@ function renderAll() {
         : `<span style="font-family:var(--fm);color:var(--mid)">₹${r.comp.toLocaleString('en-IN')}</span>`;
 
       const netColor = r.netProfit > 0 ? 'var(--green)' : 'var(--red)';
+      const suggestedHtml = `<span style="font-family:var(--fm);color:var(--green);font-weight:600">₹${cleanPrice(r.suggested)}</span>`;
 
-      // Extract raw suggested price from math helper variables
-      const mfgPc = (v.mfgO != null) ? parseFloat(v.mfgO) : (parseFloat(p.mfg_per_pc) || 0);
-      const qty   = p.variant_type === 'bundle' ? (v.qty || 1) : 1;
-      const extras = (p.extras || []).reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
-      const cogsBase = mfgPc * qty + extras;
-
-      let F = 0;
-      let P_mfg = 0;
-      let P_sell = 0;
-      (p.globals.components || []).forEach(c => {
-        let val = parseFloat(c.value) || 0;
-        if (/pack/i.test(c.name) && v.packO != null) val = parseFloat(v.packO);
-        if (c.type === 'flat') F += val;
-        else if (c.type === 'pct') {
-          if (c.applies_to === 'mfg') P_mfg += val / 100;
-          else if (c.applies_to === 'sell') P_sell += val / 100;
-          else P_mfg += val / 100;
-        }
-      });
-      const denom = 1 - P_sell - ((parseFloat(p.globals.target_margin) || 0) / 100);
-      const totalBaseCost = cogsBase * (1 + P_mfg) + F;
-      const suggested = denom > 0 ? totalBaseCost / denom : totalBaseCost * 4;
-      const suggestedHtml = `<span style="font-family:var(--fm);color:var(--green);font-weight:600">₹${cleanPrice(suggested)}</span>`;
-
-      return isAdv ? `<tr>
+      return `<tr>
         <td>${canEdit ? `<input value="${v.name||''}" style="width:85px" onchange="setVF('${p.id}','${v.id}','name',this.value)">` : `<span style="font-family:var(--fm)">${v.name}</span>`}</td>
         <td>${mfgInput}</td>
         <td>${packInput}</td>
+        ${extraCells}
         <td style="font-family:var(--fm);color:var(--mid)">₹${r.effC.toFixed(0)}</td>
         <td>${suggestedHtml}</td>
         <td>${sellingInput}</td>
@@ -2063,27 +2071,13 @@ function renderAll() {
           <button class="btn sm" onclick="openVariantHistory('${activeBrand.id}','${p.id}','${v.id}','${v.name}')" style="padding:4px 6px;font-size:11px;margin-right:2px;background:none;border:1px solid var(--border)" title="History">🕒</button>
           <button class="btn sm danger" onclick="removeVariant('${p.id}','${v.id}')">✕</button>
         </td>` : ''}
-      </tr>` : `<tr>
-        <td>${canEdit ? `<input value="${v.name||''}" style="width:90px" onchange="setVF('${p.id}','${v.id}','name',this.value)">` : `<span style="font-family:var(--fm)">${v.name}</span>`}</td>
-        <td>${mfgInput}</td>
-        <td>${suggestedHtml}</td>
-        <td>${sellingInput}</td>
-        <td><span class="pill ${mc}">${(r.margin*100).toFixed(1)}%</span></td>
-        <td style="font-family:var(--fm);font-weight:600;color:${netColor}">₹${r.netProfit.toFixed(0)}</td>
-        ${canEdit ? `<td>
-          <button class="btn sm" onclick="openVariantHistory('${activeBrand.id}','${p.id}','${v.id}','${v.name}')" style="padding:4px 6px;font-size:11px;margin-right:2px;background:none;border:1px solid var(--border)" title="History">🕒</button>
-          <button class="btn sm danger" onclick="removeVariant('${p.id}','${v.id}')">✕</button>
-        </td>` : ''}
       </tr>`;
     }).join('');
-
-    const extraSum = (p.extras || []).reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
 
     return `<div class="prod-block" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">
       <div class="prod-hd" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         ${canEdit ? `<input class="prod-name-inp" value="${p.name}" onchange="setProdName('${p.id}',this.value)" style="font-weight:800;font-size:14px;border:none;border-bottom:1px dashed var(--border);outline:none;background:transparent;padding:2px 4px">` : `<div class="prod-name-inp" style="pointer-events:none;font-weight:800;font-size:14px">${p.name}</div>`}
         <div style="display:flex;align-items:center;gap:6px">
-          ${extraSum > 0 ? `<span class="pill warn" style="font-size:10px">+₹${extraSum} extras</span>` : ''}
           ${canEdit ? `<button class="btn sm danger" onclick="removeProduct('${p.id}')" style="padding:4px 8px;font-size:11px">✕ Remove</button>` : ''}
         </div>
       </div>
@@ -2119,6 +2113,21 @@ function renderAll() {
           `).join('')}
         </div>
 
+        <!-- Product Extras (Flat/Percentage) List -->
+        ${extrasList.length > 0 ? `
+        <div style="font-weight:700;font-size:12px;color:var(--dark);margin:10px 0 8px 0;border-top:1px dashed var(--border);padding-top:8px">Product Custom Extras (Columns)</div>
+        <div class="extras-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+          ${extrasList.map(e => `
+            <div class="component-badge" style="display:inline-flex;align-items:center;background:#fff9db;border:1px solid #ffe3e3;border-radius:6px;padding:4px 8px;font-size:11px;gap:6px">
+              <span style="font-weight:700;color:#92400e">★ ${e.label}</span>
+              <span style="font-size:10px;color:var(--mid)">(${e.type === 'pct' ? 'Mfg %' : 'Flat ₹'})</span>
+              <input type="text" inputmode="decimal" value="${e.amount || 0}" onchange="updateProductExtraAmount('${p.id}', '${e.label}', this.value)" style="width:40px;border:none;border-bottom:1px solid var(--border);text-align:center;font-size:11px;font-weight:600;outline:none;padding:0;background:transparent">
+              ${canEdit ? `<button onclick="removeProductExtra('${p.id}', '${e.label}')" style="border:none;background:transparent;color:var(--red);cursor:pointer;padding:0 2px;font-size:10px;font-weight:800;margin-left:4px">✕</button>` : ''}
+            </div>
+          `).join('')}
+        </div>
+        ` : ''}
+
         ${canEdit ? `
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-top:1px dashed var(--border);padding-top:8px;margin-top:4px">
           <input type="text" id="new-c-name-${p.id}" placeholder="Component Name (e.g. Shipping)" style="flex:1;min-width:140px;height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 8px;outline:none">
@@ -2143,7 +2152,7 @@ function renderAll() {
       </table></div>
       ${canEdit ? `<div style="margin-top:12px;display:flex;gap:6px">
         <button class="btn sm" onclick="addVariant('${p.id}')" style="padding:6px 12px;font-size:11px">+ Add Variant</button>
-        <button class="btn sm" onclick="addExtra('${p.id}')" style="padding:6px 12px;font-size:11px">+ Extra Charge</button>
+        <button class="btn sm" onclick="addExtra('${p.id}')" style="padding:6px 12px;font-size:11px">+ Extra Column Charge</button>
       </div>` : ''}
     </div>`;
   }).join('');
@@ -2257,12 +2266,55 @@ function addProduct() {
 }
 function removeProduct(pid) { prods = prods.filter(p => p.id !== pid); renderAll(); deferPricingSave(); }
 function addExtra(pid) {
-  const label = prompt('Extra charge label (e.g. Zipper):'); if (!label) return;
-  const amount = parseFloat(prompt('Amount in ₹:')); if (isNaN(amount)) return;
-  const p = prods.find(p => p.id === pid); if (!p) return;
+  const label = prompt('Extra charge name (e.g. Zipper):');
+  if (!label) return;
+  const isPct = confirm('Is this a percentage charge? (Cancel for Flat ₹, OK for Percentage % of Mfg cost)');
+  const type = isPct ? 'pct' : 'flat';
+  const amount = parseFloat(prompt(isPct ? 'Enter percentage value (%):' : 'Enter flat amount (₹):'));
+  if (isNaN(amount)) return;
+  const p = prods.find(p => p.id === pid);
+  if (!p) return;
   if (!p.extras) p.extras = [];
-  p.extras.push({ label, amount });
-  renderAll(); deferPricingSave();
+  p.extras.push({ label, type, amount });
+  renderAll();
+  deferPricingSave();
+}
+
+function updateProductExtraAmount(pid, label, val) {
+  const p = prods.find(p => p.id === pid);
+  if (p && p.extras) {
+    const e = p.extras.find(x => x.label === label);
+    if (e) {
+      e.amount = parseFloat(val) || 0;
+      renderAll();
+      deferPricingSave();
+    }
+  }
+}
+
+function removeProductExtra(pid, label) {
+  const p = prods.find(p => p.id === pid);
+  if (p && p.extras) {
+    p.extras = p.extras.filter(x => x.label !== label);
+    (p.variants || []).forEach(v => {
+      if (v.extraO) delete v.extraO[label];
+    });
+    renderAll();
+    deferPricingSave();
+  }
+}
+
+function setVariantExtraOverride(pid, vid, label, val) {
+  const p = prods.find(p => p.id === pid); if (!p) return;
+  const v = p.variants.find(v => v.id === vid); if (!v) return;
+  if (!v.extraO) v.extraO = {};
+  if (val === '') {
+    delete v.extraO[label];
+  } else {
+    v.extraO[label] = parseFloat(val) || 0;
+  }
+  renderAll();
+  deferPricingSave();
 }
 async function deleteBrand(slug, name) {
   if (!confirm(`Delete brand "${name}"?\n\nThis will permanently remove all budget months, daily data, and pricing data for this brand. Reports are kept.\n\nThis cannot be undone.`)) return;
@@ -4090,32 +4142,7 @@ function ucfirst(str) {
 }
 
 // ─── REVAMPED PRICING FRONTEND ACTIONS ──────────────────────────────────────
-function setPricingViewMode(mode) {
-  pricingViewMode = mode;
-  document.getElementById('mode-std').classList.toggle('active', mode === 'std');
-  document.getElementById('mode-adv').classList.toggle('active', mode === 'adv');
-  
-  // Highlight active selector beautifully
-  const stdBtn = document.getElementById('mode-std');
-  const advBtn = document.getElementById('mode-adv');
-  if (mode === 'std') {
-    stdBtn.style.background = 'var(--bg)';
-    stdBtn.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
-    stdBtn.style.color = 'var(--fg)';
-    advBtn.style.background = 'transparent';
-    advBtn.style.boxShadow = 'none';
-    advBtn.style.color = 'var(--mid)';
-  } else {
-    advBtn.style.background = 'var(--bg)';
-    advBtn.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
-    advBtn.style.color = 'var(--fg)';
-    stdBtn.style.background = 'transparent';
-    stdBtn.style.boxShadow = 'none';
-    stdBtn.style.color = 'var(--mid)';
-  }
-  
-  renderAll();
-}
+function setPricingViewMode(mode) {}
 
 function renderCatalogBrands() {
   const grid = document.getElementById('catalog-brand-grid');
@@ -4223,7 +4250,7 @@ function renderCatalogProducts() {
   grid.innerHTML = filtered.map(p => {
     const extraSum = (p.extras || []).reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
     const extraBadges = (p.extras || []).map(e =>
-      `<span class="pill warn" style="font-size:10px;padding:2px 6px;margin:2px 0">${e.label}: ₹${e.amount}</span>`
+      `<span class="pill warn" style="font-size:10px;padding:2px 6px;margin:2px 0">${e.label}: ${e.type === 'pct' ? '' : '₹'}${e.amount}${e.type === 'pct' ? '%' : ''}</span>`
     ).join(' ');
 
     const componentsHtml = (p.globals.components || []).map(c =>
