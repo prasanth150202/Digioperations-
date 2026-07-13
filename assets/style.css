@@ -204,13 +204,13 @@ html,body{height:100%;font-family:var(--fh);background:var(--off);color:var(--bo
 .pill.good{background:var(--greeng);color:#065f46}
 .pill.warn{background:rgba(245,158,11,.1);color:#92400E}
 .pill.bad{background:var(--redg);color:#991b1b}
-.globals-card{background:#fff;border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
-.globals-hd{display:flex;align-items:center;gap:8px;padding:12px 16px;cursor:pointer;transition:background .15s}
-.globals-hd:hover{background:var(--off)}
-.globals-hd-title{font-size:13px;font-weight:700;color:var(--dark);flex:1}
-.globals-hd-note{font-size:10px;color:var(--mid)}
-.globals-body{display:none;padding:14px 16px;border-top:1px solid var(--border)}
-.globals-body.open{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.prod-cost-settings{background:var(--off);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.01)}
+.components-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.component-badge{display:inline-flex;align-items:center;background:#fff;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;gap:6px;transition:all 0.15s;box-shadow:0 1px 2px rgba(0,0,0,0.02)}
+.component-badge:hover{border-color:var(--blue);box-shadow:0 2px 4px rgba(0,0,0,0.05)}
+.component-badge select{border:none;background:transparent;font-size:10px;color:var(--mid);outline:none;cursor:pointer;padding:0}
+.component-badge input{width:40px;border:none;border-bottom:1px solid var(--border);text-align:center;font-size:11px;font-weight:600;outline:none;padding:0}
+.component-badge input:focus{border-bottom-color:var(--blue);background:none}
 
 /* ── ADMIN ── */
 .admin-table{width:100%;border-collapse:collapse;font-size:13px}

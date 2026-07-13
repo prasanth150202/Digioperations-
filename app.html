@@ -129,7 +129,10 @@
             <button class="toggle-btn" id="mode-adv" onclick="setPricingViewMode('adv')" style="border:none;border-radius:18px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:var(--mid);transition:all 0.2s"> Manager</button>
           </div>
           
-          <div class="chip save" id="save-chip" style="display:none;margin-left:auto">&#10004; Saved</div>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+            <div class="chip save" id="save-chip" style="display:none">&#10004; Saved</div>
+            <button class="btn sm" id="pricing-sync-btn" onclick="savePricingNow()" style="padding:6px 12px;font-size:11px;font-weight:600;display:none">Sync Now</button>
+          </div>
         </div>
         <div class="sum-bar">
           <div class="sum-item"><div class="sum-val" id="sum-prods">0</div><div class="sum-lbl">Products</div></div>
@@ -141,40 +144,11 @@
             <button class="btn sm primary" id="add-prod-btn" onclick="addProduct()" style="display:none">+ Add Product</button>
           </div>
         </div>
-        <div class="globals-card">
-          <div class="globals-hd">
-            <span class="globals-hd-title"> Global Cost Assumptions</span>
-            <span class="globals-hd-note">Applied to all products &middot; Edit any value to recalculate</span>
-          </div>
-          <div class="globals-body open" id="globals-body">
-            <div class="field"><label>Branding (&#8377;)</label><input type="text" inputmode="decimal" id="g-brand" value="30" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>Photography (&#8377;)</label><input type="text" inputmode="decimal" id="g-photo" value="15" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>Packaging (&#8377;)</label><input type="text" inputmode="decimal" id="g-pack" value="20" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>Shipping (&#8377;)</label><input type="text" inputmode="decimal" id="g-ship" value="70" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>Operations (&#8377;)</label><input type="text" inputmode="decimal" id="g-ops" value="25" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>Gift Wrap (&#8377;)</label><input type="text" inputmode="decimal" id="g-gw" value="0" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>RTO Rate (%)</label><input type="text" inputmode="decimal" id="g-rto" value="5" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>COD Rate (%)</label><input type="text" inputmode="decimal" id="g-cod-rate" value="50" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>COD Fee (&#8377;)</label><input type="text" inputmode="decimal" id="g-cod-fee" value="35" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>PG Fee (%)</label><input type="text" inputmode="decimal" id="g-pg-fee" value="1.8" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field"><label>Target ROAS</label><input type="text" inputmode="decimal" id="g-roas" value="3" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            <div class="field">
-              <label>Discount Type</label>
-              <select id="g-disc-type" onchange="deferSaveAndRender()" style="width:100%;height:32px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:0 8px;outline:none;background:#fff;color:var(--fg)">
-                <option value="pct" selected>Percentage (%)</option>
-                <option value="flat">Flat &#8377;</option>
-              </select>
-            </div>
-            <div class="field"><label>Discount Value</label><input type="text" inputmode="decimal" id="g-disc" value="0" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1'); deferSaveAndRender()"></div>
-            
-            <!-- Global Extra Charges Container -->
-            <div id="global-extras-container" style="grid-column:1/-1;display:flex;flex-direction:column;gap:8px;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                <span style="font-weight:700;font-size:12px;color:var(--dark)">Global Extra Charges</span>
-                <button class="btn sm" onclick="addGlobalExtra()" style="padding:4px 8px;font-size:11px;font-weight:600">+ Add Global Extra</button>
-              </div>
-              <div id="global-extras-list" style="display:flex;flex-direction:column;gap:6px"></div>
-            </div>
+        <div id="pricing-draft-banner" style="display:none;margin-bottom:16px;padding:12px 16px;border:1px solid var(--border);background:#fff9db;border-radius:10px;font-size:12px;color:#5c940d;display:none;justify-content:space-between;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,0.02)">
+          <span style="font-weight:600;display:flex;align-items:center;gap:6px">⚠️ You have unsaved changes from a previous session (local draft).</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn sm" onclick="restorePricingDraft()" style="padding:4px 8px;font-size:11px;background:#5c940d;color:#fff;border:none">Restore Draft</button>
+            <button class="btn sm secondary" onclick="discardPricingDraft()" style="padding:4px 8px;font-size:11px">Discard</button>
           </div>
         </div>
         <div id="products-container"></div>
