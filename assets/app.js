@@ -2209,24 +2209,10 @@ function renderAll() {
           `).join('')}
         </div>
 
-        <!-- Product Extras (Flat/Percentage) List -->
-        ${extrasList.length > 0 ? `
-        <div style="font-weight:700;font-size:12px;color:var(--dark);margin:10px 0 8px 0;border-top:1px dashed var(--border);padding-top:8px">Product Custom Extras (Columns)</div>
-        <div class="extras-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-          ${extrasList.map(e => `
-            <div class="component-badge" style="display:inline-flex;align-items:center;background:#fff9db;border:1px solid #ffe3e3;border-radius:6px;padding:4px 8px;font-size:11px;gap:6px">
-              <span style="font-weight:700;color:#92400e">★ ${e.label}</span>
-              <span style="font-size:10px;color:var(--mid)">(${e.type === 'pct' ? 'Mfg %' : 'Flat ₹'})</span>
-              <input type="text" inputmode="decimal" value="${e.amount || 0}" onchange="updateProductExtraAmount('${p.id}', '${e.label}', this.value)" style="width:40px;border:none;border-bottom:1px solid var(--border);text-align:center;font-size:11px;font-weight:600;outline:none;padding:0;background:transparent">
-              ${canEdit ? `<button onclick="removeProductExtra('${p.id}', '${e.label}')" style="border:none;background:transparent;color:var(--red);cursor:pointer;padding:0 2px;font-size:10px;font-weight:800;margin-left:4px">✕</button>` : ''}
-            </div>
-          `).join('')}
-        </div>
-        ` : ''}
-
         ${canEdit ? `
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-top:1px dashed var(--border);padding-top:8px;margin-top:4px">
-          <input type="text" id="new-c-name-${p.id}" placeholder="Component Name (e.g. Shipping)" style="flex:1;min-width:140px;height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 8px;outline:none">
+          <span style="font-size:11px;font-weight:600;color:var(--mid)">Add Markup Component:</span>
+          <input type="text" id="new-c-name-${p.id}" placeholder="Name (e.g. Shipping)" style="flex:1;min-width:120px;height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 8px;outline:none">
           <select id="new-c-applies-${p.id}" style="height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 4px;outline:none;background:#fff;color:var(--fg)">
             <option value="fixed">Fixed Per Order</option>
             <option value="mfg">% of Mfg Cost (COGS)</option>
@@ -2237,7 +2223,34 @@ function renderAll() {
             <option value="pct">Percentage (%)</option>
           </select>
           <input type="text" id="new-c-val-${p.id}" placeholder="Value" style="width:50px;height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 8px;outline:none">
-          <button class="btn sm primary" onclick="addProductComponent('${p.id}')" style="height:28px;padding:0 12px;font-size:11px;font-weight:600">+ Add</button>
+          <button class="btn sm primary" onclick="addProductComponent('${p.id}')" style="height:28px;padding:0 12px;font-size:11px;font-weight:600">+ Add Markup</button>
+        </div>
+        ` : ''}
+
+        <!-- Product Extras (Flat/Percentage) List & Inline Form -->
+        <div style="font-weight:700;font-size:12px;color:var(--dark);margin:10px 0 8px 0;border-top:1px dashed var(--border);padding-top:8px">Product Custom Extras (Columns)</div>
+        <div class="extras-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+          ${extrasList.length === 0 ? `<span style="font-size:11px;color:var(--mid)">No custom extra columns added yet.</span>` : ''}
+          ${extrasList.map(e => `
+            <div class="component-badge" style="display:inline-flex;align-items:center;background:#fff9db;border:1px solid #ffe3e3;border-radius:6px;padding:4px 8px;font-size:11px;gap:6px">
+              <span style="font-weight:700;color:#92400e">★ ${e.label}</span>
+              <span style="font-size:10px;color:var(--mid)">(${e.type === 'pct' ? 'Mfg %' : 'Flat ₹'})</span>
+              <input type="text" inputmode="decimal" value="${e.amount || 0}" onchange="updateProductExtraAmount('${p.id}', '${e.label}', this.value)" style="width:40px;border:none;border-bottom:1px solid var(--border);text-align:center;font-size:11px;font-weight:600;outline:none;padding:0;background:transparent">
+              ${canEdit ? `<button onclick="removeProductExtra('${p.id}', '${e.label}')" style="border:none;background:transparent;color:var(--red);cursor:pointer;padding:0 2px;font-size:10px;font-weight:800;margin-left:4px">✕</button>` : ''}
+            </div>
+          `).join('')}
+        </div>
+
+        ${canEdit ? `
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border)">
+          <span style="font-size:11px;font-weight:600;color:var(--mid)">Add Extra Column:</span>
+          <input type="text" id="new-ex-name-${p.id}" placeholder="Name (e.g. Printing)" style="flex:1;min-width:120px;height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 8px;outline:none">
+          <select id="new-ex-type-${p.id}" style="height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 4px;outline:none;background:#fff;color:var(--fg)">
+            <option value="flat">Flat (₹)</option>
+            <option value="pct">Percentage (%)</option>
+          </select>
+          <input type="text" id="new-ex-val-${p.id}" placeholder="Value" style="width:50px;height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 8px;outline:none">
+          <button class="btn sm primary" onclick="addProductExtraInline('${p.id}')" style="height:28px;padding:0 12px;font-size:11px;font-weight:600">+ Add Column</button>
         </div>
         ` : ''}
       </div>
@@ -2248,7 +2261,6 @@ function renderAll() {
       </table></div>
       ${canEdit ? `<div style="margin-top:12px;display:flex;gap:6px">
         <button class="btn sm" onclick="addVariant('${p.id}')" style="padding:6px 12px;font-size:11px">+ Add Variant</button>
-        <button class="btn sm" onclick="addExtra('${p.id}')" style="padding:6px 12px;font-size:11px">+ Extra Column Charge</button>
       </div>` : ''}
     </div>`;
   }).join('');
@@ -2361,17 +2373,30 @@ function addProduct() {
   deferPricingSave();
 }
 function removeProduct(pid) { prods = prods.filter(p => p.id !== pid); renderAll(); deferPricingSave(); }
-function addExtra(pid) {
-  const label = prompt('Extra charge name (e.g. Zipper):');
-  if (!label) return;
-  const isPct = confirm('Is this a percentage charge? (Cancel for Flat ₹, OK for Percentage % of Mfg cost)');
-  const type = isPct ? 'pct' : 'flat';
-  const amount = parseFloat(prompt(isPct ? 'Enter percentage value (%):' : 'Enter flat amount (₹):'));
-  if (isNaN(amount)) return;
+function addProductExtraInline(pid) {
   const p = prods.find(p => p.id === pid);
   if (!p) return;
   if (!p.extras) p.extras = [];
+
+  const nameEl = document.getElementById(`new-ex-name-${pid}`);
+  const typeEl = document.getElementById(`new-ex-type-${pid}`);
+  const valEl = document.getElementById(`new-ex-val-${pid}`);
+
+  const label = nameEl?.value.trim() || 'Custom Extra';
+  const type = typeEl?.value || 'flat';
+  const amount = parseFloat(valEl?.value) || 0;
+
+  // Prevent duplicate names
+  if (p.extras.some(e => e.label.toLowerCase() === label.toLowerCase())) {
+    showToast('An extra column with this name already exists!', 'error');
+    return;
+  }
+
   p.extras.push({ label, type, amount });
+
+  if (nameEl) nameEl.value = '';
+  if (valEl) valEl.value = '';
+
   renderAll();
   deferPricingSave();
 }
