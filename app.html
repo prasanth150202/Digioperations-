@@ -132,7 +132,7 @@
         <div class="sum-bar">
           <div class="sum-item"><div class="sum-val" id="sum-prods">0</div><div class="sum-lbl">Products</div></div>
           <div class="sum-item"><div class="sum-val" id="sum-vars">0</div><div class="sum-lbl">Variants</div></div>
-          <div class="sum-item"><div class="sum-val" id="sum-margin">0%</div><div class="sum-lbl">Avg Margin</div></div>
+          <div class="sum-item" style="display:none"><div class="sum-val" id="sum-margin">0%</div><div class="sum-lbl">Avg Margin</div></div>
           <div class="sum-item"><div class="sum-val" id="sum-roas">0x</div><div class="sum-lbl">Est. ROAS</div></div>
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
             <button class="btn sm" onclick="exportExcel()"> Export Excel</button>
@@ -180,7 +180,7 @@
             <div style="width:36px;height:36px;background:rgba(43,78,255,0.1);color:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px"></div>
             <div><div style="font-size:18px;font-weight:700;color:var(--fg)" id="cat-sum-vars">0</div><div style="font-size:11px;color:var(--mid)">Total Variants</div></div>
           </div>
-          <div class="card" style="padding:12px;display:flex;align-items:center;gap:12px;margin-bottom:0">
+          <div class="card" style="padding:12px;display:none;align-items:center;gap:12px;margin-bottom:0">
             <div style="width:36px;height:36px;background:rgba(245,158,11,0.1);color:var(--amber);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px"></div>
             <div><div style="font-size:18px;font-weight:700;color:var(--fg)" id="cat-sum-margin">0%</div><div style="font-size:11px;color:var(--mid)">Average Gross Margin</div></div>
           </div>

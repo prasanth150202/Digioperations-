@@ -1820,22 +1820,11 @@ function calcVariant(v, p, globals) {
     beRoas = targetRoas;
   }
 
-  // Calculate Suggested Price (what is suggested based on targetRoas)
-  const sugDenom = targetRoas * (1 - totalVarPct) - 1;
-  const sugSafeDenom = Math.max(0.05, sugDenom);
-  const suggested = (targetRoas * adjBaseCost) / sugSafeDenom;
-
   // Effective Cost including ad spend
   const adSpend = beRoas > 0 ? selling / beRoas : 0;
   const taxCost = (selling * taxRate) / 100;
   const pgCost = (selling * pgRate) / 100;
   const totalCost = adjBaseCost + taxCost + pgCost + adSpend;
-
-  const netProfit = selling - totalCost;
-  const netMargin = selling > 0 ? netProfit / selling : 0;
-
-  const grossProfit = selling - adjBaseCost;
-  const grossMargin = selling > 0 ? grossProfit / selling : 0;
 
   const comp = v.compO != null ? parseFloat(v.compO) : cleanPrice(selling * 1.5);
 
@@ -1847,11 +1836,6 @@ function calcVariant(v, p, globals) {
     effS: selling,
     selling,
     comp,
-    grossProfit,
-    profit: grossProfit,
-    netProfit,
-    netMargin,
-    margin: grossMargin,
     roas: beRoas,
     adSpend,
     pgCost,
@@ -1859,7 +1843,7 @@ function calcVariant(v, p, globals) {
     taxRate,
     pgRate,
     rtoRate,
-    suggested
+    shipCost
   };
 }
 
@@ -1970,7 +1954,7 @@ async function loadBrandProducts() {
 function renderAll() {
   if (!activeBrand) return;
   const canEdit = CU.role !== 'user';
-  let totalVars = 0, totalMargin = 0, totalROAS = 0;
+  let totalVars = 0, totalROAS = 0;
 
   document.getElementById('products-container').innerHTML = prods.map(p => {
     // Ensure product globals are initialized
@@ -2000,16 +1984,13 @@ function renderAll() {
       <th>PG Fee %</th>
       <th>Breakeven ROAS</th>
       <th>Selling Price</th>
-      <th>Margin</th>
-      <th>Net Profit</th>
       <th>Comp</th>
       ${canEdit?'<th></th>':''}
     </tr>`;
 
     let rows = (p.variants || []).map(v => {
       const r = calcVariant(v, p, p.globals);
-      totalVars++; totalMargin += r.margin; totalROAS += r.roas;
-      const mc = r.margin >= 0.35 ? 'good' : r.margin >= 0.25 ? 'warn' : 'bad';
+      totalVars++; totalROAS += r.roas;
       
       const mfgInput = canEdit
         ? `<input type="text" inputmode="decimal" value="${v.mfgO != null ? v.mfgO : p.mfg_per_pc}" style="width:55px;${v.mfgO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','mfgO',this.value)">`
@@ -2055,13 +2036,11 @@ function renderAll() {
 
       const sellingInput = canEdit
         ? `<input type="text" inputmode="decimal" value="${v.sellingO != null ? v.sellingO : r.selling}" style="width:55px;${v.sellingO != null ? 'border-color:var(--primary);font-weight:600' : 'background:#f1f3f5;color:var(--mid)'}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','sellingO',this.value)" title="${v.sellingO != null ? 'Fixed Selling Price' : 'Suggested Selling Price (Target ROAS is fixed)'}">`
-        : `<span class="pill ${mc}">₹${r.selling.toLocaleString('en-IN')}</span>`;
+        : `<span style="font-family:var(--fm);font-weight:600">₹${r.selling.toLocaleString('en-IN')}</span>`;
 
       const compInput = canEdit
         ? `<input type="text" inputmode="decimal" value="${v.compO != null ? v.compO : r.comp.toFixed(0)}" style="width:55px;${v.compO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','compO',this.value)">`
         : `<span style="font-family:var(--fm);color:var(--mid)">₹${r.comp.toLocaleString('en-IN')}</span>`;
-
-      const netColor = r.netProfit > 0 ? 'var(--green)' : 'var(--red)';
 
       return `<tr>
         <td>${canEdit ? `<input value="${v.name||''}" style="width:85px" onchange="setVF('${p.id}','${v.id}','name',this.value)">` : `<span style="font-family:var(--fm)">${v.name}</span>`}</td>
@@ -2077,8 +2056,6 @@ function renderAll() {
         ${pgInput}
         ${roasInput}
         <td>${sellingInput}</td>
-        <td><span class="pill ${mc}">${(r.margin*100).toFixed(1)}%</span></td>
-        <td style="font-family:var(--fm);font-weight:600;color:${netColor}">₹${r.netProfit.toFixed(0)}</td>
         <td>${compInput}</td>
         ${canEdit ? `<td>
           <button class="btn sm" onclick="openVariantHistory('${activeBrand.id}','${p.id}','${v.id}','${v.name}')" style="padding:4px 6px;font-size:11px;margin-right:2px;background:none;border:1px solid var(--border)" title="History">🕒</button>
@@ -2114,11 +2091,7 @@ function renderAll() {
 
   document.getElementById('sum-prods').textContent = prods.length;
   document.getElementById('sum-vars').textContent = totalVars;
-  const avgM = totalVars ? totalMargin / totalVars : 0;
   const avgR = totalVars ? totalROAS / totalVars : 0;
-  const mv = document.getElementById('sum-margin');
-  mv.textContent = (avgM * 100).toFixed(1) + '%';
-  mv.style.color = avgM >= 0.35 ? 'var(--green)' : avgM >= 0.25 ? 'var(--amber)' : 'var(--red)';
   document.getElementById('sum-roas').textContent = avgR.toFixed(1) + 'x';
 }
 
@@ -2233,12 +2206,10 @@ function addProductExtraInline(pid) {
   if (!p.extras) p.extras = [];
 
   const nameEl = document.getElementById(`new-ex-name-${pid}`);
-  const typeEl = document.getElementById(`new-ex-type-${pid}`);
   const valEl = document.getElementById(`new-ex-val-${pid}`);
 
   const label = nameEl?.value.trim() || 'Custom Extra';
-  const type = typeEl?.value || 'flat';
-  const amount = parseFloat(valEl?.value) || 0;
+  const amount = valEl?.value.trim() || '0';
 
   // Prevent duplicate names
   if (p.extras.some(e => e.label.toLowerCase() === label.toLowerCase())) {
@@ -2246,7 +2217,7 @@ function addProductExtraInline(pid) {
     return;
   }
 
-  p.extras.push({ label, type, amount });
+  p.extras.push({ label, amount });
 
   if (nameEl) nameEl.value = '';
   if (valEl) valEl.value = '';
@@ -4217,23 +4188,15 @@ function renderCatalogProducts() {
     grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-icon">🔍</div><div class="empty-title">No matching products found</div></div>';
     document.getElementById('cat-sum-prods').textContent = 0;
     document.getElementById('cat-sum-vars').textContent = 0;
-    document.getElementById('cat-sum-margin').textContent = '0%';
     return;
   }
 
-  let totalVars = 0, totalMargin = 0;
+  let totalVars = 0;
 
   grid.innerHTML = filtered.map(p => {
-    const extraSum = (p.extras || []).reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
     const extraBadges = (p.extras || []).map(e =>
-      `<span class="pill warn" style="font-size:10px;padding:2px 6px;margin:2px 0">${e.label}: ${e.type === 'pct' ? '' : '₹'}${e.amount}${e.type === 'pct' ? '%' : ''}</span>`
+      `<span class="pill warn" style="font-size:10px;padding:2px 6px;margin:2px 0">${e.label}: ${e.amount}</span>`
     ).join(' ');
-
-    const componentsHtml = (p.globals.components || []).map(c =>
-      `<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--off);border:1px solid var(--border);color:var(--mid);margin:2px 0;display:inline-block">${c.name}: ${c.type === 'flat' ? '₹' : ''}${c.value}${c.type === 'pct' ? '%' : ''}</span>`
-    ).join(' ');
-
-    const targetMarginHtml = `<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:#eef7ff;border:1px solid #d0e8ff;color:#007bff;margin:2px 0;display:inline-block;font-weight:600">Target Margin: ${p.globals.target_margin || 0}%</span>`;
 
     const variantsHtml = p.variants.map(v => {
       const selling   = v._selling   || 0;
@@ -4244,12 +4207,8 @@ function renderCatalogProducts() {
       const adjC      = v._adjC      || 0;
 
       totalVars++;
-      totalMargin += margin;
 
-      const mc       = margin >= 0.35 ? 'good' : margin >= 0.25 ? 'warn' : 'bad';
-      const mColor   = margin >= 0.35 ? 'var(--green)' : margin >= 0.25 ? 'var(--amber)' : 'var(--red)';
-      const netColor = netProfit > 0 ? 'var(--green)' : 'var(--red)';
-      const copyText = `${p.name} - ${v.name} | MRP: ₹${comp.toFixed(0)} | Selling Price: ₹${selling} | Gross Margin: ${(margin*100).toFixed(1)}%`;
+      const copyText = `${p.name} - ${v.name} | MRP: ₹${comp.toFixed(0)} | Selling Price: ₹${selling}`;
 
       return `
         <div class="catalog-variant-row" style="margin-top:8px">
@@ -4263,12 +4222,9 @@ function renderCatalogProducts() {
           <div class="catalog-variant-prices">
             <span class="catalog-price-tag selling">₹${selling.toLocaleString('en-IN')}</span>
             <span class="catalog-price-tag comp">₹${comp.toLocaleString('en-IN')}</span>
-            <span class="pill ${mc}" style="font-size:10px;margin-left:auto">${(margin*100).toFixed(1)}% gross</span>
           </div>
           <div class="catalog-metrics">
             <span class="catalog-metric-item">Adj Cost: <em>₹${adjC.toFixed(0)}</em></span>
-            <span class="catalog-metric-item">Gross Profit: <em style="color:${mColor}">₹${profit.toFixed(0)}</em></span>
-            <span class="catalog-metric-item">Net (after ads): <em style="color:${netColor}">₹${netProfit.toFixed(0)}</em></span>
           </div>
         </div>`;
     }).join('');
@@ -4281,9 +4237,7 @@ function renderCatalogProducts() {
         </div>
         <div class="catalog-card-body">
           <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
-            ${targetMarginHtml}
-            ${componentsHtml}
-            ${extraSum > 0 ? extraBadges : ''}
+            ${extraBadges}
           </div>
           ${variantsHtml}
         </div>
@@ -4292,10 +4246,6 @@ function renderCatalogProducts() {
 
   document.getElementById('cat-sum-prods').textContent = filtered.length;
   document.getElementById('cat-sum-vars').textContent = totalVars;
-  const avgMarginVal = totalVars ? (totalMargin / totalVars) * 100 : 0;
-  const avgMargEl = document.getElementById('cat-sum-margin');
-  avgMargEl.textContent = avgMarginVal.toFixed(1) + '%';
-  avgMargEl.style.color = avgMarginVal >= 35 ? 'var(--green)' : avgMarginVal >= 25 ? 'var(--amber)' : 'var(--red)';
 }
 
 function filterCatalog() {
