@@ -2077,7 +2077,7 @@ function renderAll() {
       <th>Adj Cost</th>
       <th>Tax %</th>
       <th>PG Fee %</th>
-      <th>Target ROAS</th>
+      <th>Breakeven ROAS</th>
       <th>Suggested</th>
       <th>Selling Price</th>
       <th>Margin</th>
@@ -2109,7 +2109,7 @@ function renderAll() {
       const baseCostHtml = `<td style="font-family:var(--fm);color:var(--mid)">₹${r.baseCost.toFixed(0)}</td>`;
 
       const rtoComp = p.globals.components.find(c => /rto/i.test(c.name));
-      const rtoDefault = rtoComp ? parseFloat(rtoComp.value) || 0 : 0;
+      const rtoDefault = rtoComp ? parseFloat(rtoComp.value) || 0 : 15;
       const rtoInput = canEdit
         ? `<td><input type="text" inputmode="decimal" value="${v.rtoO != null ? v.rtoO : rtoDefault}" style="width:45px;${v.rtoO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','rtoO',this.value)"></td>`
         : `<td><span style="font-family:var(--fm)">${v.rtoO != null ? v.rtoO : rtoDefault}%</span></td>`;
@@ -2118,26 +2118,27 @@ function renderAll() {
       const adjCostHtml = `<td style="font-family:var(--fm);color:var(--mid);font-weight:600">₹${r.adjC.toFixed(0)}</td>`;
 
       const taxComp = p.globals.components.find(c => /tax|gst|vat/i.test(c.name));
-      const taxDefault = taxComp ? parseFloat(taxComp.value) || 0 : 0;
+      const taxDefault = taxComp ? parseFloat(taxComp.value) || 0 : 18;
       const taxInput = canEdit
         ? `<td><input type="text" inputmode="decimal" value="${v.taxO != null ? v.taxO : taxDefault}" style="width:45px;${v.taxO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','taxO',this.value)"></td>`
         : `<td><span style="font-family:var(--fm)">${v.taxO != null ? v.taxO : taxDefault}%</span></td>`;
 
       const pgComp = p.globals.components.find(c => /pg|pay|fee|gate/i.test(c.name));
-      const pgDefault = pgComp ? parseFloat(pgComp.value) || 0 : 0;
+      const pgDefault = pgComp ? parseFloat(pgComp.value) || 0 : 2;
       const pgInput = canEdit
         ? `<td><input type="text" inputmode="decimal" value="${v.pgO != null ? v.pgO : pgDefault}" style="width:45px;${v.pgO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','pgO',this.value)"></td>`
         : `<td><span style="font-family:var(--fm)">${v.pgO != null ? v.pgO : pgDefault}%</span></td>`;
 
       const targetRoas = v.beRoasO != null ? parseFloat(v.beRoasO) : (parseFloat(p.globals.target_margin) < 10 ? parseFloat(p.globals.target_margin) : 3.0);
+      const roasValToShow = v.sellingO != null ? r.roas.toFixed(2) : (v.beRoasO != null ? v.beRoasO : targetRoas.toFixed(1));
       const roasInput = canEdit
-        ? `<td><input type="text" inputmode="decimal" value="${v.beRoasO != null ? v.beRoasO : targetRoas.toFixed(1)}" style="width:45px;${v.beRoasO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','beRoasO',this.value)"></td>`
+        ? `<td><input type="text" inputmode="decimal" value="${roasValToShow}" style="width:45px;${v.sellingO != null ? 'background:#e6fcf5;border-color:var(--green);font-weight:600' : (v.beRoasO != null ? 'border-color:var(--primary)' : '')}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','beRoasO',this.value)" title="${v.sellingO != null ? 'Calculated Breakeven ROAS (Selling Price is fixed)' : 'Target ROAS (Selling Price is auto-calculated)'}"></td>`
         : `<td><span style="font-family:var(--fm)">${r.roas.toFixed(2)}x</span></td>`;
 
       const suggestedHtml = `<td><span style="font-family:var(--fm);color:var(--green);font-weight:600">₹${cleanPrice(r.suggested)}</span></td>`;
 
       const sellingInput = canEdit
-        ? `<input type="text" inputmode="decimal" value="${v.sellingO != null ? v.sellingO : r.selling}" style="width:55px;${v.sellingO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','sellingO',this.value)">`
+        ? `<input type="text" inputmode="decimal" value="${v.sellingO != null ? v.sellingO : r.selling}" style="width:55px;${v.sellingO != null ? 'border-color:var(--primary);font-weight:600' : 'background:#f1f3f5;color:var(--mid)'}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','sellingO',this.value)" title="${v.sellingO != null ? 'Fixed Selling Price' : 'Suggested Selling Price (Target ROAS is fixed)'}">`
         : `<span class="pill ${mc}">₹${r.selling.toLocaleString('en-IN')}</span>`;
 
       const compInput = canEdit
@@ -2180,9 +2181,12 @@ function renderAll() {
 
       <!-- Cost Components Editor Panel -->
       <div class="prod-cost-settings" style="background:var(--off);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-weight:700;font-size:12px;color:var(--dark)">Cost & Markup Components</span>
-          <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div>
+            <span style="font-weight:700;font-size:12px;color:var(--dark)">Background Cost Components</span>
+            <span style="font-size:10px;color:var(--mid);display:block;margin-top:2px">Background costs and parameters (e.g. Shipping, Packaging, general expenses) used to calculate pricing. These do not show as table columns.</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
             <span style="font-size:11px;color:var(--mid)">Target Margin:</span>
             <input type="text" inputmode="decimal" value="${p.globals.target_margin || 0}" onchange="updateProductTargetMargin('${p.id}', this.value)" style="width:40px;height:24px;text-align:center;font-size:11px;border:1px solid var(--border);border-radius:4px;outline:none">%
           </div>
@@ -2228,7 +2232,10 @@ function renderAll() {
         ` : ''}
 
         <!-- Product Extras (Flat/Percentage) List & Inline Form -->
-        <div style="font-weight:700;font-size:12px;color:var(--dark);margin:10px 0 8px 0;border-top:1px dashed var(--border);padding-top:8px">Product Custom Extras (Columns)</div>
+        <div style="margin:10px 0 8px 0;border-top:1px dashed var(--border);padding-top:8px">
+          <span style="font-weight:700;font-size:12px;color:var(--dark)">Product Custom Extras (Table Columns)</span>
+          <span style="font-size:10px;color:var(--mid);display:block;margin-top:2px">Custom charges that you want to see and override per variant. Adding one creates a new editable column in the table.</span>
+        </div>
         <div class="extras-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
           ${extrasList.length === 0 ? `<span style="font-size:11px;color:var(--mid)">No custom extra columns added yet.</span>` : ''}
           ${extrasList.map(e => `
