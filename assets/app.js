@@ -1759,133 +1759,49 @@ function migrateOrGetGlobals(globalsJson) {
   if (globalsJson && Array.isArray(globalsJson.components)) {
     return globalsJson;
   }
-  // Migrate from legacy globals object
-  const legacy = globalsJson || {};
-  const brand = parseFloat(legacy.brand) || 0;
-  const photo = parseFloat(legacy.photo) || 0;
-  const pack = parseFloat(legacy.pack) || 0;
-  const ship = parseFloat(legacy.ship) || 0;
-  const ops = parseFloat(legacy.ops) || 0;
-  const gw = parseFloat(legacy.gw) || 0;
-  const rto = parseFloat(legacy.rto) || 0;
-  const roas = parseFloat(legacy.roas) || 3;
-  const cod_rate = parseFloat(legacy.cod_rate) || 0;
-  const cod_fee = parseFloat(legacy.cod_fee) || 0;
-  const pg_fee = parseFloat(legacy.pg_fee) || 0;
-
-  const components = [];
-  if (brand > 0) components.push({ id: 'c_brand', name: 'Branding', type: 'flat', applies_to: 'fixed', value: brand });
-  if (photo > 0) components.push({ id: 'c_photo', name: 'Photography', type: 'flat', applies_to: 'fixed', value: photo });
-  if (pack > 0) components.push({ id: 'c_pack', name: 'Packaging', type: 'flat', applies_to: 'fixed', value: pack });
-  if (ship > 0) components.push({ id: 'c_ship', name: 'Shipping', type: 'flat', applies_to: 'fixed', value: ship });
-  if (ops > 0) components.push({ id: 'c_ops', name: 'Operations', type: 'flat', applies_to: 'fixed', value: ops });
-  if (gw > 0) components.push({ id: 'c_gw', name: 'Gift Wrap', type: 'flat', applies_to: 'fixed', value: gw });
-  if (pg_fee > 0) components.push({ id: 'c_pg', name: 'PG Fee', type: 'pct', applies_to: 'sell', value: pg_fee });
-  
-  if (roas > 0) {
-    const adSpendPct = Math.round((100 / roas) * 100) / 100;
-    components.push({ id: 'c_ad', name: 'Ad Spend (Target ROAS)', type: 'pct', applies_to: 'sell', value: adSpendPct });
-  }
-  if (rto > 0) {
-    components.push({ id: 'c_rto', name: 'RTO Risk Fee', type: 'pct', applies_to: 'mfg', value: rto });
-  }
-  const codCost = (cod_rate / 100) * cod_fee;
-  if (codCost > 0) {
-    components.push({ id: 'c_cod', name: 'COD Cost', type: 'flat', applies_to: 'fixed', value: Math.round(codCost * 100) / 100 });
-  }
-
   return {
-    components,
-    target_margin: 0
+    components: [],
+    target_margin: 15
   };
 }
 
 const DEFAULT_STAGING_GLOBALS = {
-  components: [
-    { id: 'c_ship', name: 'Shipping', type: 'flat', applies_to: 'fixed', value: 70 },
-    { id: 'c_pack', name: 'Packaging', type: 'flat', applies_to: 'fixed', value: 20 },
-    { id: 'c_pg', name: 'PG Fee', type: 'pct', applies_to: 'sell', value: 2 },
-    { id: 'c_ad', name: 'Target Ad Spend', type: 'pct', applies_to: 'sell', value: 33.33 },
-  ],
+  components: [],
   target_margin: 15
 };
 
 function calcVariant(v, p, globals) {
-  const g = migrateOrGetGlobals(globals || p.globals_json);
-  const components = g.components || [];
-
-  // Determine Packaging Cost
-  const packComp = components.find(c => /pack/i.test(c.name));
-  const packDefault = packComp ? parseFloat(packComp.value) || 0 : 0;
-  const packPc = v.packO != null ? parseFloat(v.packO) : packDefault;
-
-  // Determine RTO Rate Override
-  const rtoComp = components.find(c => /rto/i.test(c.name));
-  const rtoDefault = rtoComp ? parseFloat(rtoComp.value) || 0 : 0;
-  const rtoRate = v.rtoO != null ? parseFloat(v.rtoO) : rtoDefault;
-
-  // Determine Tax Rate Override
-  const taxComp = components.find(c => /tax|gst|vat/i.test(c.name));
-  const taxDefault = taxComp ? parseFloat(taxComp.value) || 0 : 0;
-  const taxRate = v.taxO != null ? parseFloat(v.taxO) : taxDefault;
-
-  // Determine PG Fee Rate Override
-  const pgComp = components.find(c => /pg|pay|fee|gate/i.test(c.name));
-  const pgDefault = pgComp ? parseFloat(pgComp.value) || 0 : 0;
-  const pgRate = v.pgO != null ? parseFloat(v.pgO) : pgDefault;
-
-  // Determine Target Breakeven ROAS
-  const targetRoas = v.beRoasO != null ? parseFloat(v.beRoasO) : (parseFloat(g.target_margin) < 10 ? parseFloat(g.target_margin) : 3.0);
-
   const mfgPc = (v.mfgO != null) ? parseFloat(v.mfgO) : (parseFloat(p.mfg_per_pc) || 0);
   const qty   = p.variant_type === 'bundle' ? (v.qty || 1) : 1;
+  const mfgCost = mfgPc * qty;
 
-  // Extra Column Charges (Flat / Percentage of Mfg Cost)
-  let F_cogs = 0;
-  let extra_P_mfg = 0;
+  const packCost = v.packO != null ? parseFloat(v.packO) : 20;
+  const shipCost = v.shipO != null ? parseFloat(v.shipO) : 70;
+
+  // Extra Column Charges (Flat or Percentage of Mfg cost)
+  let extraCost = 0;
   (p.extras || []).forEach(e => {
-    const val = (v.extraO && v.extraO[e.label] != null) ? parseFloat(v.extraO[e.label]) : (parseFloat(e.amount) || 0);
-    if (e.type === 'pct') {
-      extra_P_mfg += val / 100;
+    let valStr = (v.extraO && v.extraO[e.label] != null) ? String(v.extraO[e.label]) : String(e.amount || '0');
+    valStr = valStr.trim();
+    if (valStr.endsWith('%')) {
+      const pct = parseFloat(valStr) || 0;
+      extraCost += mfgCost * (pct / 100);
     } else {
-      F_cogs += val;
+      extraCost += parseFloat(valStr) || 0;
     }
   });
 
-  // Calculate Base Cost
-  let F_components = 0;
-  let P_mfg = 0;
-  let P_sell_other = 0;
+  const baseCost = mfgCost + packCost + shipCost + extraCost;
 
-  components.forEach(c => {
-    // Skip packaging, tax, pg, and rto since they are handled separately
-    if (/pack|tax|gst|vat|pg|pay|fee|gate|rto/i.test(c.name)) return;
-    
-    const val = parseFloat(c.value) || 0;
-    if (c.type === 'flat') {
-      F_components += val;
-    } else if (c.type === 'pct') {
-      if (c.applies_to === 'mfg') {
-        P_mfg += val / 100;
-      } else if (c.applies_to === 'sell') {
-        // Exclude any double-counted ad components
-        if (!/ad|market|roas/i.test(c.name)) {
-          P_sell_other += val / 100;
-        }
-      } else {
-        P_mfg += val / 100;
-      }
-    }
-  });
-
-  const baseCost = mfgPc * qty + packPc + F_cogs + F_components;
-
-  // Calculate Adjusted Base Cost
+  const rtoRate = v.rtoO != null ? parseFloat(v.rtoO) : 15;
   const multiplier = 1 + rtoRate / 100;
   const adjBaseCost = baseCost * multiplier;
 
-  // Variable Deductions on Selling Price (excluding ROAS ad spend)
-  const totalVarPct = (taxRate + pgRate) / 100 + P_sell_other;
+  const taxRate = v.taxO != null ? parseFloat(v.taxO) : 18;
+  const pgRate = v.pgO != null ? parseFloat(v.pgO) : 2;
+  const totalVarPct = (taxRate + pgRate) / 100;
+
+  const targetRoas = v.beRoasO != null ? parseFloat(v.beRoasO) : 3.0;
 
   let selling = 0;
   let beRoas = 0;
@@ -2060,16 +1976,21 @@ function renderAll() {
     // Ensure product globals are initialized
     p.globals = migrateOrGetGlobals(p.globals_json);
 
-    const packComp = p.globals.components.find(c => /pack/i.test(c.name));
-    const packDefault = packComp ? parseFloat(packComp.value) || 0 : 0;
-
     const extrasList = p.extras || [];
-    const extraHeadersHtml = extrasList.map(e => `<th style="background:#fff3bf;color:#495057;border-bottom:1px solid #ffe066">${e.label} (${e.type === 'pct' ? '%' : '₹'})</th>`).join('');
+    const extraHeadersHtml = extrasList.map(e => `
+      <th style="background:#fff3bf;color:#495057;border-bottom:1px solid #ffe066">
+        <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+          <span>${e.label}</span>
+          ${canEdit ? `<button onclick="removeProductExtra('${p.id}', '${e.label}')" style="border:none;background:transparent;color:var(--red);cursor:pointer;padding:0 2px;font-size:10px;font-weight:800;line-height:1" title="Delete Column">✕</button>` : ''}
+        </div>
+      </th>
+    `).join('');
 
     const tableHeaders = `<tr>
       <th>Variant</th>
       <th>Mfg/pc</th>
       <th>Pack/pc</th>
+      <th>Shipping</th>
       ${extraHeadersHtml}
       <th>Base Cost</th>
       <th>RTO %</th>
@@ -2078,7 +1999,6 @@ function renderAll() {
       <th>Tax %</th>
       <th>PG Fee %</th>
       <th>Breakeven ROAS</th>
-      <th>Suggested</th>
       <th>Selling Price</th>
       <th>Margin</th>
       <th>Net Profit</th>
@@ -2096,46 +2016,42 @@ function renderAll() {
         : `<span style="font-family:var(--fm)">₹${v.mfgO != null ? v.mfgO : p.mfg_per_pc}</span>`;
 
       const packInput = canEdit
-        ? `<input type="text" inputmode="decimal" value="${v.packO != null ? v.packO : packDefault}" style="width:45px;${v.packO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','packO',this.value)">`
-        : `<span style="font-family:var(--fm)">₹${v.packO != null ? v.packO : packDefault}</span>`;
+        ? `<input type="text" inputmode="decimal" value="${v.packO != null ? v.packO : 20}" style="width:45px;${v.packO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','packO',this.value)">`
+        : `<span style="font-family:var(--fm)">₹${v.packO != null ? v.packO : 20}</span>`;
+
+      const shipInput = canEdit
+        ? `<td><input type="text" inputmode="decimal" value="${v.shipO != null ? v.shipO : 70}" style="width:45px;${v.shipO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','shipO',this.value)"></td>`
+        : `<td><span style="font-family:var(--fm)">₹${v.shipO != null ? v.shipO : 70}</span></td>`;
 
       const extraCells = extrasList.map(e => {
         const val = (v.extraO && v.extraO[e.label] != null) ? v.extraO[e.label] : e.amount;
         return canEdit
-          ? `<td><input type="text" inputmode="decimal" value="${val}" style="width:45px;${v.extraO && v.extraO[e.label] != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVariantExtraOverride('${p.id}','${v.id}','${e.label}',this.value)"></td>`
-          : `<td><span style="font-family:var(--fm)">${e.type === 'pct' ? '' : '₹'}${val}${e.type === 'pct' ? '%' : ''}</span></td>`;
+          ? `<td><input type="text" value="${val}" style="width:50px;${v.extraO && v.extraO[e.label] != null ? 'border-color:var(--primary)' : ''}" onchange="setVariantExtraOverride('${p.id}','${v.id}','${e.label}',this.value)"></td>`
+          : `<td><span style="font-family:var(--fm)">${val}</span></td>`;
       }).join('');
 
       const baseCostHtml = `<td style="font-family:var(--fm);color:var(--mid)">₹${r.baseCost.toFixed(0)}</td>`;
 
-      const rtoComp = p.globals.components.find(c => /rto/i.test(c.name));
-      const rtoDefault = rtoComp ? parseFloat(rtoComp.value) || 0 : 15;
       const rtoInput = canEdit
-        ? `<td><input type="text" inputmode="decimal" value="${v.rtoO != null ? v.rtoO : rtoDefault}" style="width:45px;${v.rtoO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','rtoO',this.value)"></td>`
-        : `<td><span style="font-family:var(--fm)">${v.rtoO != null ? v.rtoO : rtoDefault}%</span></td>`;
+        ? `<td><input type="text" inputmode="decimal" value="${v.rtoO != null ? v.rtoO : 15}" style="width:45px;${v.rtoO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','rtoO',this.value)"></td>`
+        : `<td><span style="font-family:var(--fm)">${v.rtoO != null ? v.rtoO : 15}%</span></td>`;
 
       const multiplierHtml = `<td style="font-family:var(--fm);color:var(--mid)">${r.multiplier.toFixed(2)}x</td>`;
       const adjCostHtml = `<td style="font-family:var(--fm);color:var(--mid);font-weight:600">₹${r.adjC.toFixed(0)}</td>`;
 
-      const taxComp = p.globals.components.find(c => /tax|gst|vat/i.test(c.name));
-      const taxDefault = taxComp ? parseFloat(taxComp.value) || 0 : 18;
       const taxInput = canEdit
-        ? `<td><input type="text" inputmode="decimal" value="${v.taxO != null ? v.taxO : taxDefault}" style="width:45px;${v.taxO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','taxO',this.value)"></td>`
-        : `<td><span style="font-family:var(--fm)">${v.taxO != null ? v.taxO : taxDefault}%</span></td>`;
+        ? `<td><input type="text" inputmode="decimal" value="${v.taxO != null ? v.taxO : 18}" style="width:45px;${v.taxO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','taxO',this.value)"></td>`
+        : `<td><span style="font-family:var(--fm)">${v.taxO != null ? v.taxO : 18}%</span></td>`;
 
-      const pgComp = p.globals.components.find(c => /pg|pay|fee|gate/i.test(c.name));
-      const pgDefault = pgComp ? parseFloat(pgComp.value) || 0 : 2;
       const pgInput = canEdit
-        ? `<td><input type="text" inputmode="decimal" value="${v.pgO != null ? v.pgO : pgDefault}" style="width:45px;${v.pgO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','pgO',this.value)"></td>`
-        : `<td><span style="font-family:var(--fm)">${v.pgO != null ? v.pgO : pgDefault}%</span></td>`;
+        ? `<td><input type="text" inputmode="decimal" value="${v.pgO != null ? v.pgO : 2}" style="width:45px;${v.pgO != null ? 'border-color:var(--primary)' : ''}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','pgO',this.value)"></td>`
+        : `<td><span style="font-family:var(--fm)">${v.pgO != null ? v.pgO : 2}%</span></td>`;
 
-      const targetRoas = v.beRoasO != null ? parseFloat(v.beRoasO) : (parseFloat(p.globals.target_margin) < 10 ? parseFloat(p.globals.target_margin) : 3.0);
+      const targetRoas = v.beRoasO != null ? parseFloat(v.beRoasO) : 3.0;
       const roasValToShow = v.sellingO != null ? r.roas.toFixed(2) : (v.beRoasO != null ? v.beRoasO : targetRoas.toFixed(1));
       const roasInput = canEdit
         ? `<td><input type="text" inputmode="decimal" value="${roasValToShow}" style="width:45px;${v.sellingO != null ? 'background:#e6fcf5;border-color:var(--green);font-weight:600' : (v.beRoasO != null ? 'border-color:var(--primary)' : '')}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','beRoasO',this.value)" title="${v.sellingO != null ? 'Calculated Breakeven ROAS (Selling Price is fixed)' : 'Target ROAS (Selling Price is auto-calculated)'}"></td>`
         : `<td><span style="font-family:var(--fm)">${r.roas.toFixed(2)}x</span></td>`;
-
-      const suggestedHtml = `<td><span style="font-family:var(--fm);color:var(--green);font-weight:600">₹${cleanPrice(r.suggested)}</span></td>`;
 
       const sellingInput = canEdit
         ? `<input type="text" inputmode="decimal" value="${v.sellingO != null ? v.sellingO : r.selling}" style="width:55px;${v.sellingO != null ? 'border-color:var(--primary);font-weight:600' : 'background:#f1f3f5;color:var(--mid)'}" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\\..*?)\\..*/g, '$1')" onchange="setVF('${p.id}','${v.id}','sellingO',this.value)" title="${v.sellingO != null ? 'Fixed Selling Price' : 'Suggested Selling Price (Target ROAS is fixed)'}">`
@@ -2151,6 +2067,7 @@ function renderAll() {
         <td>${canEdit ? `<input value="${v.name||''}" style="width:85px" onchange="setVF('${p.id}','${v.id}','name',this.value)">` : `<span style="font-family:var(--fm)">${v.name}</span>`}</td>
         <td>${mfgInput}</td>
         <td>${packInput}</td>
+        ${shipInput}
         ${extraCells}
         ${baseCostHtml}
         ${rtoInput}
@@ -2159,7 +2076,6 @@ function renderAll() {
         ${taxInput}
         ${pgInput}
         ${roasInput}
-        ${suggestedHtml}
         <td>${sellingInput}</td>
         <td><span class="pill ${mc}">${(r.margin*100).toFixed(1)}%</span></td>
         <td style="font-family:var(--fm);font-weight:600;color:${netColor}">₹${r.netProfit.toFixed(0)}</td>
@@ -2171,6 +2087,7 @@ function renderAll() {
       </tr>`;
     }).join('');
 
+
     return `<div class="prod-block" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">
       <div class="prod-hd" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         ${canEdit ? `<input class="prod-name-inp" value="${p.name}" onchange="setProdName('${p.id}',this.value)" style="font-weight:800;font-size:14px;border:none;border-bottom:1px dashed var(--border);outline:none;background:transparent;padding:2px 4px">` : `<div class="prod-name-inp" style="pointer-events:none;font-weight:800;font-size:14px">${p.name}</div>`}
@@ -2179,95 +2096,18 @@ function renderAll() {
         </div>
       </div>
 
-      <!-- Cost Components Editor Panel -->
-      <div class="prod-cost-settings" style="background:var(--off);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <div>
-            <span style="font-weight:700;font-size:12px;color:var(--dark)">Background Cost Components</span>
-            <span style="font-size:10px;color:var(--mid);display:block;margin-top:2px">Background costs and parameters (e.g. Shipping, Packaging, general expenses) used to calculate pricing. These do not show as table columns.</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-            <span style="font-size:11px;color:var(--mid)">Target Margin:</span>
-            <input type="text" inputmode="decimal" value="${p.globals.target_margin || 0}" onchange="updateProductTargetMargin('${p.id}', this.value)" style="width:40px;height:24px;text-align:center;font-size:11px;border:1px solid var(--border);border-radius:4px;outline:none">%
-          </div>
-        </div>
-        
-        <div class="components-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-          ${(p.globals.components || []).length === 0 ? `<span style="font-size:11px;color:var(--mid)">No components added yet.</span>` : ''}
-          ${(p.globals.components || []).map(c => `
-            <div class="component-badge" style="display:inline-flex;align-items:center;background:#fff;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;gap:6px">
-              <span style="font-weight:600;color:var(--dark)">${c.name}</span>
-              <select onchange="updateComponentField('${p.id}', '${c.id}', 'applies_to', this.value)" style="border:none;background:transparent;font-size:10px;color:var(--mid);outline:none;cursor:pointer;padding:0">
-                <option value="fixed" ${c.applies_to === 'fixed' ? 'selected' : ''}>Fixed</option>
-                <option value="mfg" ${c.applies_to === 'mfg' ? 'selected' : ''}>% COGS</option>
-                <option value="sell" ${c.applies_to === 'sell' ? 'selected' : ''}>% Revenue</option>
-              </select>
-              <span style="color:var(--border)">|</span>
-              <select onchange="updateComponentField('${p.id}', '${c.id}', 'type', this.value)" style="border:none;background:transparent;font-size:10px;color:var(--mid);outline:none;cursor:pointer;padding:0">
-                <option value="flat" ${c.type === 'flat' ? 'selected' : ''}>₹</option>
-                <option value="pct" ${c.type === 'pct' ? 'selected' : ''}>%</option>
-              </select>
-              <input type="text" inputmode="decimal" value="${c.value || 0}" onchange="updateComponentField('${p.id}', '${c.id}', 'value', this.value)" style="width:40px;border:none;border-bottom:1px solid var(--border);text-align:center;font-size:11px;font-weight:600;outline:none;padding:0">
-              ${canEdit ? `<button onclick="removeProductComponent('${p.id}', '${c.id}')" style="border:none;background:transparent;color:var(--red);cursor:pointer;padding:0 2px;font-size:10px;font-weight:800;margin-left:4px">✕</button>` : ''}
-            </div>
-          `).join('')}
-        </div>
-
-        ${canEdit ? `
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-top:1px dashed var(--border);padding-top:8px;margin-top:4px">
-          <span style="font-size:11px;font-weight:600;color:var(--mid)">Add Markup Component:</span>
-          <input type="text" id="new-c-name-${p.id}" placeholder="Name (e.g. Shipping)" style="flex:1;min-width:120px;height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 8px;outline:none">
-          <select id="new-c-applies-${p.id}" style="height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 4px;outline:none;background:#fff;color:var(--fg)">
-            <option value="fixed">Fixed Per Order</option>
-            <option value="mfg">% of Mfg Cost (COGS)</option>
-            <option value="sell">% of Selling Price</option>
-          </select>
-          <select id="new-c-type-${p.id}" style="height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 4px;outline:none;background:#fff;color:var(--fg)">
-            <option value="flat">Flat (₹)</option>
-            <option value="pct">Percentage (%)</option>
-          </select>
-          <input type="text" id="new-c-val-${p.id}" placeholder="Value" style="width:50px;height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 8px;outline:none">
-          <button class="btn sm primary" onclick="addProductComponent('${p.id}')" style="height:28px;padding:0 12px;font-size:11px;font-weight:600">+ Add Markup</button>
-        </div>
-        ` : ''}
-
-        <!-- Product Extras (Flat/Percentage) List & Inline Form -->
-        <div style="margin:10px 0 8px 0;border-top:1px dashed var(--border);padding-top:8px">
-          <span style="font-weight:700;font-size:12px;color:var(--dark)">Product Custom Extras (Table Columns)</span>
-          <span style="font-size:10px;color:var(--mid);display:block;margin-top:2px">Custom charges that you want to see and override per variant. Adding one creates a new editable column in the table.</span>
-        </div>
-        <div class="extras-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-          ${extrasList.length === 0 ? `<span style="font-size:11px;color:var(--mid)">No custom extra columns added yet.</span>` : ''}
-          ${extrasList.map(e => `
-            <div class="component-badge" style="display:inline-flex;align-items:center;background:#fff9db;border:1px solid #ffe3e3;border-radius:6px;padding:4px 8px;font-size:11px;gap:6px">
-              <span style="font-weight:700;color:#92400e">★ ${e.label}</span>
-              <span style="font-size:10px;color:var(--mid)">(${e.type === 'pct' ? 'Mfg %' : 'Flat ₹'})</span>
-              <input type="text" inputmode="decimal" value="${e.amount || 0}" onchange="updateProductExtraAmount('${p.id}', '${e.label}', this.value)" style="width:40px;border:none;border-bottom:1px solid var(--border);text-align:center;font-size:11px;font-weight:600;outline:none;padding:0;background:transparent">
-              ${canEdit ? `<button onclick="removeProductExtra('${p.id}', '${e.label}')" style="border:none;background:transparent;color:var(--red);cursor:pointer;padding:0 2px;font-size:10px;font-weight:800;margin-left:4px">✕</button>` : ''}
-            </div>
-          `).join('')}
-        </div>
-
-        ${canEdit ? `
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border)">
-          <span style="font-size:11px;font-weight:600;color:var(--mid)">Add Extra Column:</span>
-          <input type="text" id="new-ex-name-${p.id}" placeholder="Name (e.g. Printing)" style="flex:1;min-width:120px;height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 8px;outline:none">
-          <select id="new-ex-type-${p.id}" style="height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 4px;outline:none;background:#fff;color:var(--fg)">
-            <option value="flat">Flat (₹)</option>
-            <option value="pct">Percentage (%)</option>
-          </select>
-          <input type="text" id="new-ex-val-${p.id}" placeholder="Value" style="width:50px;height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 8px;outline:none">
-          <button class="btn sm primary" onclick="addProductExtraInline('${p.id}')" style="height:28px;padding:0 12px;font-size:11px;font-weight:600">+ Add Column</button>
-        </div>
-        ` : ''}
-      </div>
-
       <div style="overflow-x:auto"><table class="vtable">
         <thead>${tableHeaders}</thead>
         <tbody>${rows}</tbody>
       </table></div>
-      ${canEdit ? `<div style="margin-top:12px;display:flex;gap:6px">
+      
+      ${canEdit ? `<div style="margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <button class="btn sm" onclick="addVariant('${p.id}')" style="padding:6px 12px;font-size:11px">+ Add Variant</button>
+        <span style="color:var(--border)">|</span>
+        <span style="font-size:11px;font-weight:600;color:var(--mid)">Add Extra Column:</span>
+        <input type="text" id="new-ex-name-${p.id}" placeholder="Column Name (e.g. Printing)" style="height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 8px;outline:none;width:160px">
+        <input type="text" id="new-ex-val-${p.id}" placeholder="Default (e.g. 10% or 15)" style="height:28px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:0 8px;outline:none;width:150px">
+        <button class="btn sm primary" onclick="addProductExtraInline('${p.id}')" style="height:28px;padding:0 12px;font-size:11px;font-weight:600">+ Add Column</button>
       </div>` : ''}
     </div>`;
   }).join('');
@@ -2348,8 +2188,15 @@ function addProductComponent(pid) {
 function setVF(pid, vid, k, val) {
   const p = prods.find(p => p.id === pid); if (!p) return;
   const v = p.variants.find(v => v.id === vid); if (!v) return;
-  if (k === 'mfgO' || k === 'packO' || k === 'sellingO' || k === 'compO' || k === 'rtoO' || k === 'taxO' || k === 'pgO' || k === 'beRoasO') {
+  if (k === 'beRoasO') {
+    v.beRoasO = val === '' ? null : parseFloat(val) || 0;
+    v.sellingO = null; // Clear selling override so price recalculates from target ROAS
+  } else if (k === 'sellingO') {
+    v.sellingO = val === '' ? null : parseFloat(val) || 0;
+    v.beRoasO = null; // Clear ROAS override so ROAS recalculates from selling price
+  } else if (k === 'mfgO' || k === 'packO' || k === 'shipO' || k === 'compO' || k === 'rtoO' || k === 'taxO' || k === 'pgO') {
     v[k] = val === '' ? null : parseFloat(val) || 0;
+    v.sellingO = null; // Clear selling override so price recalculates from target ROAS
   } else {
     v[k] = val;
   }
@@ -2439,8 +2286,9 @@ function setVariantExtraOverride(pid, vid, label, val) {
   if (val === '') {
     delete v.extraO[label];
   } else {
-    v.extraO[label] = parseFloat(val) || 0;
+    v.extraO[label] = val; // Store string directly to support % suffix!
   }
+  v.sellingO = null; // Clear selling override so price recalculates from target ROAS
   renderAll();
   deferPricingSave();
 }
