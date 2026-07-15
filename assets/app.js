@@ -1072,16 +1072,16 @@ async function genPPTX() {
     
     // KPI boxes on cover slide left panel
     s1.addShape('rect', { x: 0.4, y: 1.8, w: 3.0, h: 1.4, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: COLOR_AMBER, width: 2 } });
-    s1.addText(mRev, {x: 0.5, y: 1.9, fontSize: 28, bold: true, color: COLOR_PRIMARY, fontFace: FONT_PRIMARY, w: 11.0, h: 0.35});
-    s1.addText('Current Monthly Revenue', {x: 0.5, y: 2.6, fontSize: 11, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 11.0, h: 0.35});
+    s1.addText(mRev, {x: 0.5, y: 1.9, fontSize: 28, bold: true, color: COLOR_PRIMARY, fontFace: FONT_PRIMARY, w: 2.8, h: 0.35});
+    s1.addText('Current Monthly Revenue', {x: 0.5, y: 2.6, fontSize: 11, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 2.8, h: 0.35});
     
     s1.addShape('rect', { x: 0.4, y: 3.4, w: 3.0, h: 1.4, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: COLOR_AMBER, width: 2 } });
-    s1.addText(mTarget, {x: 0.5, y: 3.5, fontSize: 28, bold: true, color: COLOR_PRIMARY, fontFace: FONT_PRIMARY, w: 11.0, h: 0.35});
-    s1.addText('90-Day Target Plan', {x: 0.5, y: 4.2, fontSize: 11, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 11.0, h: 0.35});
+    s1.addText(mTarget, {x: 0.5, y: 3.5, fontSize: 28, bold: true, color: COLOR_PRIMARY, fontFace: FONT_PRIMARY, w: 2.8, h: 0.35});
+    s1.addText('90-Day Target Plan', {x: 0.5, y: 4.2, fontSize: 11, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 2.8, h: 0.35});
     
     s1.addShape('rect', { x: 0.4, y: 5.0, w: 3.0, h: 1.4, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: COLOR_GREEN, width: 2 } });
-    s1.addText(mGrowth, {x: 0.5, y: 5.1, fontSize: 28, bold: true, color: COLOR_GREEN, fontFace: FONT_PRIMARY, w: 11.0, h: 0.35});
-    s1.addText('Projected Blended Growth', {x: 0.5, y: 5.8, fontSize: 11, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 11.0, h: 0.35});
+    s1.addText(mGrowth, {x: 0.5, y: 5.1, fontSize: 28, bold: true, color: COLOR_GREEN, fontFace: FONT_PRIMARY, w: 2.8, h: 0.35});
+    s1.addText('Projected Blended Growth', {x: 0.5, y: 5.8, fontSize: 11, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 2.8, h: 0.35});
 
     s1.addText('SHOPIFY SCALE STRATEGY', {x: 4.3, y: 1.5, fontSize: 16, bold: true, color: COLOR_PRIMARY, fontFace: FONT_PRIMARY, w: 8.50, h: 0.35});
     s1.addText(bName.toUpperCase(), {x: 4.3, y: 1.9, fontSize: 44, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY, w: 8.50, h: 0.35});
@@ -1100,14 +1100,14 @@ async function genPPTX() {
     // Left Origin Story Card
     s2.addShape('rect', { x: 0.5, y: 1.2, w: 5.8, h: 5.6, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: COLOR_PRIMARY, width: 2 } });
     s2.addShape('rect', { x: 0.5, y: 1.2, w: 5.8, h: 0.6, fill: { color: COLOR_DARK } });
-    s2.addText('THE ORIGIN STORY', {x: 0.7, y: 1.35, fontSize: 12, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY, w: 11.0, h: 0.35});
+    s2.addText('THE ORIGIN STORY', {x: 0.7, y: 1.35, fontSize: 12, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY, w: 5.4, h: 0.35});
     
     const storyTitle = isFitness ? 'Born in Coimbatore. Built for India.' : `Born in India. Built for Scale.`;
     const storyBody = isFitness
       ? `Mr. ${fName} quit a high-paying corporate job to solve one overlooked problem: international sizing and products are not engineered for Indian body proportions.\\n\\nOur products are purpose-built for Indian proportions, chest widths, and thigh circumferences — so every workout feels right.`
       : `Mr./Ms. ${fName} started ${bName} to solve one overlooked problem: legacy offerings in the ${indName} space are not engineered for modern Indian consumers.\\n\\nOur products are purpose-built to deliver premium quality, tailored specifically for local preferences.`;
 
-    s2.addText(storyTitle, {x: 0.7, y: 2.1, fontSize: 20, bold: true, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 11.0, h: 0.35});
+    s2.addText(storyTitle, {x: 0.7, y: 2.1, fontSize: 20, bold: true, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 5.4, h: 0.35});
     s2.addText(storyBody, { x: 0.7, y: 2.7, w: 5.4, fontSize: 12, color: '333333', fontFace: FONT_PRIMARY });
     s2.addShape('rect', { x: 0.7, y: 4.6, w: 5.4, h: 0.9, fill: { color: COLOR_PRIMARY }, rectRadius: 0.05 });
     s2.addText(`${mRev} → ${mTarget} in 90 Days\\nTarget Monthly Scale Up`, {x: 0.8, y: 4.75, w: 5.2, align: 'center', fontSize: 13, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY, h: 0.35});
@@ -1225,14 +1225,14 @@ async function genPPTX() {
     mkt.forEach((m, i) => {
       let x = 0.5 + (i * 3.1);
       s5.addShape('rect', { x, y: 1.1, w: 2.9, h: 1.2, fill: { color: 'FFFFFF' }, rectRadius: 0.05, line: { color: m.c, width: 2 } });
-      s5.addText(m.v, {x: x + 0.2, y: 1.2, fontSize: 24, bold: true, color: m.c, fontFace: FONT_PRIMARY, w: 3.5, h: 0.35});
+      s5.addText(m.v, {x: x + 0.2, y: 1.2, fontSize: 24, bold: true, color: m.c, fontFace: FONT_PRIMARY, w: 2.5, h: 0.35});
       s5.addText(m.l, {x: x + 0.2, y: 1.7, w: 2.5, fontSize: 10, color: '666666', fontFace: FONT_PRIMARY, h: 0.35});
     });
 
     // Sizing vs Trends
     s5.addShape('rect', { x: 0.5, y: 2.5, w: 5.9, h: 4.3, fill: { color: 'FFFFFF' }, rectRadius: 0.1 });
     s5.addShape('rect', { x: 0.5, y: 2.5, w: 5.9, h: 0.5, fill: { color: COLOR_DARK } });
-    s5.addText('MARKET SIZING', {x: 0.7, y: 2.65, fontSize: 12, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY, w: 11.0, h: 0.35});
+    s5.addText('MARKET SIZING', {x: 0.7, y: 2.65, fontSize: 12, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY, w: 5.5, h: 0.35});
     
     const mktSizingText = isFitness
       ? 'TAM: ₹55,000 Cr — Total India activewear retail\\nSAM: ₹8,000–10,000 Cr — Premium D2C gymwear\\nSOM: ₹3–5 Cr ARR — Realistic 12-month target\\nGAP: OPEN FIELD — No Indian brand owns body-fit story.'
@@ -1359,7 +1359,7 @@ async function genPPTX() {
       s7.addText(hp.t, {x: x + 0.15, y: y + 0.6, w: 2.6, fontSize: 10, bold: true, italic: true, color: COLOR_DARK, fontFace: FONT_PRIMARY, h: 0.35});
       hp.f.forEach((f, i) => {
         s7.addShape('rect', { x: x + 0.15, y: y + 1.2 + (i * 0.45), w: 2.6, h: 0.35, fill: { color: COLOR_BG_LIGHT } });
-        s7.addText(f, {x: x + 0.3, y: y + 1.25 + (i * 0.45), fontSize: 10, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 3.5, h: 0.35});
+        s7.addText(f, {x: x + 0.3, y: y + 1.25 + (i * 0.45), fontSize: 10, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 2.5, h: 0.35});
       });
     });
 
@@ -1650,7 +1650,7 @@ async function genPPTX() {
       let x = 0.5 + (i % 4) * 3.1;
       let y = 1.1 + Math.floor(i / 4) * 2.8;
       s17.addShape('rect', { x, y, w: 2.9, h: 2.5, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: k.c, width: 2 } });
-      s17.addText(k.v, {x: x + 0.2, y: y + 0.2, fontSize: 32, bold: true, color: k.c, fontFace: FONT_PRIMARY, w: 3.5, h: 0.35});
+      s17.addText(k.v, {x: x + 0.2, y: y + 0.2, fontSize: 32, bold: true, color: k.c, fontFace: FONT_PRIMARY, w: 2.5, h: 0.35});
       s17.addText(k.l, {x: x + 0.2, y: y + 0.95, w: 2.5, fontSize: 12, bold: true, color: COLOR_DARK, fontFace: FONT_PRIMARY, h: 0.35});
       s17.addText(k.d, {x: x + 0.2, y: y + 1.5, w: 2.5, fontSize: 10, color: '666666', fontFace: FONT_PRIMARY, h: 0.35});
     });
@@ -1675,7 +1675,7 @@ async function genPPTX() {
       s18.addShape('rect', { x, y: 1.1, w: 2.9, h: 1.4, fill: { color: 'FFFFFF' }, rectRadius: 0.05 });
       s18.addShape('rect', { x, y: 1.1, w: 2.9, h: 0.35, fill: { color: c.c } });
       s18.addText(c.m, {x: x + 0.1, y: 1.15, w: 2.7, align: 'center', fontSize: 10, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY, h: 0.35});
-      s18.addText(c.v, {x: x + 0.1, y: 1.5, fontSize: 24, bold: true, color: c.c, fontFace: FONT_PRIMARY, w: 3.5, h: 0.35});
+      s18.addText(c.v, {x: x + 0.1, y: 1.5, fontSize: 24, bold: true, color: c.c, fontFace: FONT_PRIMARY, w: 2.7, h: 0.35});
       s18.addText(c.o + '\\n' + c.d, {x: x + 0.1, y: 2.0, w: 2.7, fontSize: 9, color: '666666', fontFace: FONT_PRIMARY, h: 0.35});
     });
 
