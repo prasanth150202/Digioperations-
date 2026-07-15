@@ -1495,7 +1495,7 @@ async function genPPTX() {
     s11.addText('YOUTUBE ADS — Video Reach', { x: 7.1, y: 1.25, fontSize: 14, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY });
     
     const youtubeText = isFitness
-      ? '6-Second Bumper Ads\\n· Dark visual + product name + single hook. Unskippable.\\n· "Anti-rip. Squat proof. Built for India." — mass impression at scale.\\n\\n15–30 Sec Pre-Roll\\n· Structure: Problem → Feature → Proof → CTA.\\n· Target: Fitness channels, bodybuilding tutorials, vlogs.\\n\\nTarget Channels:\\n· Fitness YouTube & Bodybuilding channels\\n· Gym tutorials & transformation vlogs\\n· Supplement review channels'
+      ? '6-Second Bumper Ads\\n· Dark visual + product name + single hook. Unskippable.\\n· "Anti-rip. Squat proof. Built for India." — mass impression at scale.\\n\\n15–30 Sec Pre-Roll\\n· Structure: Problem → Feature → Proof → CTA.\\n· Target: Fitness channels, bodybuilding tutorials vlogs.\\n\\nTarget Channels:\\n· Fitness YouTube & Bodybuilding channels\\n· Gym tutorials & transformation vlogs\\n· Supplement review channels'
       : `6-Second Bumper Ads\\n· Clean visuals + product spotlight + single hook. Unskippable.\\n· "Premium quality. Ethically sourced. Built for India."\\n\\n15–30 Sec Pre-Roll\\n· Structure: Problem → Feature → Proof → CTA.\\n· Target: Lifestyle channels, product reviews vlogs.\\n\\nTarget Channels:\\n· Industry influencer channels\\n· Niche lifestyle and review channels\\n· Family and home vlogs`;
     s11.addText(youtubeText, { x: 7.1, y: 1.9, w: 5.5, fontSize: 11, lineSpacing: 22, color: COLOR_DARK, fontFace: FONT_PRIMARY });
 
@@ -1534,7 +1534,7 @@ async function genPPTX() {
       : `2x Long-form/month: Product comparison and deep-dives\\nFounder Story: "Why Mr./Ms. ${fName} started ${bName}"\\nProduct performance: "${bName} product testing and reviews"\\nYouTube Shorts from long-form content`;
 
     const socCols = [
-      { t: 'INSTAGRAM', s: `@${handleRaw}`, c: `3x Reels/week: Product features · Lifestyle integration · UGC\\n2x Static Posts: Product photography · Customer reviews\\n5x Stories/day: Polls · User tips · Product of the day\\n1x Carousel/week: Product deep-dive explainer`, id: 'Feed: Clean, premium, high-contrast. Reflecting our brand voice.', tag: `#${bName.replace(/\\s+/g, '')} #BuiltForIndia #Premium	ext{indName.replace(/\\s+/g, '')}`, color: COLOR_RED },
+      { t: 'INSTAGRAM', s: `@${handleRaw}`, c: `3x Reels/week: Product features · Lifestyle integration · UGC\\n2x Static Posts: Product photography · Customer reviews\\n5x Stories/day: Polls · User tips · Product of the day\\n1x Carousel/week: Product deep-dive explainer`, id: 'Feed: Clean, premium, high-contrast. Reflecting our brand voice.', tag: `#${bName.replace(/\\s+/g, '')} #BuiltForIndia #Premium${indName.replace(/\\s+/g, '')}`, color: COLOR_RED },
       { t: 'YOUTUBE', s: `${bName} Official`, c: ytMix, id: 'Clean thumbnails. Strong product visuals. Bold white text on dark bg.', tag: 'Monthly founder LIVE: Product drops + Q&A session', color: 'FF0000' },
       { t: 'FACEBOOK', s: handleRaw, c: `Primary use: Paid retargeting pixel + dynamic product ads\\nCommunity Group: "${bName} VIPs" — drop announcements + Q&As\\nCatalogue connected for dynamic product retargeting ads\\nNot primary organic channel — mainly used for paid retargeting`, id: 'Focus: pixel-perfect attribution + catalogue for dynamic ads. Community group for loyal buyers.', tag: 'Secondary organic — primary paid retargeting + community', color: COLOR_PRIMARY }
     ];
@@ -1595,10 +1595,10 @@ async function genPPTX() {
 
     retCols.forEach((col, i) => {
       let x = 0.5 + (i * 4.25);
-      s15.addShape('rect', { x, y: 1.1, w: 3.9, h: 5.6, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: col.color, width: 2 } });
+      s15.addShape('rect', { x, y: 1.1, w: 3.9, h: 5.6, fill: { color: col.color }, rectRadius: 0.1, line: { color: col.color, width: 2 } });
       s15.addShape('rect', { x, y: 1.1, w: 3.9, h: 0.5, fill: { color: col.color } });
-      s15.addText(col.t, {x: x + 0.15, y: y + 0.15, fontSize: 13, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY, w: 3.5, h: 0.35});
-      s15.addText(col.s, {x: x + 1.8, y: y + 0.15, w: 1.95, align: 'right', fontSize: 9, color: 'FFFFFF', fontFace: FONT_PRIMARY, h: 0.35});
+      s15.addText(col.t, {x: x + 0.15, y: 1.15, fontSize: 13, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY, w: 3.5, h: 0.35});
+      s15.addText(col.s, {x: x + 1.8, y: 1.15, w: 1.95, align: 'right', fontSize: 9, color: 'FFFFFF', fontFace: FONT_PRIMARY, h: 0.35});
 
       s15.addText(col.c, {x: x + 0.2, y: 1.7, w: 3.5, fontSize: 10, bold: true, color: COLOR_DARK, fontFace: FONT_PRIMARY, h: 0.35});
     });
@@ -1641,7 +1641,7 @@ async function genPPTX() {
       { v: '5x+', l: 'ROAS — Google', d: 'High-intent buyers should convert at better rate', c: COLOR_RED },
       { v: `< ₹${stratForm['targetCAC'] || '450'}`, l: 'Customer Acquisition Cost', d: `If CAC > ₹${stratForm['targetCAC'] || '450'}, contribution margin suffers`, c: COLOR_AMBER },
       { v: '₹1,800+', l: 'Average Order Value', d: 'Higher AOV = free gift triggered = better margin', c: COLOR_AMBER },
-      { v: '2.5–4%', l: 'Conversion Rate', d: '1,00,0 visitors, <25 buyers = store problem', c: COLOR_PURPLE },
+      { v: '2.5–4%', l: 'Conversion Rate', d: '1,000 visitors, <25 buyers = store problem', c: COLOR_PURPLE },
       { v: '< 60%', l: 'Cart Abandonment Rate', d: '40%+ recovery via WhatsApp = big revenue win', c: COLOR_RED },
       { v: '25%', l: 'Repeat Purchase Rate', d: 'Every repeat buyer = 5x acquisition efficiency', c: COLOR_PRIMARY }
     ];
@@ -1703,14 +1703,14 @@ async function genPPTX() {
     const month3AmbassadorText = isFitness ? `· ${bName} Athletes program: 3 ambassadors.` : `· ${bName} Brand Ambassador program: 3 ambassadors.`;
 
     const rdmCols = [
-      { t: 'MONTH 01', st: 'FOUNDATION & LAUNCH', tar: formatVal(0.20), c: `· Shopify store audit — speed, product pages.\\n· Meta Pixel + GA4 + WhatsApp API connected.\\n	ext{month1PhotoText}\\n· 10 ad creatives produced (5 angles × 2 formats).\\n· Google Shopping feed with SEO-optimised titles.\\n· WhatsApp flows live — 8 touchpoints.\\n· 15 micro influencers contacted, confirmed.`, color: COLOR_PRIMARY },
+      { t: 'MONTH 01', st: 'FOUNDATION & LAUNCH', tar: formatVal(0.20), c: `· Shopify store audit — speed, product pages.\\n· Meta Pixel + GA4 + WhatsApp API connected.\\n${month1PhotoText}\\n· 10 ad creatives produced (5 angles × 2 formats).\\n· Google Shopping feed with SEO-optimised titles.\\n· WhatsApp flows live — 8 touchpoints.\\n· 15 micro influencers contacted, confirmed.`, color: COLOR_PRIMARY },
       { t: 'MONTH 02', st: 'SCALE WINNERS', tar: formatVal(0.50), c: '· Analyse Month 1 — identify top ad creatives.\\n· Double budget on winning ad sets immediately.\\n· Kill bottom 20% underperforming creatives.\\n· 5 new creatives produced based on Month 1.\\n· Remaining 10 micro influencers activated.\\n· Add 1 macro creator (₹20,000 budget).\\n· A/B test: Feature-led vs lifestyle creative.', color: COLOR_GREEN },
-      { t: 'MONTH 03', st: 'FULL SCALE', tar: mTarget, c: `· Scale all winning channels — increase budgets.\\n· Retention driving 30%+ of total monthly revenue.\\n· New product drop — pre-hype via Stories + Reels.\\n· Launch loyalty: Repeat buyers get early access.\\n· UGC wall live on Shopify homepage.\\n	ext{month3AmbassadorText}\\n· Customer referral: "Give ₹200, Get ₹200".`, color: COLOR_AMBER }
+      { t: 'MONTH 03', st: 'FULL SCALE', tar: mTarget, c: `· Scale all winning channels — increase budgets.\\n· Retention driving 30%+ of total monthly revenue.\\n· New product drop — pre-hype via Stories + Reels.\\n· Launch loyalty: Repeat buyers get early access.\\n· UGC wall live on Shopify homepage.\\n${month3AmbassadorText}\\n· Customer referral: "Give ₹200, Get ₹200".`, color: COLOR_AMBER }
     ];
 
     rdmCols.forEach((col, i) => {
       let x = 0.5 + (i * 4.25);
-      s19.addShape('rect', { x: 0.5 + (i * 4.25), y: 1.1, w: 3.9, h: 5.6, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: col.color, width: 2 } });
+      s19.addShape('rect', { x: 0.5 + (i * 4.25), y: 1.1, w: 3.9, h: 5.6, fill: { color: col.color }, rectRadius: 0.1, line: { color: col.color, width: 2 } });
       s19.addShape('rect', { x: 0.5 + (i * 4.25), y: 1.1, w: 3.9, h: 0.8, fill: { color: col.color } });
       s19.addText(col.t, {x: x + 0.15, y: 1.15, fontSize: 13, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY, w: 3.5, h: 0.35});
       s19.addText(col.st, {x: x + 0.15, y: 1.5, fontSize: 9, color: 'FFFFFF', fontFace: FONT_PRIMARY, w: 3.5, h: 0.35});
@@ -1793,7 +1793,7 @@ async function genPPTX() {
 
     adCols.forEach((col, i) => {
       let x = 0.5 + (i * 4.25);
-      s22.addShape('rect', { x: 0.5 + (i * 4.25), y: 1.1, w: 3.9, h: 5.6, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: col.color, width: 2 } });
+      s22.addShape('rect', { x: 0.5 + (i * 4.25), y: 1.1, w: 3.9, h: 5.6, fill: { color: col.color }, rectRadius: 0.1, line: { color: col.color, width: 2 } });
       s22.addShape('rect', { x: 0.5 + (i * 4.25), y: 1.1, w: 3.9, h: 0.5, fill: { color: col.color } });
       s22.addText(col.t, {x: x + 0.15, y: 1.15, fontSize: 13, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY, w: 3.5, h: 0.35});
 
@@ -1814,7 +1814,7 @@ async function genPPTX() {
     } else {
       compOfferStack = [
         { t: `${comp1.toUpperCase()} — HEAVY DISCOUNTS`, c: '· 10-20% off sitewide codes always active\\n· Welcome code stackable with other offers\\n· Frequent site-wide clearance sales\\n· Influencer codes widely distributed\\n· Free shipping on all orders with no minimum\\n· No structured AOV progress bars\\n· High COD return rates due to lack of prepaid push\\n\\nVERDICT\\nPositioning as low-price alternative. Zero margin cushion.', color: COLOR_RED },
-        { t: `	ext{comp2.toUpperCase()} — DISORGANIZED OFFERS`, c: '· Generic 10% off first purchase code\\n· Unstructured seasonal sale banners\\n· Free shipping threshold is inconsistent\\n· No loyalty rewards or gamified incentives\\n· High friction checkout experience\\n· Lacks post-purchase upsell strategy\\n\\nVERDICT\\nDiscount-addicted but poor UX execution.', color: COLOR_AMBER },
+        { t: `${comp2.toUpperCase()} — DISORGANIZED OFFERS`, c: '· Generic 10% off first purchase code\\n· Unstructured seasonal sale banners\\n· Free shipping threshold is inconsistent\\n· No loyalty rewards or gamified incentives\\n· High friction checkout experience\\n· Lacks post-purchase upsell strategy\\n\\nVERDICT\\nDiscount-addicted but poor UX execution.', color: COLOR_AMBER },
         { t: `${bName.toUpperCase()} — PREMIUM OFFERS`, c: `· ${primaryOffer || 'Free Gift @ ₹1,499+'}\\n· PREPAID50 — ₹50 off to incentivize prepaid UPI\\n· No permanent sitewide coupons — protect brand value\\n· Curated bundles for cross-selling (15% savings)\\n· Post-purchase one-click upsells active\\n· Flash sales limited to 48-hour monthly windows\\n· WhatsApp cart recovery sends gift triggers, not discounts\\n\\nOUR MOAT\\nMargin-protecting premium brand positioning.`, color: COLOR_PRIMARY }
       ];
     }
@@ -1832,11 +1832,11 @@ async function genPPTX() {
     let s24 = pptx.addSlide();
     addHeader(s24, 'Tech Stack', `${bName} Recommended Tech Stack — Tools to Install`);
     const techStack = [
-      { t: 'WhatsApp Business API', amt: '₹4,000–7,000/mo', sub: 'DAY 1', desc: `WhatsApp Business API — automated order confirm, cart recovery, broadcasts.\\n\\n${comp1} has NO automation. 	ext{comp2} has NO automation. Immediate advantage.`, color: COLOR_GREEN },
-      { t: 'Email Automation', amt: 'Free → ₹3,500/mo', sub: 'DAY 1', desc: `Full email CRM — 5-email welcome flow, abandoned cart, post-purchase sequences.\\n\\nNeither 	ext{comp1} nor 	ext{comp2} uses email marketing actively.`, color: COLOR_PRIMARY },
-      { t: 'Reviews Collector', amt: '₹1,500–2,500/mo', sub: 'DAY 1', desc: `Photo + video reviews auto-collected. Feeds Google Shopping + builds trust wall.\\n\\n	ext{comp1} uses reviews. Match them. Add photo incentive for UGC advantage.`, color: COLOR_RED },
+      { t: 'WhatsApp Business API', amt: '₹4,000–7,000/mo', sub: 'DAY 1', desc: `WhatsApp Business API — automated order confirm, cart recovery, broadcasts.\\n\\n${comp1} has NO automation. ${comp2} has NO automation. Immediate advantage.`, color: COLOR_GREEN },
+      { t: 'Email Automation', amt: 'Free → ₹3,500/mo', sub: 'DAY 1', desc: `Full email CRM — 5-email welcome flow, abandoned cart, post-purchase sequences.\\n\\nNeither ${comp1} nor ${comp2} uses email marketing actively.`, color: COLOR_PRIMARY },
+      { t: 'Reviews Collector', amt: '₹1,500–2,500/mo', sub: 'DAY 1', desc: `Photo + video reviews auto-collected. Feeds Google Shopping + builds trust wall.\\n\\n${comp1} uses reviews. Match them. Add photo incentive for UGC advantage.`, color: COLOR_RED },
       { t: 'Push Notifications', amt: 'Free → ₹1,200/mo', sub: 'MONTH 1', desc: `Web push notifications — flash sale alerts, back-in-stock, abandoned cart.\\n\\nNeither competitor uses push. 15%+ CTR on engaged subscribers.`, color: COLOR_PURPLE },
-      { t: 'Rebuy / AfterSell', amt: '₹2,500–4,000/mo', sub: 'MONTH 1', desc: `Post-purchase upsell page + cart upsells. "Complete the bundle" cross-sells.\\n\\n	ext{comp2} has OutSell. Match + exceed with Rebuy's AI engine.`, color: COLOR_AMBER },
+      { t: 'Rebuy / AfterSell', amt: '₹2,500–4,000/mo', sub: 'MONTH 1', desc: `Post-purchase upsell page + cart upsells. "Complete the bundle" cross-sells.\\n\\n${comp2} has OutSell. Match + exceed with Rebuy's AI engine.`, color: COLOR_AMBER },
       { t: 'GA4 + Meta Pixel', amt: 'FREE', sub: 'DAY 1', desc: `Full attribution setup. UTM tracking on every campaign from Day 1.\\n\\nBoth competitors confirmed using GA4 + FB Pixel. Table stakes — must have.`, color: COLOR_DARK }
     ];
 
@@ -1860,10 +1860,10 @@ async function genPPTX() {
     addDarkHeader(s25, 'Competitive Advantage', 'THE GAPS THEY LEFT. WE TAKE THEM ALL.');
     
     const gaps = [
-      { t: 'WhatsApp Automation', d: `THEM: 	ext{comp1} = manual · 	ext{comp2} = broadcast only\\nUS: automated flows — 8 touchpoints from Day 1\\nRecover 30–40% of abandoned carts competitors lose forever`, c: COLOR_GREEN },
-      { t: 'Email Marketing', d: `THEM: Neither 	ext{comp1} nor 	ext{comp2} runs email nurture\\nUS: Klaviyo 5-email welcome flow + lifecycle sequences\\nZero competition in inbox = 25–30% open rate from Day 1`, c: COLOR_PRIMARY },
+      { t: 'WhatsApp Automation', d: `THEM: ${comp1} = manual · ${comp2} = broadcast only\\nUS: automated flows — 8 touchpoints from Day 1\\nRecover 30–40% of abandoned carts competitors lose forever`, c: COLOR_GREEN },
+      { t: 'Email Marketing', d: `THEM: Neither ${comp1} nor ${comp2} runs email nurture\\nUS: Klaviyo 5-email welcome flow + lifecycle sequences\\nZero competition in inbox = 25–30% open rate from Day 1`, c: COLOR_PRIMARY },
       { t: 'YouTube Strategy', d: `THEM: No competitor owns YouTube SEO\\nUS: 2 videos/month — size guide, feature demos, founder story\\nCompound organic traffic — competitor presence is extremely low`, c: COLOR_RED },
-      { t: 'Google Shopping', d: `THEM: 	ext{comp2} runs Shopping. 	ext{comp1} does NOT.\\nUS: All SKUs with SEO-optimised titles from Day 1\\nCapture purchase-intent searches competitors ignore completely`, c: COLOR_AMBER },
+      { t: 'Google Shopping', d: `THEM: ${comp2} runs Shopping. ${comp1} does NOT.\\nUS: All SKUs with SEO-optimised titles from Day 1\\nCapture purchase-intent searches competitors ignore completely`, c: COLOR_AMBER },
       { t: 'Premium Offer Design', d: 'THEM: Both brands = discount-dependent. Codes everywhere.\\nUS: Gift-first strategy — gifts, bundle upsells, early access.\\nHigher AOV, better margins, loyal customers who pay full price', c: COLOR_PURPLE },
       { t: 'Brand Origin Story', d: isFitness
         ? `THEM: No competitor owns the 'engineered for India' narrative\\nUS: Every ad, page, and post leads with Indian body fit identity\\nEmotional moat — once owned, impossible for others to steal`
@@ -1891,7 +1891,7 @@ async function genPPTX() {
     if (isFitness) {
       creativeAnglesText = `01. THE PERFORMANCE PROOF (Reel · 15s)\\n"Anti-rip test. 100kg deadlift. Watch what happens."\\n\\n02. THE INDIAN BODY STORY (Reel · 30s)\\n"International brands size you down. We size you right."\\n\\n03. THE DARK AESTHETIC DROP (Video · 6s)\\n"New drop. No captions needed."\\n\\n04. THE SOCIAL PROOF WALL (Static Carousel)\\n"47 people bought this today. Here's why."\\n\\n05. THE OFFER REVEAL (Static Image)\\n"Free Shaker when you spend ₹1,499. Today only."`;
     } else {
-      creativeAnglesText = `01. THE PERFORMANCE PROOF (Reel · 15s)\\n"Demonstrate product efficacy and premium ingredients/materials."\\n\\n02. THE VALUE / PROBLEM STORY (Reel · 30s)\\n"Showcase the core problem Mr./Ms. 	ext{founderName || 'Founder'} set out to solve for India."\\n\\n03. THE AESTHETIC DROP (Video · 6s)\\n"Visual-first showcase of the product and its packaging."\\n\\n04. THE SOCIAL PROOF WALL (Static Carousel)\\n"Real user reviews, testimonials, and rating highlights."\\n\\n05. THE OFFER REVEAL (Static Image)\\n"	ext{primaryOffer || 'Exclusive gift with purchase reveal.'}"`;
+      creativeAnglesText = `01. THE PERFORMANCE PROOF (Reel · 15s)\\n"Demonstrate product efficacy and premium ingredients/materials."\\n\\n02. THE VALUE / PROBLEM STORY (Reel · 30s)\\n"Showcase the core problem Mr./Ms. ${fName || 'Founder'} set out to solve for India."\\n\\n03. THE AESTHETIC DROP (Video · 6s)\\n"Visual-first showcase of the product and its packaging."\\n\\n04. THE SOCIAL PROOF WALL (Static Carousel)\\n"Real user reviews, testimonials, and rating highlights."\\n\\n05. THE OFFER REVEAL (Static Image)\\n"${primaryOffer || 'Exclusive gift with purchase reveal.'}"`;
     }
     s26.addText(creativeAnglesText, { x: 0.7, y: 1.8, w: 5.5, fontSize: 10.5, lineSpacing: 18, color: COLOR_DARK, fontFace: FONT_PRIMARY });
 
@@ -1902,7 +1902,7 @@ async function genPPTX() {
     
     const week2AdsText = isFitness
       ? `· 1x Founder story Reel (Indian body fit narrative)\\n· 1x YouTube video (size guide or feature deep-dive)\\n· 1x BOFU offer static (Free Shaker reveal)`
-      : `· 1x Founder story Reel (Brand origin and mission)\\n· 1x YouTube video (product comparison or feature deep-dive)\\n· 1x BOFU offer static (	ext{primaryOffer || 'Free Gift'} reveal)`;
+      : `· 1x Founder story Reel (Brand origin and mission)\\n· 1x YouTube video (product comparison or feature deep-dive)\\n· 1x BOFU offer static (${primaryOffer || 'Free Gift'} reveal)`;
     s26.addText('WEEK 1\\n· 2x Performance Proof Reels (efficacy / tech tests)\\n· 2x Aesthetic statics (new product angle)\\n· 1x Social Proof carousel (UGC compilation)\\n\\nWEEK 2\\n' + week2AdsText + '\\n\\nWEEK 3\\n· 2x Influencer UGC cuts (from micro-creator deliverables)\\n· 1x Shopping search image (clean product on dark BG)\\n· 1x A/B test variant of best Week 1 creative\\n\\nWEEK 4\\n· 1x New drop teaser Reel (6-sec dark identity)\\n· Review + retire bottom performer — replace with winner', {x: 7.1, y: 1.7, w: 5.5, fontSize: 10, lineSpacing: 16, color: COLOR_DARK, fontFace: FONT_PRIMARY, h: 0.35});
 
     // SLIDE 27: Campaign Calendar (Light Theme)
@@ -1918,7 +1918,7 @@ async function genPPTX() {
       ];
     } else {
       campaignCalendarCols = [
-        { m: 'APRIL 2026', c: `Apr 7 ★ KEY\\nWorld Health Day\\nHealth and wellness focus related to 	ext{industry || 'D2C'}.\\n\\nApr 14 ★ KEY\\nTamil New Year / Vishu\\nSpring season buying season. Regional campaigns.\\n\\nApr 22\\nEarth Day\\nHighlight eco-friendly packaging and ethics.\\n\\nApr 3\\nGood Friday\\nLong weekend shopping spike — boost retention.`, color: COLOR_RED },
+        { m: 'APRIL 2026', c: `Apr 7 ★ KEY\\nWorld Health Day\\nHealth and wellness focus related to ${indName || 'D2C'}.\\n\\nApr 14 ★ KEY\\nTamil New Year / Vishu\\nSpring season buying season. Regional campaigns.\\n\\nApr 22\\nEarth Day\\nHighlight eco-friendly packaging and ethics.\\n\\nApr 3\\nGood Friday\\nLong weekend shopping spike — boost retention.`, color: COLOR_RED },
         { m: 'MAY 2026', c: `May 1\\nLabour Day\\nCampaign theme: "Reward your hard work".\\n\\nMay 10 ★ KEY\\nMother's Day\\nGifting campaign targeting women. Special gift boxes.\\n\\nMay 23\\nBuddha Purnima\\nContent angle: clarity, simplicity, purity.\\n\\nMay 27\\nBakri Eid\\nFestive gifting season — run targeted WhatsApp alerts.`, color: COLOR_PURPLE },
         { m: 'JUNE 2026', c: `Jun 15 ★ KEY\\nFather's Day\\nMen's gifting segment push. Bundle offers.\\n\\nJun 21 ★ KEY\\nSummer Solstice Sale\\nMid-year peak shopping days. High paid ads bid.\\n\\nJun 21\\nWorld Music Day\\nCurated audio track and Reels lifestyle trend.\\n\\nJun 17\\nIslamic New Year\\nFestive greeting and early-access drop alerts.`, color: COLOR_GREEN }
       ];
