@@ -102,7 +102,7 @@ if ($method === 'POST' && $action === 'crawl') {
         }
     }
     
-    const CRAWL_SYS = 'You are a world-class brand crawler and intelligence compiler. Analyze the inputs and extract precise data. Return ONLY valid JSON, no preamble, no markdown formatting.';
+    $crawlSys = 'You are a world-class brand crawler and intelligence compiler. Analyze the inputs and extract precise data. Return ONLY valid JSON, no preamble, no markdown formatting.';
     
     $prompt = "We are performing a deep digital audit on the brand: '$brandName'\n"
             . "Website URL: '$brandUrl'\n"
@@ -129,7 +129,7 @@ if ($method === 'POST' && $action === 'crawl') {
             . "}";
             
     try {
-        $data = callJSON(CRAWL_SYS, $prompt, 2000);
+        $data = callJSON($crawlSys, $prompt, 2000);
         json_out($data);
     } catch (Throwable $e) {
         json_err($e->getMessage());
@@ -149,7 +149,7 @@ if ($method === 'POST' && $action === 'formulate') {
     $crawledStr = json_encode($crawled);
     $briefStr = json_encode($brief);
     
-    const STRAT_SYS = 'You are a member of a Million-Dollar Advisory Board comprised of Steve Jobs, Elon Musk, Warren Buffett, Charlie Munger, and elite Dentsu/Deloitte marketing directors. You formulate out-of-the-box, highly actionable, deeply personalized D2C strategy recommendations. Return ONLY a valid JSON object matching the requested structure.';
+    $stratSys = 'You are a member of a Million-Dollar Advisory Board comprised of Steve Jobs, Elon Musk, Warren Buffett, Charlie Munger, and elite Dentsu/Deloitte marketing directors. You formulate out-of-the-box, highly actionable, deeply personalized D2C strategy recommendations. Return ONLY a valid JSON object matching the requested structure.';
     
     $prompt = "Formulate a comprehensive growth strategy deck for the brand: '$brandName' ($brandUrl).\n\n"
             . "CRAWLED BRAND DETAILS:\n$crawledStr\n\n"
@@ -201,7 +201,7 @@ if ($method === 'POST' && $action === 'formulate') {
             . "}";
             
     try {
-        $strategyData = callJSON(STRAT_SYS, $prompt, 3200);
+        $strategyData = callJSON($stratSys, $prompt, 3200);
         json_out($strategyData);
     } catch (Throwable $e) {
         json_err($e->getMessage());
