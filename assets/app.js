@@ -6026,20 +6026,23 @@ function exportConsultantPPTX() {
   const jmRecs = jm.recommendations || [];
   jmRecs.forEach((rec, idx) => {
     if (!rec.trim()) return;
-    let y = 1.3 + (idx * 2.8);
-    if (y > 6.0) return; // safety boundary
+    let x = idx === 0 ? 0.6 : 6.8;
     
     // Card container
-    slide2.addShape('rect', { x: 0.6, y: y, w: 12.1, h: 2.5, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
-    slide2.addShape('rect', { x: 0.6, y: y, w: 0.12, h: 2.5, fill: { color: primaryColor } });
+    slide2.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 5.3, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
+    slide2.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 0.45, fill: { color: primaryColor } });
     
     // Bullet/Label
-    slide2.addText(`PERSPECTIVE PILLAR 0${idx+1}`, { x: 1.0, y: y + 0.2, w: 11.0, h: 0.25, fontSize: 10, bold: true, color: '64748B', fontFace: FONT_PRIMARY });
+    slide2.addText(`PERSPECTIVE PILLAR 0${idx+1}`, {
+      x: x + 0.2, y: 1.35, w: 5.5, h: 0.35,
+      fontSize: 11, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY,
+      valign: 'middle'
+    });
     
     // Content Text
     slide2.addText(rec, {
-      x: 1.0, y: y + 0.6, w: 11.3, h: 1.6,
-      fontSize: 13, lineSpacing: 22, color: COLOR_DARK, fontFace: FONT_PRIMARY,
+      x: x + 0.2, y: 1.9, w: 5.5, h: 4.5,
+      fontSize: 12, lineSpacing: 20, color: COLOR_DARK, fontFace: FONT_PRIMARY,
       valign: 'top'
     });
   });
@@ -6052,17 +6055,20 @@ function exportConsultantPPTX() {
   const bmRecs = bm.recommendations || [];
   bmRecs.forEach((rec, idx) => {
     if (!rec.trim()) return;
-    let y = 1.3 + (idx * 2.8);
-    if (y > 6.0) return;
+    let x = idx === 0 ? 0.6 : 6.8;
     
-    slide3.addShape('rect', { x: 0.6, y: y, w: 12.1, h: 2.5, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
-    slide3.addShape('rect', { x: 0.6, y: y, w: 0.12, h: 2.5, fill: { color: '#F59E0B' } });
+    slide3.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 5.3, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
+    slide3.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 0.45, fill: { color: '#F59E0B' } });
     
-    slide3.addText(`PERSPECTIVE PILLAR 0${idx+1}`, { x: 1.0, y: y + 0.2, w: 11.0, h: 0.25, fontSize: 10, bold: true, color: '64748B', fontFace: FONT_PRIMARY });
+    slide3.addText(`PERSPECTIVE PILLAR 0${idx+1}`, {
+      x: x + 0.2, y: 1.35, w: 5.5, h: 0.35,
+      fontSize: 11, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY,
+      valign: 'middle'
+    });
     
     slide3.addText(rec, {
-      x: 1.0, y: y + 0.6, w: 11.3, h: 1.6,
-      fontSize: 13, lineSpacing: 22, color: COLOR_DARK, fontFace: FONT_PRIMARY,
+      x: x + 0.2, y: 1.9, w: 5.5, h: 4.5,
+      fontSize: 12, lineSpacing: 20, color: COLOR_DARK, fontFace: FONT_PRIMARY,
       valign: 'top'
     });
   });
@@ -6075,17 +6081,20 @@ function exportConsultantPPTX() {
   const afRecs = af.recommendations || [];
   afRecs.forEach((rec, idx) => {
     if (!rec.trim()) return;
-    let y = 1.3 + (idx * 2.8);
-    if (y > 6.0) return;
+    let x = idx === 0 ? 0.6 : 6.8;
     
-    slide4.addShape('rect', { x: 0.6, y: y, w: 12.1, h: 2.5, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
-    slide4.addShape('rect', { x: 0.6, y: y, w: 0.12, h: 2.5, fill: { color: '#2B4EFF' } });
+    slide4.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 5.3, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
+    slide4.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 0.45, fill: { color: '#2B4EFF' } });
     
-    slide4.addText(`PERSPECTIVE PILLAR 0${idx+1}`, { x: 1.0, y: y + 0.2, w: 11.0, h: 0.25, fontSize: 10, bold: true, color: '64748B', fontFace: FONT_PRIMARY });
+    slide4.addText(`PERSPECTIVE PILLAR 0${idx+1}`, {
+      x: x + 0.2, y: 1.35, w: 5.5, h: 0.35,
+      fontSize: 11, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY,
+      valign: 'middle'
+    });
     
     slide4.addText(rec, {
-      x: 1.0, y: y + 0.6, w: 11.3, h: 1.6,
-      fontSize: 13, lineSpacing: 22, color: COLOR_DARK, fontFace: FONT_PRIMARY,
+      x: x + 0.2, y: 1.9, w: 5.5, h: 4.5,
+      fontSize: 12, lineSpacing: 20, color: COLOR_DARK, fontFace: FONT_PRIMARY,
       valign: 'top'
     });
   });
@@ -6098,17 +6107,20 @@ function exportConsultantPPTX() {
   const cpRecs = cp.recommendations || [];
   cpRecs.forEach((rec, idx) => {
     if (!rec.trim()) return;
-    let y = 1.3 + (idx * 2.8);
-    if (y > 6.0) return;
+    let x = idx === 0 ? 0.6 : 6.8;
     
-    slide5.addShape('rect', { x: 0.6, y: y, w: 12.1, h: 2.5, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
-    slide5.addShape('rect', { x: 0.6, y: y, w: 0.12, h: 2.5, fill: { color: '#10B981' } });
+    slide5.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 5.3, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
+    slide5.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 0.45, fill: { color: '#10B981' } });
     
-    slide5.addText(`PLAYBOOK CRITERIA 0${idx+1}`, { x: 1.0, y: y + 0.2, w: 11.0, h: 0.25, fontSize: 10, bold: true, color: '64748B', fontFace: FONT_PRIMARY });
+    slide5.addText(`PLAYBOOK CRITERIA 0${idx+1}`, {
+      x: x + 0.2, y: 1.35, w: 5.5, h: 0.35,
+      fontSize: 11, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY,
+      valign: 'middle'
+    });
     
     slide5.addText(rec, {
-      x: 1.0, y: y + 0.6, w: 11.3, h: 1.6,
-      fontSize: 13, lineSpacing: 22, color: COLOR_DARK, fontFace: FONT_PRIMARY,
+      x: x + 0.2, y: 1.9, w: 5.5, h: 4.5,
+      fontSize: 12, lineSpacing: 20, color: COLOR_DARK, fontFace: FONT_PRIMARY,
       valign: 'top'
     });
   });
