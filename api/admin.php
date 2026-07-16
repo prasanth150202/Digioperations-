@@ -121,7 +121,7 @@ if ($method === 'DELETE' && $action === 'months' && $id) {
 
 // GET /api/admin.php?action=settings
 if ($method === 'GET' && $action === 'settings') {
-    $keys = ['ai_provider','anthropic_model','openai_model','anthropic_api_key','openai_api_key'];
+    $keys = ['ai_provider','anthropic_model','openai_model','anthropic_api_key','openai_api_key','jina_api_key','firecrawl_api_key','tavily_api_key','serpapi_api_key'];
     $out  = [];
     foreach ($keys as $k) $out[$k] = getSetting($k);
     json_out($out);
@@ -130,7 +130,7 @@ if ($method === 'GET' && $action === 'settings') {
 // POST /api/admin.php?action=settings
 if ($method === 'POST' && $action === 'settings') {
     $b = body();
-    $allowed = ['ai_provider','anthropic_model','openai_model','anthropic_api_key','openai_api_key'];
+    $allowed = ['ai_provider','anthropic_model','openai_model','anthropic_api_key','openai_api_key','jina_api_key','firecrawl_api_key','tavily_api_key','serpapi_api_key'];
     foreach ($allowed as $k) {
         if (isset($b[$k])) setSetting($k, $b[$k], $user['name']);
     }

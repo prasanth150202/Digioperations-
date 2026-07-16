@@ -2941,6 +2941,15 @@ async function loadSettings() {
   if (ak) ak.value = s.anthropic_api_key || '';
   if (ok) ok.value = s.openai_api_key || '';
   
+  const jk = document.getElementById('intel-jina-key');
+  const fk = document.getElementById('intel-firecrawl-key');
+  const tk = document.getElementById('intel-tavily-key');
+  const sk = document.getElementById('intel-serpapi-key');
+  if (jk) jk.value = s.jina_api_key || '';
+  if (fk) fk.value = s.firecrawl_api_key || '';
+  if (tk) tk.value = s.tavily_api_key || '';
+  if (sk) sk.value = s.serpapi_api_key || '';
+  
   selectPrimaryProvider(s.ai_provider || 'anthropic', false);
 }
 
@@ -5594,576 +5603,215 @@ async function submitEditReportData() {
   }
 }
 
-// ─── AI CONSULTANT ────────────────────────────────────────────────────────────
-let consultantState = {
-  brandId: '',
-  brandName: '',
-  brandUrl: '',
-  crawled: {},
-  brief: {},
-  strategy: {},
-  isDirty: false
-};
 
-function initConsultantPage() {
-  if (!activeBrand) {
-    document.getElementById('consultant-active-brand-badge').textContent = 'No brand selected';
-    document.getElementById('c-phase-discovery').style.display = 'none';
-    document.getElementById('c-phase-briefing').style.display = 'none';
-    document.getElementById('c-phase-strategy-workspace').style.display = 'none';
-    document.getElementById('consultant-export-btn').style.display = 'none';
-    alert('Please select a brand from the top sidebar picker first.');
-    openBrandPicker();
-    return;
-  }
 
-  consultantState.brandId = activeBrand.id;
-  document.getElementById('consultant-active-brand-badge').textContent = activeBrand.name;
-  
-  // Load existing strategy draft if any
-  api('/api/consultant.php?action=load&brand_id=' + activeBrand.id)
-    .then(data => {
-      if (data && !data.empty) {
-        consultantState.brandName = data.brand_name || activeBrand.name;
-        consultantState.brandUrl = data.brand_url || '';
-        consultantState.crawled = data.crawled_json || {};
-        consultantState.brief = data.brief_json || {};
-        consultantState.strategy = data.strategy_json || {};
-        
-        // Populate inputs
-        populateBriefingPhaseInputs();
-        populateWorkspaceEditorInputs();
-        
-        // Show strategy workspace directly since they already have a strategy
-        showConsultantPhase(3);
-      } else {
-        // Reset to first step
-        consultantState.brandName = activeBrand.name;
-        consultantState.brandUrl = '';
-        consultantState.crawled = {};
-        consultantState.brief = {};
-        consultantState.strategy = {};
-        
-        document.getElementById('c-crawl-name').value = activeBrand.name;
-        document.getElementById('c-crawl-url').value = '';
-        showConsultantPhase(1);
-      }
-    })
-    .catch(err => {
-      console.error('Failed to load consultant draft:', err);
-      showConsultantPhase(1);
-    });
+
+// === BRAND INTELLIGENCE ENGINE CONTROLLER ===
+
+let _ciIntelligence=null,_ciQuestions=[],_ciSources=[],_ciModules={},_ciCurrentTab='',_ciFounderAnswers={},_ciBrandName='',_ciBrandUrl='';
+const CI_MODULES=[{id:'diagnosis',label:'🔍 Diagnosis'},{id:'market_intelligence',label:'📊 Market'},{id:'customer_map',label:'👤 Customer'},{id:'brand_voice',label:'✍️ Brand Voice'},{id:'growth_playbook',label:'📣 Growth'},{id:'crm_retention',label:'📧 CRM'},{id:'revenue_model',label:'💰 Revenue'},{id:'execution_plan',label:'📅 90-Day Plan'},{id:'risk_scenarios',label:'⚠️ Risks'}];
+const CI_SCORE_LABELS={product_differentiation:'Product Differentiation',online_presence:'Online Presence & SEO',customer_sentiment:'Customer Sentiment',content_quality:'Content Quality',competitive_positioning:'Competitive Positioning',brand_clarity:'Brand Clarity',revenue_model_strength:'Revenue Model Strength',growth_momentum:'Growth Momentum'};
+
+function goToPhase(n){for(let i=1;i<=5;i++){const ph=document.getElementById('c-phase-'+i),st=document.getElementById('c-step-'+i);if(ph)ph.style.display=(i===n)?'':'none';if(st){st.classList.toggle('active',i===n);st.classList.toggle('done',i<n);}}}
+function selectDepth(d){['standard','deep'].forEach(v=>{const el=document.getElementById('depth-opt-'+v);if(el)el.style.borderColor=(v===d)?'var(--blue)':'var(--border)';});}
+
+function initConsultantPage(){
+  const b=activeBrand,badge=document.getElementById('consultant-active-brand-badge');
+  if(!b){if(badge)badge.textContent='No brand selected';return;}
+  if(badge){badge.textContent='🏷 '+b.name;badge.style.background='rgba(43,78,255,0.1)';badge.style.color='var(--blue)';}
+  const ne=document.getElementById('c-crawl-name'),ue=document.getElementById('c-crawl-url');
+  if(ne&&!ne.value)ne.value=b.name||'';
+  if(ue&&!ue.value)ue.value=b.website||'';
+  fetch('api/consultant.php?action=load&brand_id='+encodeURIComponent(b.id)).then(r=>r.json()).then(d=>{
+    if(d&&!d.empty&&d.modules_json&&Object.keys(d.modules_json).length){
+      _ciBrandName=d.brand_name||b.name;_ciBrandUrl=d.brand_url||'';
+      if(d.crawled_json)_ciIntelligence=d.crawled_json;
+      _ciModules=d.modules_json;renderDocumentWorkspace();goToPhase(4);
+    }
+  }).catch(()=>{});
+  loadIntelKeysToUI();injectConsultantStyles();
 }
 
-function showConsultantPhase(phaseNum) {
-  // Update UI containers visibility
-  document.getElementById('c-phase-discovery').style.display = phaseNum === 1 ? '' : 'none';
-  document.getElementById('c-phase-briefing').style.display = phaseNum === 2 ? '' : 'none';
-  document.getElementById('c-phase-strategy-workspace').style.display = phaseNum === 3 ? '' : 'none';
-  
-  // Export button
-  document.getElementById('consultant-export-btn').style.display = phaseNum === 3 ? '' : 'none';
-
-  // Stepper styles
-  for (let i = 1; i <= 3; i++) {
-    const step = document.getElementById('c-step-' + i);
-    if (!step) continue;
-    const numSpan = step.querySelector('span');
-    
-    if (i < phaseNum) {
-      step.style.color = 'var(--green)';
-      step.style.fontWeight = '700';
-      if (numSpan) {
-        numSpan.style.background = 'var(--green)';
-        numSpan.style.color = '#fff';
-        numSpan.textContent = '✓';
-      }
-    } else if (i === phaseNum) {
-      step.style.color = 'var(--blue)';
-      step.style.fontWeight = '700';
-      if (numSpan) {
-        numSpan.style.background = 'var(--blue)';
-        numSpan.style.color = '#fff';
-        numSpan.textContent = i;
-      }
-    } else {
-      step.style.color = 'var(--mid)';
-      step.style.fontWeight = '600';
-      if (numSpan) {
-        numSpan.style.background = 'var(--border)';
-        numSpan.style.color = 'var(--mid)';
-        numSpan.textContent = i;
+function startDeepCrawl(){
+  const name=(document.getElementById('c-crawl-name')||{value:''}).value.trim();
+  const url=(document.getElementById('c-crawl-url')||{value:''}).value.trim();
+  if(!name){alert('Please enter a brand name.');return;}
+  _ciBrandName=name;_ciBrandUrl=url;_ciModules={};_ciIntelligence=null;
+  const feedEl=document.getElementById('c-intel-feed'),startBtn=document.getElementById('c-start-crawl-btn');
+  if(feedEl)feedEl.style.display='';
+  if(startBtn){startBtn.disabled=true;startBtn.textContent='⏳ Crawling...';}
+  const feedLog=document.getElementById('c-feed-log');
+  if(feedLog)feedLog.innerHTML='';
+  function appendLog(msg,color){if(!feedLog)return;const d=document.createElement('div');if(color)d.style.color=color;d.textContent=msg;feedLog.appendChild(d);feedLog.scrollTop=feedLog.scrollHeight;}
+  function setProgress(pct){const bar=document.getElementById('c-feed-progress-bar'),pEl=document.getElementById('c-feed-pct');if(bar)bar.style.width=pct+'%';if(pEl)pEl.textContent=pct+'%';}
+  fetch('api/consultant.php?action=deep_crawl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({brand_name:name,brand_url:url})})
+  .then(async res=>{
+    const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='';
+    while(true){const{done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const parts=buffer.split('\n\n');buffer=parts.pop();
+      for(const part of parts){const lines=part.split('\n');let event='message',data='';for(const line of lines){if(line.startsWith('event: '))event=line.slice(7);if(line.startsWith('data: '))data=line.slice(6);}
+        if(!data)continue;let payload;try{payload=JSON.parse(data);}catch{continue;}
+        if(event==='progress'){appendLog(payload.message);setProgress(payload.pct||0);}
+        else if(event==='start'){appendLog('🚀 '+payload.message,'var(--blue)');}
+        else if(event==='done'){
+          _ciIntelligence=payload.intelligence;_ciQuestions=payload.questions||[];_ciSources=payload.sources||[];
+          const stats=payload.stats||{},statMap={pages:'pages_crawled',searches:'search_results',reddit:'reddit_threads',competitors:'competitor_pages'};
+          Object.entries(statMap).forEach(([k,v])=>{const el=document.getElementById('stat-'+k);if(el)el.textContent=stats[v]||0;});
+          const sEl=document.getElementById('c-feed-stats');if(sEl)sEl.style.display='grid';
+          appendLog('✅ Research complete!','#10B981');setProgress(100);
+          setTimeout(()=>{renderScorecard();goToPhase(2);},800);
+        }else if(event==='error'){appendLog('❌ '+(payload.message||'Error'),'#ef4444');if(startBtn){startBtn.disabled=false;startBtn.textContent='🚀 Start Intelligence Crawl';}}
       }
     }
-  }
+  }).catch(err=>{appendLog('❌ Connection error: '+err.message,'#ef4444');if(startBtn){startBtn.disabled=false;startBtn.textContent='🚀 Start Intelligence Crawl';}});
 }
 
-function runDiscoveryCrawl() {
-  const name = document.getElementById('c-crawl-name').value.trim();
-  const url = document.getElementById('c-crawl-url').value.trim();
-  
-  if (!name) {
-    alert('Please enter a Brand Name');
-    return;
+function renderScorecard(){
+  const intel=_ciIntelligence;if(!intel)return;
+  const ovg=document.getElementById('c-overview-grid');
+  if(ovg&&intel.brand_overview){const o=intel.brand_overview;ovg.innerHTML=[['Founded',o.founded],['HQ',o.headquarters],['Founders',o.founders],['Category',o.category],['Funding',o.funding],['Mission',o.mission]].map(([l,v])=>'<div style="padding:10px 12px;background:#fff;border-radius:8px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">'+l+'</div><div style="font-size:12px;color:var(--dark);font-weight:600;line-height:1.4">'+(v||'Not found')+'</div></div>').join('');}
+  const sb=document.getElementById('c-scorecard-bars');
+  if(sb&&intel.brand_health_score){sb.innerHTML=Object.entries(intel.brand_health_score).map(([k,v])=>{const pct=Math.min(100,Math.max(0,Number(v)||0)),col=pct>=70?'#10B981':pct>=45?'#f59e0b':'#ef4444';return '<div><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:12px;color:var(--dark);font-weight:600">'+(CI_SCORE_LABELS[k]||k)+'</span><span style="font-size:12px;font-weight:800;color:'+col+'">'+pct+'/100</span></div><div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+';transition:width 0.8s;border-radius:3px"></div></div></div>';}).join('');}
+  const sl=document.getElementById('c-sources-list');
+  if(sl&&_ciSources.length)sl.innerHTML=_ciSources.slice(0,30).map(s=>'<div style="font-size:11px;color:var(--mid);padding:4px 8px;background:var(--off);border-radius:5px">'+s.label+'</div>').join('');
+  const pl=document.getElementById('c-priorities-list');
+  if(pl&&intel.top_3_priority_fixes)pl.innerHTML=intel.top_3_priority_fixes.map((f,i)=>'<div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start"><div style="width:22px;height:22px;border-radius:50%;background:#ef4444;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0">'+(i+1)+'</div><div style="font-size:12px;color:var(--dark);line-height:1.5">'+f+'</div></div>').join('');
+  const cl=document.getElementById('c-competitors-list');
+  if(cl&&intel.competitors)cl.innerHTML=intel.competitors.slice(0,4).map(c=>'<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:#fff"><div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:4px">'+c.name+'</div><div style="font-size:11px;color:#10B981;margin-bottom:2px">✓ '+(c.strength||'—')+'</div><div style="font-size:11px;color:#ef4444">✗ '+(c.weakness||'—')+'</div></div>').join('');
+  const cv=document.getElementById('c-customer-voice-grid');
+  if(cv&&intel.customer_voice){const praise=(intel.customer_voice.praise||[]).slice(0,3),complaints=(intel.customer_voice.complaints||[]).slice(0,3);cv.innerHTML='<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:#10B981;margin-bottom:6px">CUSTOMERS LOVE</div>'+praise.map(p=>'<div style="font-size:11px;color:var(--mid);padding:4px 0;border-bottom:1px solid var(--border)">✓ '+p+'</div>').join('')+'</div><div><div style="font-size:11px;font-weight:700;color:#ef4444;margin-bottom:6px">CUSTOMERS COMPLAIN</div>'+complaints.map(c=>'<div style="font-size:11px;color:var(--mid);padding:4px 0;border-bottom:1px solid var(--border)">✗ '+c+'</div>').join('')+'</div>';}
+  const gl=document.getElementById('c-gaps-list');
+  if(gl&&intel.research_gaps)gl.innerHTML=intel.research_gaps.map(g=>'<div>• '+g+'</div>').join('');
+}
+
+function proceedToBriefing(){renderBriefingQuestions();goToPhase(3);}
+function renderBriefingQuestions(){
+  const container=document.getElementById('c-dynamic-questions');if(!container)return;
+  container.innerHTML=_ciQuestions.map(q=>'<div style="border:1px solid var(--border);border-radius:10px;padding:18px;background:#fff"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;background:rgba(43,78,255,0.1);color:var(--blue)">'+(q.category||'General')+'</span><span style="font-size:12px;font-weight:700;color:var(--dark)">'+q.question+'</span></div><div style="font-size:11px;color:var(--mid);margin-bottom:10px;font-style:italic">Why this matters: '+(q.why||'')+'</div><textarea id="brief-'+q.id+'" placeholder="'+(q.placeholder||'Your answer...')+'" style="width:100%;min-height:80px;font-size:12px;resize:vertical" oninput="saveBriefingAnswer(\''+q.id+'\',this.value)"></textarea></div>').join('');
+  Object.entries(_ciFounderAnswers).forEach(([id,val])=>{const el=document.getElementById('brief-'+id);if(el)el.value=val;});
+}
+function saveBriefingAnswer(id,value){_ciFounderAnswers[id]=value;}
+
+async function startDocumentGeneration(){
+  goToPhase(4);
+  const loader=document.getElementById('c-doc-gen-loader'),workspace=document.getElementById('c-doc-workspace');
+  if(loader)loader.style.display='';if(workspace)workspace.style.display='none';
+  const avatars=['jobs','musk','buffett','munger','agency'];let ai=0;
+  const aint=setInterval(()=>{const av=document.getElementById('av-'+avatars[ai%avatars.length]);if(av){av.style.opacity='1';av.style.transform='scale(1.1)';setTimeout(()=>{if(av){av.style.opacity='0.5';av.style.transform='scale(1)';}},500);}ai++;},1200);
+  const modulesToGen=(_ciIntelligence&&_ciIntelligence.recommended_documents?_ciIntelligence.recommended_documents:CI_MODULES.map(m=>m.id)).filter(id=>CI_MODULES.find(m=>m.id===id));
+  const total=modulesToGen.length;let done=0;
+  const upd=(title,sub)=>{const tEl=document.getElementById('c-doc-loader-title'),sEl=document.getElementById('c-doc-loader-sub'),pb=document.getElementById('c-doc-progress-bar');if(tEl)tEl.textContent=title;if(sEl)sEl.textContent=sub;if(pb)pb.style.width=((done/total)*100)+'%';};
+  const founderBrief={};_ciQuestions.forEach(q=>{if(_ciFounderAnswers[q.id])founderBrief[(q.category||'Q')+'_'+q.id]={question:q.question,answer:_ciFounderAnswers[q.id]};});
+  for(const moduleId of modulesToGen){
+    const mod=CI_MODULES.find(m=>m.id===moduleId);
+    upd('Generating: '+(mod?mod.label:moduleId)+' ('+(done+1)+'/'+total+')','Applying advisory board frameworks...');
+    try{const res=await apiFetch('api/consultant.php?action=generate_module',{brand_name:_ciBrandName,module_id:moduleId,intelligence:_ciIntelligence||{},founder_brief:founderBrief});if(res.ok&&res.content)_ciModules[moduleId]=res.content;}
+    catch(e){_ciModules[moduleId]='Generation failed: '+e.message+'\n\nPlease use Regenerate button to retry.';}
+    done++;await new Promise(r=>setTimeout(r,300));
   }
-  
-  consultantState.brandName = name;
-  consultantState.brandUrl = url;
-  
-  // Show loader and animate progress
-  const loader = document.getElementById('c-crawl-loader');
-  const bar = document.getElementById('c-loader-progress-bar');
-  const status = document.getElementById('c-loader-status');
-  const detail = document.getElementById('c-loader-detail');
-  
-  loader.style.display = '';
-  bar.style.width = '10%';
-  status.textContent = 'Initiating Deep Crawl...';
-  detail.textContent = 'Contacting hostname and running WHOIS check...';
-  
-  const steps = [
-    { p: 25, s: 'Resolving DNS and SSL Protocols...', d: 'Establishing secure port handshake...' },
-    { p: 45, s: 'Crawling Site Maps & Robots...', d: 'Indexing links and scraping HTML layout elements...' },
-    { p: 65, s: 'Analyzing Brand Visual Theme...', d: 'Extracting CSS palettes, stylesheets, and font families...' },
-    { p: 85, s: 'Profiling Content & Hero Items...', d: 'Parsing pricing catalogs, USPs, and social tags...' }
-  ];
-  
-  let stepIdx = 0;
-  const interval = setInterval(() => {
-    if (stepIdx < steps.length) {
-      bar.style.width = steps[stepIdx].p + '%';
-      status.textContent = steps[stepIdx].s;
-      detail.textContent = steps[stepIdx].d;
-      stepIdx++;
-    } else {
-      clearInterval(interval);
+  clearInterval(aint);await saveConsultantDossier(true);renderDocumentWorkspace();
+  if(loader)loader.style.display='none';if(workspace)workspace.style.display='';
+}
+
+function renderDocumentWorkspace(){
+  const tabs=document.getElementById('c-doc-tabs'),panels=document.getElementById('c-doc-panels');if(!tabs||!panels)return;
+  const avail=CI_MODULES.filter(m=>_ciModules[m.id]);if(!avail.length)return;
+  tabs.innerHTML=avail.map((m,i)=>'<button class="c-doc-tab'+(i===0?' active':'')+'" id="tab-'+m.id+'" onclick="switchDocTab(\''+m.id+'\')" style="padding:12px 16px;border:none;border-bottom:3px solid '+(i===0?'var(--blue)':'transparent')+';background:none;cursor:pointer;font-size:12px;font-weight:'+(i===0?'700':'600')+';color:'+(i===0?'var(--blue)':'var(--mid)')+';white-space:nowrap;transition:all 0.2s">'+m.label+'</button>').join('');
+  _ciCurrentTab=avail[0].id;renderDocPanel(_ciCurrentTab);
+}
+function switchDocTab(moduleId){
+  _ciCurrentTab=moduleId;
+  document.querySelectorAll('.c-doc-tab').forEach(t=>{const a=t.id==='tab-'+moduleId;t.style.borderBottomColor=a?'var(--blue)':'transparent';t.style.color=a?'var(--blue)':'var(--mid)';t.style.fontWeight=a?'700':'600';});
+  renderDocPanel(moduleId);
+}
+function renderDocPanel(moduleId){
+  const panels=document.getElementById('c-doc-panels');if(!panels)return;
+  const content=_ciModules[moduleId]||'(No content generated yet)';
+  panels.innerHTML='<textarea id="doc-panel-'+moduleId+'" style="width:100%;min-height:500px;font-size:13px;font-family:var(--fm);line-height:1.7;border:1px solid var(--border);border-radius:8px;padding:16px;resize:vertical;color:var(--dark)" oninput="markDocumentDirty()">'+content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</textarea>';
+}
+function markDocumentDirty(){const el=document.getElementById('c-save-status');if(el){el.textContent='Unsaved changes';el.style.color='#f59e0b';}}
+
+async function regenerateCurrentModule(){
+  if(!_ciCurrentTab)return;const mod=CI_MODULES.find(m=>m.id===_ciCurrentTab);
+  if(!confirm('Regenerate "'+( mod?mod.label:_ciCurrentTab)+'"? This overwrites current content.'))return;
+  const btn=event.target;btn.disabled=true;btn.textContent='⏳ Regenerating...';
+  const founderBrief={};_ciQuestions.forEach(q=>{if(_ciFounderAnswers[q.id])founderBrief[(q.category||'Q')+'_'+q.id]={question:q.question,answer:_ciFounderAnswers[q.id]};});
+  try{const res=await apiFetch('api/consultant.php?action=generate_module',{brand_name:_ciBrandName,module_id:_ciCurrentTab,intelligence:_ciIntelligence||{},founder_brief:founderBrief});if(res.ok&&res.content){_ciModules[_ciCurrentTab]=res.content;renderDocPanel(_ciCurrentTab);showToast('Section regenerated!','success');}}
+  catch(e){showToast('Regeneration failed: '+e.message,'error');}
+  btn.disabled=false;btn.textContent='🔄 Regenerate This Section';
+}
+
+async function saveConsultantDossier(silent){
+  CI_MODULES.forEach(m=>{const el=document.getElementById('doc-panel-'+m.id);if(el)_ciModules[m.id]=el.value;});
+  const b=activeBrand;if(!b)return;
+  try{await apiFetch('api/consultant.php?action=save',{brand_id:b.id,brand_name:_ciBrandName,brand_url:_ciBrandUrl,crawled:_ciIntelligence||{},brief:_ciFounderAnswers,strategy:{},modules:_ciModules});
+    if(!silent){const el=document.getElementById('c-save-status');if(el){el.textContent='Saved ✓';el.style.color='#10B981';}showToast('Dossier saved!','success');}
+  }catch(e){if(!silent)showToast('Save failed: '+e.message,'error');}
+}
+
+function exportConsultantPPTX(){
+  const intel=_ciIntelligence||{},brand=_ciBrandName||'Brand';
+  const color1=((intel.brand_identity&&intel.brand_identity.primary_color)||'#2B4EFF').replace('#','');
+  const scores=intel.brand_health_score||{};
+  const pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';pptx.title='Brand Intelligence — '+brand;
+  const dBg='0F0F1A';
+  const newSlide=(title,sub)=>{const s=pptx.addSlide();s.background={color:dBg};if(title)s.addText(title,{x:0.4,y:0.3,w:'95%',h:0.5,fontSize:22,bold:true,color:'FFFFFF',fontFace:'Calibri'});if(sub)s.addText(sub,{x:0.4,y:0.8,w:'95%',h:0.3,fontSize:12,color:'9CA3AF',fontFace:'Calibri'});return s;};
+  const cover=pptx.addSlide();cover.background={color:dBg};
+  cover.addText('Brand Intelligence Report',{x:1,y:1.5,w:11,h:0.8,fontSize:32,bold:true,color:'FFFFFF',fontFace:'Calibri',align:'center'});
+  cover.addText(brand,{x:1,y:2.5,w:11,h:1.2,fontSize:56,bold:true,color:color1,fontFace:'Calibri',align:'center'});
+  cover.addText('Prepared by Digifyce Intelligence Engine',{x:1,y:4.5,w:11,h:0.4,fontSize:13,color:'6B7280',fontFace:'Calibri',align:'center'});
+  if(intel.brand_overview){const s=newSlide('Brand Overview','AI-synthesized from deep research');const o=intel.brand_overview;[['Founded',o.founded],['HQ',o.headquarters],['Founders',o.founders],['Category',o.category],['Funding',o.funding]].filter(r=>r[1]).forEach(([k,v],i)=>{s.addText(k+':',{x:0.4,y:1.2+i*0.55,w:2,h:0.4,fontSize:11,bold:true,color:'9CA3AF'});s.addText(v||'',{x:2.6,y:1.2+i*0.55,w:10,h:0.4,fontSize:12,color:'FFFFFF'});});if(o.mission)s.addText('"'+o.mission+'"',{x:0.4,y:4.5,w:'90%',h:0.6,fontSize:13,italic:true,color:'6366f1'});}
+  if(Object.keys(scores).length){const s=newSlide('Brand Health Scorecard','8-dimension assessment');Object.entries(scores).forEach(([k,v],i)=>{const pct=Math.min(100,Math.max(0,Number(v)||0)),col=pct>=70?'10B981':pct>=45?'F59E0B':'EF4444',cx=i<4?0.4:6.7,cy=i<4?i:i-4;s.addText((CI_SCORE_LABELS[k]||k),{x:cx,y:1.2+cy*1.1,w:3,h:0.3,fontSize:10,color:'9CA3AF'});s.addText(pct+'/100',{x:cx+3.1,y:1.2+cy*1.1,w:1.5,h:0.3,fontSize:12,bold:true,color:col});s.addShape(pptx.ShapeType.rect,{x:cx,y:1.55+cy*1.1,w:4.4,h:0.18,fill:{color:'1F2937'}});if(pct>0)s.addShape(pptx.ShapeType.rect,{x:cx,y:1.55+cy*1.1,w:4.4*pct/100,h:0.18,fill:{color:col}});});}
+  if(intel.top_3_priority_fixes){const s=newSlide('Top Priority Issues','Most urgent areas needing attention');intel.top_3_priority_fixes.slice(0,3).forEach((fix,i)=>{s.addText(''+(i+1),{x:0.4,y:1.3+i*1.5,w:0.5,h:0.5,fontSize:18,bold:true,color:color1});s.addText(fix,{x:1.1,y:1.3+i*1.5,w:11.5,h:1.2,fontSize:12,color:'FFFFFF',valign:'top',wrap:true});});}
+  CI_MODULES.filter(m=>_ciModules[m.id]).forEach(m=>{const content=_ciModules[m.id];const chunks=[];let buf='';(content||'').split('\n').forEach(line=>{if((buf+line).length>1200){if(buf)chunks.push(buf);buf=line+'\n';}else buf+=line+'\n';});if(buf)chunks.push(buf);chunks.slice(0,3).forEach((chunk,ci)=>{const s=newSlide(m.label+(ci>0?' (cont.)':''),ci===0?'AI-generated intelligence':'');s.addText(chunk.trim(),{x:0.4,y:1.1,w:'90%',h:4.5,fontSize:10.5,color:'D1D5DB',wrap:true,valign:'top',fontFace:'Calibri'});});});
+  pptx.writeFile({fileName:'Intelligence_'+brand.replace(/\s+/g,'_')+'_'+new Date().toISOString().split('T')[0]}).then(()=>showToast('Board Presentation downloaded!','success'));
+}
+
+function exportDossierPDF(){
+  const intel=_ciIntelligence||{},brand=_ciBrandName||'Brand',color=(intel.brand_identity&&intel.brand_identity.primary_color)||'#2B4EFF';
+  const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+brand+' Dossier</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Georgia,serif;color:#111;padding:40px;max-width:900px;margin:0 auto}h2{font-size:20px;color:'+color+';margin:40px 0 12px;border-bottom:2px solid '+color+';padding-bottom:6px}p{font-size:14px;line-height:1.8;margin-bottom:12px;white-space:pre-wrap}.cover{text-align:center;padding:60px 0;border-bottom:3px solid '+color+';margin-bottom:40px}@media print{body{padding:20px}}</style></head><body><div class="cover"><h1 style="font-size:42px;color:'+color+'">'+brand+'</h1><p style="color:#666;margin-top:8px">Brand Intelligence Dossier · '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'})+'</p></div>'+CI_MODULES.filter(m=>_ciModules[m.id]).map(m=>'<h2>'+m.label+'</h2><p>'+(_ciModules[m.id]||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</p>').join('')+'</body></html>';
+  const w=window.open('','_blank');if(w){w.document.write(html);w.document.close();}
+}
+
+function exportSwipeFile(){
+  let text='BRAND INTELLIGENCE SWIPE FILE\n'+_ciBrandName+'\nGenerated: '+new Date().toLocaleDateString()+'\n'+'='.repeat(60)+'\n\n';
+  CI_MODULES.filter(m=>_ciModules[m.id]).forEach(m=>{text+='\n'+'='.repeat(60)+'\n'+m.label.toUpperCase()+'\n'+'='.repeat(60)+'\n\n'+_ciModules[m.id]+'\n\n';});
+  const blob=new Blob([text],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Swipe_File_'+_ciBrandName.replace(/\s+/g,'_')+'.txt';a.click();URL.revokeObjectURL(url);showToast('Swipe file downloaded!','success');
+}
+
+function exportExecutiveSummary(){
+  const intel=_ciIntelligence||{},brand=_ciBrandName||'Brand',color=(intel.brand_identity&&intel.brand_identity.primary_color)||'#2B4EFF',scores=intel.brand_health_score||{},avg=Object.values(scores).length?Math.round(Object.values(scores).reduce((a,b)=>a+Number(b),0)/Object.values(scores).length):0;
+  const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+brand+' Executive Brief</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;padding:40px;max-width:800px;margin:0 auto}.header{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid '+color+';padding-bottom:16px;margin-bottom:24px}.score{font-size:48px;font-weight:900;color:'+color+'}h3{font-size:13px;font-weight:700;color:'+color+';text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;margin-top:20px}ul{font-size:13px;line-height:1.8;padding-left:16px}</style></head><body><div class="header"><div><div style="font-size:11px;color:#888;text-transform:uppercase">Executive Brief</div><div style="font-size:28px;font-weight:900">'+brand+'</div><div style="font-size:12px;color:#888">'+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'})+'</div></div><div style="text-align:center"><div class="score">'+avg+'</div><div style="font-size:11px;color:#888">Brand Health / 100</div></div></div><h3>Mission</h3><p style="font-size:13px">'+((intel.brand_overview&&intel.brand_overview.mission)||'Not captured')+'</p><h3>Top 3 Priority Issues</h3><ul>'+(intel.top_3_priority_fixes||[]).map(f=>'<li>'+f+'</li>').join('')+'</ul><h3>Competitive Gaps</h3><ul>'+(intel.competitors||[]).slice(0,3).map(c=>'<li><strong>'+c.name+'</strong>: '+c.weakness+'</li>').join('')+'</ul></body></html>';
+  const w=window.open('','_blank');if(w){w.document.write(html);w.document.close();}
+}
+
+let _intelKeySaveTimer=null;
+function saveIntelKeys(){
+  clearTimeout(_intelKeySaveTimer);
+  _intelKeySaveTimer=setTimeout(async()=>{
+    const keys={
+      jina_api_key:(document.getElementById('intel-jina-key')||{value:''}).value.trim(),
+      firecrawl_api_key:(document.getElementById('intel-firecrawl-key')||{value:''}).value.trim(),
+      tavily_api_key:(document.getElementById('intel-tavily-key')||{value:''}).value.trim(),
+      serpapi_api_key:(document.getElementById('intel-serpapi-key')||{value:''}).value.trim()
+    };
+    try{ await api('/api/settings','POST',keys); }catch(e){ console.error(e); }
+  },1200);
+}
+
+function loadIntelKeysToUI(){
+  api('/api/settings').then(s=>{
+    if(s){
+      [['intel-jina-key','jina_api_key'],['intel-firecrawl-key','firecrawl_api_key'],['intel-tavily-key','tavily_api_key'],['intel-serpapi-key','serpapi_api_key']].forEach(([id,k])=>{
+        const el=document.getElementById(id);
+        if(el&&s[k]) el.value=s[k];
+      });
     }
-  }, 1000);
-  
-  api('/api/consultant.php?action=crawl', 'POST', { brand_name: name, brand_url: url })
-    .then(data => {
-      clearInterval(interval);
-      bar.style.width = '100%';
-      status.textContent = 'Crawl Completed!';
-      detail.textContent = 'Formatting discovery dashboard...';
-      
-      setTimeout(() => {
-        loader.style.display = 'none';
-        consultantState.crawled = data || {};
-        
-        // Populate and transition to Phase 2
-        populateBriefingPhaseInputs();
-        showConsultantPhase(2);
-      }, 500);
-    })
-    .catch(err => {
-      clearInterval(interval);
-      loader.style.display = 'none';
-      alert('Crawling failed: ' + err.message);
-    });
+  }).catch(()=>{});
 }
 
-function populateBriefingPhaseInputs() {
-  const c = consultantState.crawled || {};
-  document.getElementById('c-res-color1').value = c.primaryColor || '#2B4EFF';
-  document.getElementById('c-res-color1-hex').value = c.primaryColor || '#2B4EFF';
-  document.getElementById('c-res-color2').value = c.secondaryColor || '#10B981';
-  document.getElementById('c-res-color2-hex').value = c.secondaryColor || '#10B981';
-  
-  document.getElementById('c-res-aesthetics').value = c.visualTone || '';
-  
-  // Format USPs
-  if (Array.isArray(c.usps)) {
-    document.getElementById('c-res-usps').value = c.usps.join('\n');
-  } else {
-    document.getElementById('c-res-usps').value = c.usps || '';
-  }
-  
-  // Format Hero Products
-  if (Array.isArray(c.heroProducts)) {
-    const formatted = c.heroProducts.map(p => `• ${p.name} (${p.price}) - USP: ${p.usp}`).join('\n');
-    document.getElementById('c-res-products').value = formatted;
-  } else {
-    document.getElementById('c-res-products').value = c.heroProducts || '';
-  }
-  
-  document.getElementById('c-res-tone').value = `Tone: ${c.toneOfVoice || ''}\nStyle: ${c.contentStyle || ''}\nBio: ${c.socialBio || ''}`;
-  
-  // Also populate briefing questionnaire if existing
-  const b = consultantState.brief || {};
-  document.getElementById('c-brief-challenges').value = b.challenges || '';
-  document.getElementById('c-brief-goals').value = b.goals || '';
-  document.getElementById('c-brief-failed').value = b.failed || '';
-  document.getElementById('c-brief-secrets').value = b.secrets || '';
+function injectConsultantStyles(){
+  if(document.getElementById('ci-styles'))return;
+  const s=document.createElement('style');s.id='ci-styles';
+  s.textContent='.c-step{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--mid);padding:6px 10px;border-radius:8px;transition:all .2s;font-size:12px}.c-step.active{color:var(--blue);background:rgba(43,78,255,.07);font-weight:700}.c-step.done{color:#10B981}.c-step-num{width:20px;height:20px;border-radius:50%;background:var(--border);color:var(--mid);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}.c-step.active .c-step-num{background:var(--blue);color:#fff}.c-step.done .c-step-num{background:#10B981;color:#fff}.c-step-arrow{color:var(--border);font-size:12px}.export-card:hover{border-color:var(--blue)!important;transform:translateY(-2px);box-shadow:0 8px 24px rgba(43,78,255,.12)}.c-doc-tab:hover{color:var(--dark)!important;background:var(--off)}';
+  document.head.appendChild(s);
 }
-
-function goToBriefingPhase() {
-  showConsultantPhase(2);
-}
-
-function formulateAdvisoryStrategy() {
-  // Read any edits from discovery panel + brief input
-  const c = consultantState.crawled;
-  c.primaryColor = document.getElementById('c-res-color1').value;
-  c.secondaryColor = document.getElementById('c-res-color2').value;
-  c.visualTone = document.getElementById('c-res-aesthetics').value;
-  c.usps = document.getElementById('c-res-usps').value;
-  c.heroProducts = document.getElementById('c-res-products').value;
-  c.toneOfVoice = document.getElementById('c-res-tone').value;
-  
-  const b = consultantState.brief;
-  b.challenges = document.getElementById('c-brief-challenges').value;
-  b.goals = document.getElementById('c-brief-goals').value;
-  b.failed = document.getElementById('c-brief-failed').value;
-  b.secrets = document.getElementById('c-brief-secrets').value;
-  
-  // Show advisory loaders
-  showConsultantPhase(3);
-  const workspace = document.getElementById('c-workspace-editor');
-  const loader = document.getElementById('c-advisory-loader');
-  
-  workspace.style.display = 'none';
-  loader.style.display = '';
-  
-  // Animate avatars opacity sequentially to look like meetings
-  const avatars = ['av-jobs', 'av-musk', 'av-buffett', 'av-munger', 'av-agency'];
-  avatars.forEach((id, idx) => {
-    document.getElementById(id).style.opacity = '0.3';
-    setTimeout(() => {
-      document.getElementById(id).style.opacity = '1.0';
-    }, idx * 1200);
-  });
-  
-  api('/api/consultant.php?action=formulate', 'POST', {
-    brand_name: consultantState.brandName,
-    brand_url: consultantState.brandUrl,
-    crawled: c,
-    brief: b
-  })
-    .then(strategyData => {
-      loader.style.display = 'none';
-      workspace.style.display = '';
-      
-      consultantState.strategy = strategyData || {};
-      populateWorkspaceEditorInputs();
-      
-      // Auto-save strategy record
-      saveConsultantStrategyDraft(true);
-    })
-    .catch(err => {
-      loader.style.display = 'none';
-      showConsultantPhase(2);
-      alert('Strategy formulation failed: ' + err.message);
-    });
-}
-
-function populateWorkspaceEditorInputs() {
-  const s = consultantState.strategy || {};
-  
-  const jm = s.jobs_musk || {};
-  document.getElementById('c-title-jobs').textContent = jm.title || 'Steve Jobs & Elon Musk Perspective';
-  document.getElementById('c-text-jobs').value = Array.isArray(jm.recommendations) ? jm.recommendations.join('\n\n') : '';
-
-  const bm = s.buffett_munger || {};
-  document.getElementById('c-title-buffett').textContent = bm.title || 'Warren Buffett & Charlie Munger Perspective';
-  document.getElementById('c-text-buffett').value = Array.isArray(bm.recommendations) ? bm.recommendations.join('\n\n') : '';
-
-  const af = s.agency_funnel || {};
-  document.getElementById('c-title-agency').textContent = af.title || 'The Omnichannel Growth Funnel (Deloitte/Dentsu)';
-  document.getElementById('c-text-agency').value = Array.isArray(af.recommendations) ? af.recommendations.join('\n\n') : '';
-
-  const cp = s.cross_pollination || {};
-  document.getElementById('c-title-cross').textContent = cp.title || 'Out-of-the-Box Cross-Pollination Playbook';
-  document.getElementById('c-text-cross').value = Array.isArray(cp.recommendations) ? cp.recommendations.join('\n\n') : '';
-
-  const rp = s.action_plan || {};
-  document.getElementById('c-title-roadmap').textContent = rp.title || 'Million-Dollar Execution Roadmap';
-  document.getElementById('c-text-roadmap').value = Array.isArray(rp.recommendations) ? rp.recommendations.join('\n\n') : '';
-  
-  consultantState.isDirty = false;
-  document.getElementById('c-workspace-save-status').textContent = 'Saved';
-}
-
-function markConsultantDirty() {
-  consultantState.isDirty = true;
-  document.getElementById('c-workspace-save-status').textContent = 'Unsaved changes...';
-}
-
-function saveConsultantStrategyDraft(isSilent = false) {
-  // Sync values from textareas back to strategy object
-  const s = consultantState.strategy;
-  
-  s.jobs_musk = s.jobs_musk || { title: 'Steve Jobs & Elon Musk Perspective', subtitle: 'First-principles thinking & cult experience' };
-  s.jobs_musk.recommendations = document.getElementById('c-text-jobs').value.split('\n\n');
-
-  s.buffett_munger = s.buffett_munger || { title: 'Warren Buffett & Charlie Munger Perspective', subtitle: 'Moats & margins safety' };
-  s.buffett_munger.recommendations = document.getElementById('c-text-buffett').value.split('\n\n');
-
-  s.agency_funnel = s.agency_funnel || { title: 'The Omnichannel Growth Funnel (Deloitte/Dentsu)', subtitle: 'Acquisition & lifecycle scaling' };
-  s.agency_funnel.recommendations = document.getElementById('c-text-agency').value.split('\n\n');
-
-  s.cross_pollination = s.cross_pollination || { title: 'Out-of-the-Box Cross-Pollination Playbook', subtitle: 'Unusual industry growth hacks' };
-  s.cross_pollination.recommendations = document.getElementById('c-text-cross').value.split('\n\n');
-
-  s.action_plan = s.action_plan || { title: 'Million-Dollar Execution Roadmap', subtitle: '90-day weekly execution schedule' };
-  s.action_plan.recommendations = document.getElementById('c-text-roadmap').value.split('\n\n');
-
-  const payload = {
-    brand_id: consultantState.brandId,
-    brand_name: consultantState.brandName,
-    brand_url: consultantState.brandUrl,
-    crawled: consultantState.crawled,
-    brief: consultantState.brief,
-    strategy: s
-  };
-  
-  api('/api/consultant.php?action=save', 'POST', payload)
-    .then(() => {
-      consultantState.isDirty = false;
-      document.getElementById('c-workspace-save-status').textContent = 'Draft Saved';
-      if (!isSilent) {
-        showToast('Strategy draft saved successfully!', 'success');
-      }
-    })
-    .catch(err => {
-      console.error('Failed to save draft:', err);
-      if (!isSilent) {
-        alert('Failed to save draft: ' + err.message);
-      }
-    });
-}
-
-function exportConsultantPPTX() {
-  if (consultantState.isDirty) {
-    saveConsultantStrategyDraft(true);
-  }
-  
-  const bName = consultantState.brandName || activeBrand.name;
-  const brandUrl = consultantState.brandUrl || '';
-  const primaryColor = consultantState.crawled.primaryColor || '#2B4EFF';
-  const secondaryColor = consultantState.crawled.secondaryColor || '#10B981';
-  
-  const s = consultantState.strategy || {};
-  
-  // Initialize PptxGenJS
-  const pptx = new PptxGenJS();
-  pptx.layout = 'LAYOUT_WIDE'; // 16:9
-  
-  // Theme Setup
-  const COLOR_DARK = '111E35';
-  const COLOR_LIGHT = 'F4F7FB';
-  const FONT_PRIMARY = 'Plus Jakarta Sans';
-  
-  // Helper: Add Slide Header
-  function addSlideHeader(slide, title, subtitle) {
-    slide.background = { color: COLOR_LIGHT };
-    
-    // Header Bar Accent
-    slide.addShape('rect', { x: 0.5, y: 0.4, w: 0.15, h: 0.6, fill: { color: primaryColor } });
-    
-    // Title
-    slide.addText(title.toUpperCase(), {
-      x: 0.8, y: 0.4, w: 10.0, h: 0.35,
-      fontSize: 22, bold: true, color: COLOR_DARK, fontFace: FONT_PRIMARY,
-      valign: 'middle'
-    });
-    
-    // Subtitle
-    slide.addText(subtitle, {
-      x: 0.8, y: 0.75, w: 10.0, h: 0.25,
-      fontSize: 11, italic: true, color: '64748B', fontFace: FONT_PRIMARY,
-      valign: 'middle'
-    });
-    
-    // Confidentiality tag
-    slide.addText('MILLION-DOLLAR BRIEFING', {
-      x: 10.5, y: 0.4, w: 2.3, h: 0.3,
-      align: 'right', fontSize: 9, bold: true, color: secondaryColor, fontFace: FONT_PRIMARY
-    });
-  }
-  
-  // ── SLIDE 1: COVER SLIDE (Premium Deep Navy Theme) ──
-  const slide1 = pptx.addSlide();
-  slide1.background = { color: COLOR_DARK };
-  
-  // Design elements
-  slide1.addShape('rect', { x: 0, y: 0, w: 0.4, h: 7.5, fill: { color: primaryColor } });
-  slide1.addShape('rect', { x: 13.0, y: 0, w: 0.33, h: 7.5, fill: { color: secondaryColor } });
-  
-  slide1.addText('THE MILLION-DOLLAR STRATEGY PLAYBOOK', {
-    x: 1.0, y: 1.8, w: 11.0, h: 0.4,
-    fontSize: 14, bold: true, color: secondaryColor, fontFace: FONT_PRIMARY,
-    letterSpacing: 2
-  });
-  
-  slide1.addText(bName.toUpperCase(), {
-    x: 1.0, y: 2.3, w: 11.0, h: 0.9,
-    fontSize: 54, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY
-  });
-  
-  if (brandUrl) {
-    slide1.addText(brandUrl, {
-      x: 1.0, y: 3.2, w: 11.0, h: 0.3,
-      fontSize: 18, color: '818cf8', fontFace: FONT_PRIMARY, italic: true
-    });
-  }
-  
-  slide1.addText('Advisory Blueprint formulated by Steve Jobs, Elon Musk, Warren Buffett & Charlie Munger modeling.', {
-    x: 1.0, y: 4.8, w: 10.0, h: 0.4,
-    fontSize: 12, color: '94a3b8', fontFace: FONT_PRIMARY
-  });
-  
-  slide1.addText('CONFIDENTIAL DECK · DIGIFYCE GROWTH CONSULTING', {
-    x: 1.0, y: 6.4, w: 8.0, h: 0.3,
-    fontSize: 10, bold: true, color: '475569', fontFace: FONT_PRIMARY
-  });
-
-  // ── SLIDE 2: STEVE JOBS & ELON MUSK (Product & Cult Experience) ──
-  const slide2 = pptx.addSlide();
-  const jm = s.jobs_musk || {};
-  addSlideHeader(slide2, jm.title || 'Product & Innovation', jm.subtitle || 'Jobs & Musk Perspective');
-  
-  const jmRecs = jm.recommendations || [];
-  jmRecs.forEach((rec, idx) => {
-    if (!rec.trim()) return;
-    let x = idx === 0 ? 0.6 : 6.8;
-    
-    // Card container
-    slide2.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 5.3, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
-    slide2.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 0.45, fill: { color: primaryColor } });
-    
-    // Bullet/Label
-    slide2.addText(`PERSPECTIVE PILLAR 0${idx+1}`, {
-      x: x + 0.2, y: 1.35, w: 5.5, h: 0.35,
-      fontSize: 11, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY,
-      valign: 'middle'
-    });
-    
-    // Content Text
-    slide2.addText(rec, {
-      x: x + 0.2, y: 1.9, w: 5.5, h: 4.5,
-      fontSize: 12, lineSpacing: 20, color: COLOR_DARK, fontFace: FONT_PRIMARY,
-      valign: 'top'
-    });
-  });
-
-  // ── SLIDE 3: WARREN BUFFETT & CHARLIE MUNGER (Moats & Pricing Power) ──
-  const slide3 = pptx.addSlide();
-  const bm = s.buffett_munger || {};
-  addSlideHeader(slide3, bm.title || 'Economics & Value Moats', bm.subtitle || 'Buffett & Munger Perspective');
-  
-  const bmRecs = bm.recommendations || [];
-  bmRecs.forEach((rec, idx) => {
-    if (!rec.trim()) return;
-    let x = idx === 0 ? 0.6 : 6.8;
-    
-    slide3.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 5.3, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
-    slide3.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 0.45, fill: { color: '#F59E0B' } });
-    
-    slide3.addText(`PERSPECTIVE PILLAR 0${idx+1}`, {
-      x: x + 0.2, y: 1.35, w: 5.5, h: 0.35,
-      fontSize: 11, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY,
-      valign: 'middle'
-    });
-    
-    slide3.addText(rec, {
-      x: x + 0.2, y: 1.9, w: 5.5, h: 4.5,
-      fontSize: 12, lineSpacing: 20, color: COLOR_DARK, fontFace: FONT_PRIMARY,
-      valign: 'top'
-    });
-  });
-
-  // ── SLIDE 4: THE OMNICHANNEL ACQUISITION & RETENTION FUNNEL (Scale) ──
-  const slide4 = pptx.addSlide();
-  const af = s.agency_funnel || {};
-  addSlideHeader(slide4, af.title || 'Omnichannel Scale Funnel', af.subtitle || 'Dentsu/Deloitte Perspective');
-  
-  const afRecs = af.recommendations || [];
-  afRecs.forEach((rec, idx) => {
-    if (!rec.trim()) return;
-    let x = idx === 0 ? 0.6 : 6.8;
-    
-    slide4.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 5.3, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
-    slide4.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 0.45, fill: { color: '#2B4EFF' } });
-    
-    slide4.addText(`PERSPECTIVE PILLAR 0${idx+1}`, {
-      x: x + 0.2, y: 1.35, w: 5.5, h: 0.35,
-      fontSize: 11, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY,
-      valign: 'middle'
-    });
-    
-    slide4.addText(rec, {
-      x: x + 0.2, y: 1.9, w: 5.5, h: 4.5,
-      fontSize: 12, lineSpacing: 20, color: COLOR_DARK, fontFace: FONT_PRIMARY,
-      valign: 'top'
-    });
-  });
-
-  // ── SLIDE 5: OUT-OF-THE-BOX CROSS-POLLINATION PLAYBOOK ──
-  const slide5 = pptx.addSlide();
-  const cp = s.cross_pollination || {};
-  addSlideHeader(slide5, cp.title || 'Cross-Pollination Playbook', cp.subtitle || 'Unusual Industry Growth Hacks');
-  
-  const cpRecs = cp.recommendations || [];
-  cpRecs.forEach((rec, idx) => {
-    if (!rec.trim()) return;
-    let x = idx === 0 ? 0.6 : 6.8;
-    
-    slide5.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 5.3, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
-    slide5.addShape('rect', { x: x, y: 1.3, w: 5.9, h: 0.45, fill: { color: '#10B981' } });
-    
-    slide5.addText(`PLAYBOOK CRITERIA 0${idx+1}`, {
-      x: x + 0.2, y: 1.35, w: 5.5, h: 0.35,
-      fontSize: 11, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY,
-      valign: 'middle'
-    });
-    
-    slide5.addText(rec, {
-      x: x + 0.2, y: 1.9, w: 5.5, h: 4.5,
-      fontSize: 12, lineSpacing: 20, color: COLOR_DARK, fontFace: FONT_PRIMARY,
-      valign: 'top'
-    });
-  });
-
-  // ── SLIDE 6: 90-DAY EXECUTION ROADMAP ──
-  const slide6 = pptx.addSlide();
-  const rp = s.action_plan || {};
-  addSlideHeader(slide6, rp.title || 'Execution Roadmap', rp.subtitle || '90-Day Deliverables Timeline');
-  
-  const rpRecs = rp.recommendations || [];
-  rpRecs.forEach((rec, idx) => {
-    if (!rec.trim()) return;
-    let x = 0.5 + (idx * 4.25);
-    if (x > 12.0) return;
-    
-    slide6.addShape('rect', { x: x, y: 1.3, w: 3.9, h: 5.6, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
-    slide6.addShape('rect', { x: x, y: 1.3, w: 3.9, h: 0.45, fill: { color: primaryColor } });
-    
-    // Month label
-    slide6.addText(`MONTH 0${idx+1} TIMELINE`, {
-      x: x + 0.15, y: 1.35, w: 3.6, h: 0.35,
-      fontSize: 11, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY,
-      valign: 'middle'
-    });
-    
-    // Recommendations list
-    slide6.addText(rec, {
-      x: x + 0.2, y: 1.9, w: 3.5, h: 4.8,
-      fontSize: 10.5, lineSpacing: 18, color: COLOR_DARK, fontFace: FONT_PRIMARY,
-      valign: 'top'
-    });
-  });
-
-  // Save/Download deck
-  const cleanFilename = `Strategy_Consultant_${bName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`;
-  pptx.writeFile({ fileName: cleanFilename })
-    .then(() => {
-      showToast('PowerPoint deck downloaded successfully!', 'success');
-    })
-    .catch(err => {
-      console.error('Failed to export PPTX:', err);
-      alert('Failed to export PPTX: ' + err.message);
-    });
-}
-
-

@@ -189,11 +189,27 @@ function db(): PDO {
               `crawled_json`      MEDIUMTEXT   NOT NULL,
               `brief_json`        MEDIUMTEXT   NOT NULL,
               `strategy_json`     MEDIUMTEXT   NOT NULL,
+              `modules_json`      LONGTEXT     DEFAULT NULL,
               `generated_by`      VARCHAR(255) NOT NULL DEFAULT '',
               `created_at`        DATETIME     NOT NULL DEFAULT NOW(),
               KEY `idx_cg_brand`   (`brand_id`),
               CONSTRAINT `fk_cg_brand` FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        } catch (Throwable $migrationErr) {}
+
+        // Add modules_json column to existing tables (self-healing)
+        try {
+            $cols = $pdo->query("SHOW COLUMNS FROM `consultant_generations` LIKE 'modules_json'")->fetchAll();
+            if (empty($cols)) {
+                $pdo->exec("ALTER TABLE `consultant_generations` ADD COLUMN `modules_json` LONGTEXT DEFAULT NULL");
+            }
+        } catch (Throwable $migrationErr) {}
+
+        // Seed intelligence API key settings rows if not present
+        try {
+            foreach (['firecrawl_api_key','tavily_api_key','serpapi_api_key','jina_api_key'] as $k) {
+                $pdo->exec("INSERT IGNORE INTO `settings` (`key`, `value`, `updated_by`) VALUES ('{$k}', '', 'system')");
+            }
         } catch (Throwable $migrationErr) {}
 
         // Run self-cleaning retention policy to delete reports older than 12 weeks

@@ -112,6 +112,320 @@
     </div>
     <!-- PAGE: AI CONSULTANT -->
     <div class="page hidden" id="page-consultant" style="padding:24px;overflow-y:auto">
+
+      <!-- Header -->
+      <div class="page-hd" style="margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:14px">
+        <div>
+          <div class="page-title" style="font-size:22px;font-weight:800;letter-spacing:-0.5px;color:var(--dark);display:flex;align-items:center;gap:10px">
+            <span style="background:linear-gradient(135deg,#2B4EFF,#6366f1);width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🧠</span>
+            Brand Intelligence Engine
+          </div>
+          <div class="page-sub" style="font-size:12px;color:var(--mid);margin-top:4px">
+            7-layer deep internet research · AI synthesis · Multi-format consulting output
+          </div>
+        </div>
+        <div style="display:flex;gap:8px" id="c-header-actions"></div>
+      </div>
+
+      <!-- Phase Stepper -->
+      <div class="card" style="padding:12px 20px;margin-bottom:20px;background:rgba(255,255,255,0.6)">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+          <div style="display:flex;gap:4px;align-items:center;overflow-x:auto" id="consultant-stepper">
+            <div class="c-step active" id="c-step-1" data-step="1">
+              <span class="c-step-num">1</span><span class="c-step-label">Deep Research</span>
+            </div>
+            <span class="c-step-arrow">→</span>
+            <div class="c-step" id="c-step-2" data-step="2">
+              <span class="c-step-num">2</span><span class="c-step-label">Brand Scorecard</span>
+            </div>
+            <span class="c-step-arrow">→</span>
+            <div class="c-step" id="c-step-3" data-step="3">
+              <span class="c-step-num">3</span><span class="c-step-label">Founder Brief</span>
+            </div>
+            <span class="c-step-arrow">→</span>
+            <div class="c-step" id="c-step-4" data-step="4">
+              <span class="c-step-num">4</span><span class="c-step-label">Documents</span>
+            </div>
+            <span class="c-step-arrow">→</span>
+            <div class="c-step" id="c-step-5" data-step="5">
+              <span class="c-step-num">5</span><span class="c-step-label">Export</span>
+            </div>
+          </div>
+          <div id="consultant-active-brand-badge" style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--border);color:var(--dark);white-space:nowrap">No brand selected</div>
+        </div>
+      </div>
+
+      <!-- ═══ PHASE 1: RESEARCH INPUT ════════════════════════════════════════ -->
+      <div id="c-phase-1" class="c-phase-container">
+        <div style="max-width:680px;margin:0 auto">
+          <!-- Input card -->
+          <div class="card" style="padding:36px;margin-bottom:20px">
+            <div style="text-align:center;margin-bottom:28px">
+              <div style="font-size:48px;margin-bottom:12px">🌐</div>
+              <h3 style="font-size:20px;font-weight:800;color:var(--dark);margin-bottom:8px">Start Deep Intelligence Crawl</h3>
+              <p style="font-size:13px;color:var(--mid);line-height:1.6">The engine will crawl the brand website, mine Reddit discussions, research competitors, read news coverage, and synthesize everything into structured brand intelligence — automatically.</p>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div class="field">
+                <label>Brand Name <span style="color:#ef4444">*</span></label>
+                <input type="text" id="c-crawl-name" placeholder="e.g. Hapli Earth" style="height:44px;font-size:14px">
+              </div>
+              <div class="field">
+                <label>Brand Website URL <span style="color:var(--mid);font-weight:400">(optional but strongly recommended)</span></label>
+                <input type="text" id="c-crawl-url" placeholder="e.g. hapliearth.com or https://hapliearth.com" style="height:44px;font-size:14px">
+              </div>
+
+              <!-- Mode selector -->
+              <div style="background:var(--off);border:1px solid var(--border);border-radius:10px;padding:16px">
+                <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px">Research Depth</div>
+                <div style="display:flex;gap:8px">
+                  <label style="flex:1;cursor:pointer">
+                    <input type="radio" name="crawl-depth" value="standard" checked style="display:none" id="depth-standard">
+                    <div class="depth-option active" id="depth-opt-standard" onclick="selectDepth('standard')" style="border:2px solid var(--blue);border-radius:8px;padding:12px;text-align:center;transition:all 0.2s">
+                      <div style="font-size:18px;margin-bottom:4px">⚡</div>
+                      <div style="font-size:12px;font-weight:700;color:var(--dark)">Standard</div>
+                      <div style="font-size:10px;color:var(--mid);margin-top:2px">~2-3 min · Free</div>
+                    </div>
+                  </label>
+                  <label style="flex:1;cursor:pointer">
+                    <input type="radio" name="crawl-depth" value="deep" style="display:none" id="depth-deep">
+                    <div class="depth-option" id="depth-opt-deep" onclick="selectDepth('deep')" style="border:2px solid var(--border);border-radius:8px;padding:12px;text-align:center;transition:all 0.2s">
+                      <div style="font-size:18px;margin-bottom:4px">🔬</div>
+                      <div style="font-size:12px;font-weight:700;color:var(--dark)">Deep Dive</div>
+                      <div style="font-size:10px;color:var(--mid);margin-top:2px">~5-15 min · More data</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <button class="btn primary" id="c-start-crawl-btn" onclick="startDeepCrawl()" style="justify-content:center;height:48px;font-size:14px;font-weight:800;background:linear-gradient(135deg,#2B4EFF,#6366f1);border:none;box-shadow:0 4px 16px rgba(43,78,255,0.3);border-radius:12px;letter-spacing:0.3px">
+                🚀 Start Intelligence Crawl
+              </button>
+            </div>
+          </div>
+
+          <!-- Live intelligence feed (shown during crawl) -->
+          <div id="c-intel-feed" style="display:none" class="card" style="padding:24px">
+            <div style="padding:24px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                <div style="font-size:14px;font-weight:800;color:var(--dark)">🔬 Live Intelligence Feed</div>
+                <div style="font-size:11px;font-weight:700;color:var(--blue)" id="c-feed-pct">0%</div>
+              </div>
+              <!-- Progress bar -->
+              <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:20px">
+                <div id="c-feed-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#2B4EFF,#6366f1);transition:width 0.5s;border-radius:3px"></div>
+              </div>
+              <!-- Feed log -->
+              <div id="c-feed-log" style="max-height:320px;overflow-y:auto;font-size:12px;font-family:var(--fm);line-height:1.8;color:var(--mid)">
+                <div style="color:var(--blue);font-weight:700">Initializing research engine...</div>
+              </div>
+              <!-- Stats row -->
+              <div id="c-feed-stats" style="display:none;margin-top:16px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+                <div style="text-align:center;padding:8px;background:var(--off);border-radius:8px">
+                  <div style="font-size:18px;font-weight:800;color:var(--blue)" id="stat-pages">0</div>
+                  <div style="font-size:10px;color:var(--mid)">Pages Crawled</div>
+                </div>
+                <div style="text-align:center;padding:8px;background:var(--off);border-radius:8px">
+                  <div style="font-size:18px;font-weight:800;color:#10B981" id="stat-searches">0</div>
+                  <div style="font-size:10px;color:var(--mid)">Search Results</div>
+                </div>
+                <div style="text-align:center;padding:8px;background:var(--off);border-radius:8px">
+                  <div style="font-size:18px;font-weight:800;color:#f59e0b" id="stat-reddit">0</div>
+                  <div style="font-size:10px;color:var(--mid)">Reddit Threads</div>
+                </div>
+                <div style="text-align:center;padding:8px;background:var(--off);border-radius:8px">
+                  <div style="font-size:18px;font-weight:800;color:#8b5cf6" id="stat-competitors">0</div>
+                  <div style="font-size:10px;color:var(--mid)">Competitor Pages</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ PHASE 2: BRAND SCORECARD ═══════════════════════════════════════ -->
+      <div id="c-phase-2" class="c-phase-container" style="display:none">
+        <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div style="font-size:16px;font-weight:800;color:var(--dark)">📊 Brand Intelligence Scorecard</div>
+          <button class="btn primary" onclick="proceedToBriefing()" style="background:linear-gradient(135deg,#2B4EFF,#6366f1);border:none;font-weight:700">Proceed to Founder Briefing →</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+
+          <!-- Left: Score cards -->
+          <div>
+            <!-- Summary card -->
+            <div class="card" style="padding:24px;margin-bottom:16px;background:linear-gradient(135deg,rgba(43,78,255,0.04),rgba(99,102,241,0.04));border:1px solid rgba(43,78,255,0.15)">
+              <div style="font-size:13px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.05em;margin-bottom:16px">Brand Overview (AI-Synthesized from Research)</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="c-overview-grid"></div>
+            </div>
+
+            <!-- 8-dimension scorecard -->
+            <div class="card" style="padding:24px;margin-bottom:16px">
+              <div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:16px">Brand Health Score — 8 Dimensions</div>
+              <div id="c-scorecard-bars" style="display:flex;flex-direction:column;gap:14px"></div>
+            </div>
+
+            <!-- Research sources found -->
+            <div class="card" style="padding:24px;margin-bottom:16px">
+              <div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:14px">🔍 Sources Found During Research</div>
+              <div id="c-sources-list" style="display:flex;flex-direction:column;gap:6px;max-height:250px;overflow-y:auto"></div>
+            </div>
+
+            <!-- Top 3 priorities -->
+            <div class="card" style="padding:24px;border-left:4px solid #ef4444">
+              <div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:14px">🚨 Top 3 Priority Issues Found</div>
+              <div id="c-priorities-list"></div>
+            </div>
+          </div>
+
+          <!-- Right: Competitor intel + customer voice -->
+          <div>
+            <div class="card" style="padding:20px;margin-bottom:16px">
+              <div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:14px">🏆 Competitor Intelligence</div>
+              <div id="c-competitors-list" style="display:flex;flex-direction:column;gap:10px"></div>
+            </div>
+            <div class="card" style="padding:20px;margin-bottom:16px">
+              <div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:14px">💬 Real Customer Voice</div>
+              <div id="c-customer-voice-grid"></div>
+            </div>
+            <div class="card" style="padding:20px">
+              <div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:14px">🕳️ Research Gaps (Founder Must Answer)</div>
+              <div id="c-gaps-list" style="font-size:12px;color:var(--mid);line-height:1.8"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ PHASE 3: FOUNDER BRIEFING ══════════════════════════════════════ -->
+      <div id="c-phase-3" class="c-phase-container" style="display:none">
+        <div style="max-width:820px;margin:0 auto">
+          <div style="margin-bottom:20px">
+            <div style="font-size:16px;font-weight:800;color:var(--dark);margin-bottom:6px">✍️ Founder Intelligence Briefing</div>
+            <p style="font-size:12px;color:var(--mid)">These questions were generated based on what the AI found — and couldn't find — during the research. Your answers complete the intelligence picture. Be as specific as possible.</p>
+          </div>
+
+          <div class="card" style="padding:24px;margin-bottom:20px">
+            <div id="c-dynamic-questions" style="display:flex;flex-direction:column;gap:20px">
+              <!-- Questions injected by JS -->
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <button class="btn" onclick="goToPhase(2)" style="font-weight:700">← Back to Scorecard</button>
+            <button class="btn primary" onclick="startDocumentGeneration()" id="c-gen-docs-btn" style="background:linear-gradient(135deg,#2B4EFF,#6366f1);border:none;font-weight:700;height:44px;padding:0 24px">
+              🧠 Generate Intelligence Documents →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ PHASE 4: DOCUMENT WORKSPACE ════════════════════════════════════ -->
+      <div id="c-phase-4" class="c-phase-container" style="display:none">
+
+        <!-- Doc generation loading state -->
+        <div id="c-doc-gen-loader" style="text-align:center;padding:60px;display:none">
+          <div style="display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;background:linear-gradient(135deg,#2B4EFF,#6366f1);border-radius:16px;margin-bottom:20px">
+            <div class="spinner" style="width:28px;height:28px;border-width:3px;border-top-color:#fff;border-color:rgba(255,255,255,0.3);border-top-color:#fff"></div>
+          </div>
+          <h3 style="font-size:16px;font-weight:800;color:var(--dark);margin-bottom:8px" id="c-doc-loader-title">Generating Intelligence Documents...</h3>
+          <p style="font-size:12px;color:var(--mid)" id="c-doc-loader-sub">Convening the advisory board...</p>
+          <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;max-width:400px;margin:20px auto 0">
+            <div id="c-doc-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#2B4EFF,#6366f1);transition:width 0.6s;border-radius:2px"></div>
+          </div>
+          <div style="margin-top:20px;display:grid;grid-template-columns:repeat(5,1fr);gap:12px;max-width:600px;margin:20px auto 0" id="c-advisor-avatars">
+            <div class="av-card" style="opacity:0.3;text-align:center;transition:opacity 0.5s" id="av-jobs"><div style="font-size:24px">🍎</div><div style="font-size:10px;font-weight:700;margin-top:4px">Jobs</div></div>
+            <div class="av-card" style="opacity:0.3;text-align:center;transition:opacity 0.5s" id="av-musk"><div style="font-size:24px">🚀</div><div style="font-size:10px;font-weight:700;margin-top:4px">Musk</div></div>
+            <div class="av-card" style="opacity:0.3;text-align:center;transition:opacity 0.5s" id="av-buffett"><div style="font-size:24px">💵</div><div style="font-size:10px;font-weight:700;margin-top:4px">Buffett</div></div>
+            <div class="av-card" style="opacity:0.3;text-align:center;transition:opacity 0.5s" id="av-munger"><div style="font-size:24px">🧠</div><div style="font-size:10px;font-weight:700;margin-top:4px">Munger</div></div>
+            <div class="av-card" style="opacity:0.3;text-align:center;transition:opacity 0.5s" id="av-agency"><div style="font-size:24px">📈</div><div style="font-size:10px;font-weight:700;margin-top:4px">Deloitte</div></div>
+          </div>
+        </div>
+
+        <!-- Document workspace -->
+        <div id="c-doc-workspace" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+            <div style="font-size:16px;font-weight:800;color:var(--dark)">📂 Brand Intelligence Dossier</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn" onclick="goToPhase(3)" style="font-weight:700;font-size:12px">← Edit Brief</button>
+              <button class="btn" onclick="saveConsultantDossier()" style="font-weight:700;font-size:12px">💾 Save</button>
+              <button class="btn primary" onclick="goToPhase(5)" style="background:linear-gradient(135deg,#2B4EFF,#6366f1);border:none;font-weight:700;font-size:12px">📥 Export Suite →</button>
+            </div>
+          </div>
+
+          <!-- Document tabs navigation -->
+          <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px">
+            <div style="overflow-x:auto;border-bottom:1px solid var(--border)">
+              <div id="c-doc-tabs" style="display:flex;padding:0 16px;gap:0;min-width:max-content"></div>
+            </div>
+            <div id="c-doc-panels" style="padding:28px"></div>
+          </div>
+
+          <!-- Regenerate button -->
+          <div class="card" style="padding:14px 20px;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:11px;color:var(--mid)" id="c-save-status">All changes saved</span>
+            <button class="btn sm" onclick="regenerateCurrentModule()" style="font-weight:700;font-size:11px">🔄 Regenerate This Section</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ PHASE 5: EXPORT HUB ════════════════════════════════════════════ -->
+      <div id="c-phase-5" class="c-phase-container" style="display:none">
+        <div style="max-width:780px;margin:0 auto">
+          <div style="text-align:center;margin-bottom:32px">
+            <div style="font-size:48px;margin-bottom:12px">📦</div>
+            <h3 style="font-size:20px;font-weight:800;color:var(--dark)">Export Your Intelligence Suite</h3>
+            <p style="font-size:13px;color:var(--mid)">Choose the formats that match your audience. Combine them for a complete consulting delivery.</p>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+            <div class="card export-card" onclick="exportConsultantPPTX()" style="padding:28px;cursor:pointer;transition:all 0.2s;border:2px solid var(--border)">
+              <div style="font-size:36px;margin-bottom:14px">📊</div>
+              <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">Board Presentation</div>
+              <div style="font-size:12px;color:var(--mid);margin-bottom:16px;line-height:1.5">Adaptive-length PowerPoint deck. Slides generated from actual intelligence, not a template. Uses brand colors.</div>
+              <div class="btn primary" style="font-size:12px;font-weight:700;background:linear-gradient(135deg,#2B4EFF,#6366f1);border:none;display:inline-flex;align-items:center;gap:6px">
+                Download PPTX
+              </div>
+            </div>
+
+            <div class="card export-card" onclick="exportDossierPDF()" style="padding:28px;cursor:pointer;transition:all 0.2s;border:2px solid var(--border)">
+              <div style="font-size:36px;margin-bottom:14px">📄</div>
+              <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">Full Strategy Dossier</div>
+              <div style="font-size:12px;color:var(--mid);margin-bottom:16px;line-height:1.5">Complete printable PDF of all documents. Open in browser and use Ctrl+P to print or save as PDF.</div>
+              <div class="btn primary" style="font-size:12px;font-weight:700;background:linear-gradient(135deg,#10B981,#059669);border:none;display:inline-flex;align-items:center;gap:6px">
+                Open PDF View
+              </div>
+            </div>
+
+            <div class="card export-card" onclick="exportSwipeFile()" style="padding:28px;cursor:pointer;transition:all 0.2s;border:2px solid var(--border)">
+              <div style="font-size:36px;margin-bottom:14px">✍️</div>
+              <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">Swipe File Pack</div>
+              <div style="font-size:12px;color:var(--mid);margin-bottom:16px;line-height:1.5">All ad scripts, email hooks, headlines, captions, and WhatsApp messages in one copyable text file.</div>
+              <div class="btn primary" style="font-size:12px;font-weight:700;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;display:inline-flex;align-items:center;gap:6px">
+                Download TXT
+              </div>
+            </div>
+
+            <div class="card export-card" onclick="exportExecutiveSummary()" style="padding:28px;cursor:pointer;transition:all 0.2s;border:2px solid var(--border)">
+              <div style="font-size:36px;margin-bottom:14px">⚡</div>
+              <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">1-Page Executive Brief</div>
+              <div style="font-size:12px;color:var(--mid);margin-bottom:16px;line-height:1.5">The single-page founder briefing: brand score, top 3 priorities, and 90-day first actions. For the meeting before the meeting.</div>
+              <div class="btn primary" style="font-size:12px;font-weight:700;background:linear-gradient(135deg,#8b5cf6,#6d28d9);border:none;display:inline-flex;align-items:center;gap:6px">
+                Download PDF
+              </div>
+            </div>
+          </div>
+
+          <div style="text-align:center;margin-top:20px">
+            <button class="btn" onclick="goToPhase(4)" style="font-weight:700">← Back to Documents</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
       <div class="page-hd" style="margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:14px">
         <div>
           <div class="page-title" style="font-size:22px;font-weight:800;letter-spacing:-0.5px;color:var(--dark);display:flex;align-items:center;gap:8px">
@@ -956,8 +1270,42 @@
                 <div class="key-status-text" id="status-openai" style="font-size:11px;font-weight:600;color:var(--mid)">Not checked</div>
               </div>
             </div>
-            
+
           </div>
+
+          <!-- Intelligence Research APIs -->
+          <div class="card" style="padding:22px;border-radius:12px;margin-bottom:0;border:1px solid rgba(99,102,241,0.2);background:rgba(99,102,241,0.02)">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+              <div style="width:36px;height:36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px">🌐</div>
+              <div>
+                <h4 style="font-size:13.5px;font-weight:700;color:var(--dark)">Intelligence Research APIs</h4>
+                <p style="font-size:11px;color:var(--mid);margin-top:2px">Optional: Enhance deep crawl quality. All free tiers work. Leave blank to use free-only mode (Jina + Reddit + DuckDuckGo).</p>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div class="field" style="margin-bottom:0">
+                <label>Jina AI Key <span style="font-size:10px;color:#10B981;font-weight:700">FREE — 10M tokens</span></label>
+                <input type="password" id="intel-jina-key" placeholder="jina_..." oninput="saveIntelKeys()" style="width:100%">
+                <div style="font-size:10px;color:var(--mid);margin-top:4px">jina.ai — URL reader + web search. No key needed but key increases rate limits.</div>
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label>Firecrawl Key <span style="font-size:10px;color:#f59e0b;font-weight:700">500 pages/mo free</span></label>
+                <input type="password" id="intel-firecrawl-key" placeholder="fc-..." oninput="saveIntelKeys()" style="width:100%">
+                <div style="font-size:10px;color:var(--mid);margin-top:4px">firecrawl.dev — Full JS-rendered website crawl. Best quality.</div>
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label>Tavily Key <span style="font-size:10px;color:#f59e0b;font-weight:700">1000 credits/mo free</span></label>
+                <input type="password" id="intel-tavily-key" placeholder="tvly-..." oninput="saveIntelKeys()" style="width:100%">
+                <div style="font-size:10px;color:var(--mid);margin-top:4px">tavily.com — Deep research-grade web search. Much better than Google.</div>
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label>SerpAPI Key <span style="font-size:10px;color:#f59e0b;font-weight:700">100 searches/mo free</span></label>
+                <input type="password" id="intel-serpapi-key" placeholder="..." oninput="saveIntelKeys()" style="width:100%">
+                <div style="font-size:10px;color:var(--mid);margin-top:4px">serpapi.com — YouTube, Amazon, Reddit, Google results at scale.</div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
