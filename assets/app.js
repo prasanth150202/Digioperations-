@@ -895,20 +895,43 @@ function renderStrategyStep() {
       </div>`; break;
 
     case 9:
-    case 10: html += `<div class="ai-block">
-      <div class="ai-tag">✦ AI-GENERATED</div>
-      <div class="ai-block-title">${st.label}</div>
-      <div class="ai-block-desc">${stratStep === 9
-        ? 'AI will generate 6 content pillars aligned to your buyer personas and brand voice.'
-        : 'AI will generate 5 high-converting sales angles based on your USPs and problem statement.'}<br>
-        Complete Brand Overview, USPs, and Personas first for best results.</div>
-      <div style="margin-top:14px">
-        ${canGen
-          ? `<button class="btn amr" onclick="runAI('${st.id}')">✦ Generate ${st.label}</button>`
-          : `<div style="font-size:12px;color:var(--mid)">⚠ Fill Brand Name in Step 1 to unlock generation</div>`}
-      </div>
-      <div id="ai-output-${st.id}" style="margin-top:14px"></div>
-    </div>`; break;
+    case 10: {
+      const type = stratStep === 9 ? 'pillars' : 'sales';
+      const savedData = type === 'pillars' ? stratForm.ai_pillars : stratForm.ai_angles;
+      let outputHtml = '';
+      if (savedData && savedData.length > 0) {
+        if (type === 'pillars') {
+          outputHtml = savedData.map(p => `
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+              <div style="width:6px;height:6px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:5px"></div>
+              <div><div style="font-weight:700;color:var(--dark);font-size:13px;margin-bottom:3px">${p.title}</div>
+              <div style="font-size:12px;color:var(--mid)">${p.description}</div></div>
+            </div>`).join('');
+        } else {
+          outputHtml = savedData.map((a, i) => `
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+              <div style="width:22px;height:22px;border-radius:6px;background:var(--navy);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
+              <div><div style="font-weight:700;color:var(--dark);font-size:13px;margin-bottom:2px">${a.headline}</div>
+              <div style="font-size:12px;color:var(--mid);margin-bottom:3px">${a.body}</div>
+              ${a.cta ? `<div style="font-size:11px;color:var(--green);font-weight:600">${a.cta}</div>` : ''}</div>
+            </div>`).join('');
+        }
+      }
+      html += `<div class="ai-block">
+        <div class="ai-tag">✦ AI-GENERATED</div>
+        <div class="ai-block-title">${st.label}</div>
+        <div class="ai-block-desc">${stratStep === 9
+          ? 'AI will generate 8 content pillars aligned to your brand voice and USPs.'
+          : 'AI will generate 6 high-converting sales angles based on your buyer personas.'}<br>
+          Complete Brand Overview, USPs, and Personas first for best results.</div>
+        <div style="margin-top:14px">
+          ${canGen
+            ? `<button class="btn amr" onclick="runAI('${st.id}')">✦ Generate ${st.label}</button>`
+            : `<div style="font-size:12px;color:var(--mid)">⚠ Fill Brand Name in Step 1 to unlock generation</div>`}
+        </div>
+        <div id="ai-output-${st.id}" style="margin-top:14px">${outputHtml}</div>
+      </div>`;
+    } break;
 
     case 11: html += `<div class="card"><div class="card-title"><div class="ct-num">1</div>Ads Setup</div>
       <div class="g4">${F('Meta Daily Budget','metaBudget','₹2,000')}${F('Meta Objective','metaObj','Conversions')}${F('Google Daily Budget','googleBudget','₹1,000')}${F('Google Type','googleType','Shopping + Search')}</div>
@@ -954,14 +977,18 @@ async function runAI(type) {
     if (!data) throw new Error('Empty response from server');
 
     if (type === 'pillars') {
-      el.innerHTML = (data.pillars || []).map(p => `
+      const generatedPillars = data.pillars || [];
+      stratForm.ai_pillars = generatedPillars;
+      el.innerHTML = generatedPillars.map(p => `
         <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
           <div style="width:6px;height:6px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:5px"></div>
           <div><div style="font-weight:700;color:var(--dark);font-size:13px;margin-bottom:3px">${p.title}</div>
           <div style="font-size:12px;color:var(--mid)">${p.description}</div></div>
         </div>`).join('');
     } else {
-      el.innerHTML = (data.angles || []).map((a, i) => `
+      const generatedAngles = data.angles || [];
+      stratForm.ai_angles = generatedAngles;
+      el.innerHTML = generatedAngles.map((a, i) => `
         <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
           <div style="width:22px;height:22px;border-radius:6px;background:var(--navy);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
           <div><div style="font-weight:700;color:var(--dark);font-size:13px;margin-bottom:2px">${a.headline}</div>
@@ -972,6 +999,7 @@ async function runAI(type) {
     stratDone.add(stratStep);
     renderPhaseStrip();
     renderStratSteps();
+    deferStratSave();
   } catch (err) {
     el.innerHTML = `<div style="color:var(--red);font-size:12px">⚠ ${err.message}</div>`;
   }

@@ -180,12 +180,20 @@ if ($method === 'POST' && $action === 'generate') {
         $pers  = $f['personas'] ?? 'Not specified';
 
         // Step 1: pillars
-        $pillarsPrompt = "Brand context:\n$ctx\n\nMonthly Theme: $theme\nBrand USPs: $usps\n\nGenerate 8 content pillars. Return JSON: {\"pillars\":[{\"title\":\"...\",\"description\":\"...\"}]}";
-        $pillarsData = callJSON(SYS, $pillarsPrompt, 2000);
+        if (!empty($f['ai_pillars']) && is_array($f['ai_pillars'])) {
+            $pillarsData = ['pillars' => $f['ai_pillars']];
+        } else {
+            $pillarsPrompt = "Brand context:\n$ctx\n\nMonthly Theme: $theme\nBrand USPs: $usps\n\nGenerate 8 content pillars. Return JSON: {\"pillars\":[{\"title\":\"...\",\"description\":\"...\"}]}";
+            $pillarsData = callJSON(SYS, $pillarsPrompt, 2000);
+        }
 
         // Step 2: sales angles
-        $salesPrompt = "Brand context:\n$ctx\n\nMonthly Theme: $theme\nBuyer Personas: $pers\n\nGenerate 6 sales angles. Return JSON: {\"angles\":[{\"headline\":\"...\",\"body\":\"...\",\"cta\":\"...\"}]}";
-        $salesData = callJSON(SYS, $salesPrompt, 2000);
+        if (!empty($f['ai_angles']) && is_array($f['ai_angles'])) {
+            $salesData = ['angles' => $f['ai_angles']];
+        } else {
+            $salesPrompt = "Brand context:\n$ctx\n\nMonthly Theme: $theme\nBuyer Personas: $pers\n\nGenerate 6 sales angles. Return JSON: {\"angles\":[{\"headline\":\"...\",\"body\":\"...\",\"cta\":\"...\"}]}";
+            $salesData = callJSON(SYS, $salesPrompt, 2000);
+        }
 
         // Save generation record (Always insert new for v1, v2 history)
         $month = $f['strategyMonth'] ?? date('Y-m');
