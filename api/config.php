@@ -179,6 +179,23 @@ function db(): PDO {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
         } catch (Throwable $migrationErr) {}
 
+        // Self-healing migration for consultant_generations table
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `consultant_generations` (
+              `id`                VARCHAR(36)  NOT NULL PRIMARY KEY,
+              `brand_id`          VARCHAR(36)  NOT NULL,
+              `brand_name`        VARCHAR(255) NOT NULL DEFAULT '',
+              `brand_url`         VARCHAR(500) NOT NULL DEFAULT '',
+              `crawled_json`      MEDIUMTEXT   NOT NULL,
+              `brief_json`        MEDIUMTEXT   NOT NULL,
+              `strategy_json`     MEDIUMTEXT   NOT NULL,
+              `generated_by`      VARCHAR(255) NOT NULL DEFAULT '',
+              `created_at`        DATETIME     NOT NULL DEFAULT NOW(),
+              KEY `idx_cg_brand`   (`brand_id`),
+              CONSTRAINT `fk_cg_brand` FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        } catch (Throwable $migrationErr) {}
+
         // Run self-cleaning retention policy to delete reports older than 12 weeks
         try {
             $pdo->exec("DELETE FROM reports WHERE created_at < DATE_SUB(NOW(), INTERVAL 12 WEEK)");

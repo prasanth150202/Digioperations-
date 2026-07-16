@@ -7,6 +7,7 @@ const NAV = [
   ]},
   { group:'Tools', items:[
     { id:'strategy',  label:'Strategy Builder',  icon:'🧠', sub:'AI-powered strategy docs' },
+    { id:'consultant',label:'AI Consultant',     icon:'👔', sub:'Next-Gen Brand Intelligence' },
     { id:'pricing',   label:'Pricing Calculator',icon:'💰', sub:'Margin & price analysis'  },
     { id:'catalog',   label:'Price Catalog',     icon:'📋', sub:'Searchable price lookup'  },
     { id:'budget',    label:'Budget Tracker',    icon:'📊', sub:'Monthly performance & ROAS'},
@@ -107,7 +108,7 @@ async function api(methodOrUrl, urlOrBody, body) {
   renderSidebar();
   renderDashboard();
   const _hashPage = window.location.hash.slice(1);
-  const _validPages = ['dashboard','strategy','pricing','catalog','budget','reports','admin','activity'];
+  const _validPages = ['dashboard','strategy','consultant','pricing','catalog','budget','reports','admin','activity'];
   showPage(_validPages.includes(_hashPage) ? _hashPage : 'dashboard');
 
   // Show add product / new brand buttons for editors
@@ -161,6 +162,7 @@ function showPage(id) {
   const labels = { 
     dashboard: 'Dashboard', 
     strategy: 'Strategy Builder', 
+    consultant: 'AI Consultant',
     pricing: 'Pricing Calculator', 
     catalog: 'Price Catalog', 
     budget: 'Budget Tracker', 
@@ -171,6 +173,7 @@ function showPage(id) {
   document.getElementById('tb-page-name').textContent = labels[id] || id;
   updateTopbarRight();
   if (id === 'strategy') initStrategyPage();
+  if (id === 'consultant') initConsultantPage();
   if (id === 'pricing')  { renderPricingBrands(); backToBrands(); }
   if (id === 'catalog')  { renderCatalogBrands(); backToCatalogBrands(); }
   if (id === 'admin')    renderAdmin();
@@ -191,6 +194,7 @@ function renderSidebar() {
       if (CU.role === 'superadmin') return true;
       const pages = Array.isArray(CU.pages) ? CU.pages : [];
       if (i.id === 'catalog' && pages.includes('pricing')) return true;
+      if (i.id === 'consultant' && pages.includes('strategy')) return true;
       return pages.includes(i.id);
     });
     if (!items.length) return;
@@ -5588,4 +5592,565 @@ async function submitEditReportData() {
     alert('Failed to update report data: ' + e.message);
   }
 }
+
+// ─── AI CONSULTANT ────────────────────────────────────────────────────────────
+let consultantState = {
+  brandId: '',
+  brandName: '',
+  brandUrl: '',
+  crawled: {},
+  brief: {},
+  strategy: {},
+  isDirty: false
+};
+
+function initConsultantPage() {
+  if (!activeBrand) {
+    document.getElementById('consultant-active-brand-badge').textContent = 'No brand selected';
+    document.getElementById('c-phase-discovery').style.display = 'none';
+    document.getElementById('c-phase-briefing').style.display = 'none';
+    document.getElementById('c-phase-strategy-workspace').style.display = 'none';
+    document.getElementById('consultant-export-btn').style.display = 'none';
+    alert('Please select a brand from the top sidebar picker first.');
+    openBrandPicker();
+    return;
+  }
+
+  consultantState.brandId = activeBrand.id;
+  document.getElementById('consultant-active-brand-badge').textContent = activeBrand.name;
+  
+  // Load existing strategy draft if any
+  api('/api/consultant.php?action=load&brand_id=' + activeBrand.id)
+    .then(data => {
+      if (data && !data.empty) {
+        consultantState.brandName = data.brand_name || activeBrand.name;
+        consultantState.brandUrl = data.brand_url || '';
+        consultantState.crawled = data.crawled_json || {};
+        consultantState.brief = data.brief_json || {};
+        consultantState.strategy = data.strategy_json || {};
+        
+        // Populate inputs
+        populateBriefingPhaseInputs();
+        populateWorkspaceEditorInputs();
+        
+        // Show strategy workspace directly since they already have a strategy
+        showConsultantPhase(3);
+      } else {
+        // Reset to first step
+        consultantState.brandName = activeBrand.name;
+        consultantState.brandUrl = '';
+        consultantState.crawled = {};
+        consultantState.brief = {};
+        consultantState.strategy = {};
+        
+        document.getElementById('c-crawl-name').value = activeBrand.name;
+        document.getElementById('c-crawl-url').value = '';
+        showConsultantPhase(1);
+      }
+    })
+    .catch(err => {
+      console.error('Failed to load consultant draft:', err);
+      showConsultantPhase(1);
+    });
+}
+
+function showConsultantPhase(phaseNum) {
+  // Update UI containers visibility
+  document.getElementById('c-phase-discovery').style.display = phaseNum === 1 ? '' : 'none';
+  document.getElementById('c-phase-briefing').style.display = phaseNum === 2 ? '' : 'none';
+  document.getElementById('c-phase-strategy-workspace').style.display = phaseNum === 3 ? '' : 'none';
+  
+  // Export button
+  document.getElementById('consultant-export-btn').style.display = phaseNum === 3 ? '' : 'none';
+
+  // Stepper styles
+  for (let i = 1; i <= 3; i++) {
+    const step = document.getElementById('c-step-' + i);
+    if (!step) continue;
+    const numSpan = step.querySelector('span');
+    
+    if (i < phaseNum) {
+      step.style.color = 'var(--green)';
+      step.style.fontWeight = '700';
+      if (numSpan) {
+        numSpan.style.background = 'var(--green)';
+        numSpan.style.color = '#fff';
+        numSpan.textContent = '✓';
+      }
+    } else if (i === phaseNum) {
+      step.style.color = 'var(--blue)';
+      step.style.fontWeight = '700';
+      if (numSpan) {
+        numSpan.style.background = 'var(--blue)';
+        numSpan.style.color = '#fff';
+        numSpan.textContent = i;
+      }
+    } else {
+      step.style.color = 'var(--mid)';
+      step.style.fontWeight = '600';
+      if (numSpan) {
+        numSpan.style.background = 'var(--border)';
+        numSpan.style.color = 'var(--mid)';
+        numSpan.textContent = i;
+      }
+    }
+  }
+}
+
+function runDiscoveryCrawl() {
+  const name = document.getElementById('c-crawl-name').value.trim();
+  const url = document.getElementById('c-crawl-url').value.trim();
+  
+  if (!name) {
+    alert('Please enter a Brand Name');
+    return;
+  }
+  
+  consultantState.brandName = name;
+  consultantState.brandUrl = url;
+  
+  // Show loader and animate progress
+  const loader = document.getElementById('c-crawl-loader');
+  const bar = document.getElementById('c-loader-progress-bar');
+  const status = document.getElementById('c-loader-status');
+  const detail = document.getElementById('c-loader-detail');
+  
+  loader.style.display = '';
+  bar.style.width = '10%';
+  status.textContent = 'Initiating Deep Crawl...';
+  detail.textContent = 'Contacting hostname and running WHOIS check...';
+  
+  const steps = [
+    { p: 25, s: 'Resolving DNS and SSL Protocols...', d: 'Establishing secure port handshake...' },
+    { p: 45, s: 'Crawling Site Maps & Robots...', d: 'Indexing links and scraping HTML layout elements...' },
+    { p: 65, s: 'Analyzing Brand Visual Theme...', d: 'Extracting CSS palettes, stylesheets, and font families...' },
+    { p: 85, s: 'Profiling Content & Hero Items...', d: 'Parsing pricing catalogs, USPs, and social tags...' }
+  ];
+  
+  let stepIdx = 0;
+  const interval = setInterval(() => {
+    if (stepIdx < steps.length) {
+      bar.style.width = steps[stepIdx].p + '%';
+      status.textContent = steps[stepIdx].s;
+      detail.textContent = steps[stepIdx].d;
+      stepIdx++;
+    } else {
+      clearInterval(interval);
+    }
+  }, 1000);
+  
+  api('/api/consultant.php?action=crawl', 'POST', { brand_name: name, brand_url: url })
+    .then(data => {
+      clearInterval(interval);
+      bar.style.width = '100%';
+      status.textContent = 'Crawl Completed!';
+      detail.textContent = 'Formatting discovery dashboard...';
+      
+      setTimeout(() => {
+        loader.style.display = 'none';
+        consultantState.crawled = data || {};
+        
+        // Populate and transition to Phase 2
+        populateBriefingPhaseInputs();
+        showConsultantPhase(2);
+      }, 500);
+    })
+    .catch(err => {
+      clearInterval(interval);
+      loader.style.display = 'none';
+      alert('Crawling failed: ' + err.message);
+    });
+}
+
+function populateBriefingPhaseInputs() {
+  const c = consultantState.crawled || {};
+  document.getElementById('c-res-color1').value = c.primaryColor || '#2B4EFF';
+  document.getElementById('c-res-color1-hex').value = c.primaryColor || '#2B4EFF';
+  document.getElementById('c-res-color2').value = c.secondaryColor || '#10B981';
+  document.getElementById('c-res-color2-hex').value = c.secondaryColor || '#10B981';
+  
+  document.getElementById('c-res-aesthetics').value = c.visualTone || '';
+  
+  // Format USPs
+  if (Array.isArray(c.usps)) {
+    document.getElementById('c-res-usps').value = c.usps.join('\n');
+  } else {
+    document.getElementById('c-res-usps').value = c.usps || '';
+  }
+  
+  // Format Hero Products
+  if (Array.isArray(c.heroProducts)) {
+    const formatted = c.heroProducts.map(p => `• ${p.name} (${p.price}) - USP: ${p.usp}`).join('\n');
+    document.getElementById('c-res-products').value = formatted;
+  } else {
+    document.getElementById('c-res-products').value = c.heroProducts || '';
+  }
+  
+  document.getElementById('c-res-tone').value = `Tone: ${c.toneOfVoice || ''}\nStyle: ${c.contentStyle || ''}\nBio: ${c.socialBio || ''}`;
+  
+  // Also populate briefing questionnaire if existing
+  const b = consultantState.brief || {};
+  document.getElementById('c-brief-challenges').value = b.challenges || '';
+  document.getElementById('c-brief-goals').value = b.goals || '';
+  document.getElementById('c-brief-failed').value = b.failed || '';
+  document.getElementById('c-brief-secrets').value = b.secrets || '';
+}
+
+function goToBriefingPhase() {
+  showConsultantPhase(2);
+}
+
+function formulateAdvisoryStrategy() {
+  // Read any edits from discovery panel + brief input
+  const c = consultantState.crawled;
+  c.primaryColor = document.getElementById('c-res-color1').value;
+  c.secondaryColor = document.getElementById('c-res-color2').value;
+  c.visualTone = document.getElementById('c-res-aesthetics').value;
+  c.usps = document.getElementById('c-res-usps').value;
+  c.heroProducts = document.getElementById('c-res-products').value;
+  c.toneOfVoice = document.getElementById('c-res-tone').value;
+  
+  const b = consultantState.brief;
+  b.challenges = document.getElementById('c-brief-challenges').value;
+  b.goals = document.getElementById('c-brief-goals').value;
+  b.failed = document.getElementById('c-brief-failed').value;
+  b.secrets = document.getElementById('c-brief-secrets').value;
+  
+  // Show advisory loaders
+  showConsultantPhase(3);
+  const workspace = document.getElementById('c-workspace-editor');
+  const loader = document.getElementById('c-advisory-loader');
+  
+  workspace.style.display = 'none';
+  loader.style.display = '';
+  
+  // Animate avatars opacity sequentially to look like meetings
+  const avatars = ['av-jobs', 'av-musk', 'av-buffett', 'av-munger', 'av-agency'];
+  avatars.forEach((id, idx) => {
+    document.getElementById(id).style.opacity = '0.3';
+    setTimeout(() => {
+      document.getElementById(id).style.opacity = '1.0';
+    }, idx * 1200);
+  });
+  
+  api('/api/consultant.php?action=formulate', 'POST', {
+    brand_name: consultantState.brandName,
+    brand_url: consultantState.brandUrl,
+    crawled: c,
+    brief: b
+  })
+    .then(strategyData => {
+      loader.style.display = 'none';
+      workspace.style.display = '';
+      
+      consultantState.strategy = strategyData || {};
+      populateWorkspaceEditorInputs();
+      
+      // Auto-save strategy record
+      saveConsultantStrategyDraft(true);
+    })
+    .catch(err => {
+      loader.style.display = 'none';
+      showConsultantPhase(2);
+      alert('Strategy formulation failed: ' + err.message);
+    });
+}
+
+function populateWorkspaceEditorInputs() {
+  const s = consultantState.strategy || {};
+  
+  const jm = s.jobs_musk || {};
+  document.getElementById('c-title-jobs').textContent = jm.title || 'Steve Jobs & Elon Musk Perspective';
+  document.getElementById('c-text-jobs').value = Array.isArray(jm.recommendations) ? jm.recommendations.join('\n\n') : '';
+
+  const bm = s.buffett_munger || {};
+  document.getElementById('c-title-buffett').textContent = bm.title || 'Warren Buffett & Charlie Munger Perspective';
+  document.getElementById('c-text-buffett').value = Array.isArray(bm.recommendations) ? bm.recommendations.join('\n\n') : '';
+
+  const af = s.agency_funnel || {};
+  document.getElementById('c-title-agency').textContent = af.title || 'The Omnichannel Growth Funnel (Deloitte/Dentsu)';
+  document.getElementById('c-text-agency').value = Array.isArray(af.recommendations) ? af.recommendations.join('\n\n') : '';
+
+  const cp = s.cross_pollination || {};
+  document.getElementById('c-title-cross').textContent = cp.title || 'Out-of-the-Box Cross-Pollination Playbook';
+  document.getElementById('c-text-cross').value = Array.isArray(cp.recommendations) ? cp.recommendations.join('\n\n') : '';
+
+  const rp = s.action_plan || {};
+  document.getElementById('c-title-roadmap').textContent = rp.title || 'Million-Dollar Execution Roadmap';
+  document.getElementById('c-text-roadmap').value = Array.isArray(rp.recommendations) ? rp.recommendations.join('\n\n') : '';
+  
+  consultantState.isDirty = false;
+  document.getElementById('c-workspace-save-status').textContent = 'Saved';
+}
+
+function markConsultantDirty() {
+  consultantState.isDirty = true;
+  document.getElementById('c-workspace-save-status').textContent = 'Unsaved changes...';
+}
+
+function saveConsultantStrategyDraft(isSilent = false) {
+  // Sync values from textareas back to strategy object
+  const s = consultantState.strategy;
+  
+  s.jobs_musk = s.jobs_musk || { title: 'Steve Jobs & Elon Musk Perspective', subtitle: 'First-principles thinking & cult experience' };
+  s.jobs_musk.recommendations = document.getElementById('c-text-jobs').value.split('\n\n');
+
+  s.buffett_munger = s.buffett_munger || { title: 'Warren Buffett & Charlie Munger Perspective', subtitle: 'Moats & margins safety' };
+  s.buffett_munger.recommendations = document.getElementById('c-text-buffett').value.split('\n\n');
+
+  s.agency_funnel = s.agency_funnel || { title: 'The Omnichannel Growth Funnel (Deloitte/Dentsu)', subtitle: 'Acquisition & lifecycle scaling' };
+  s.agency_funnel.recommendations = document.getElementById('c-text-agency').value.split('\n\n');
+
+  s.cross_pollination = s.cross_pollination || { title: 'Out-of-the-Box Cross-Pollination Playbook', subtitle: 'Unusual industry growth hacks' };
+  s.cross_pollination.recommendations = document.getElementById('c-text-cross').value.split('\n\n');
+
+  s.action_plan = s.action_plan || { title: 'Million-Dollar Execution Roadmap', subtitle: '90-day weekly execution schedule' };
+  s.action_plan.recommendations = document.getElementById('c-text-roadmap').value.split('\n\n');
+
+  const payload = {
+    brand_id: consultantState.brandId,
+    brand_name: consultantState.brandName,
+    brand_url: consultantState.brandUrl,
+    crawled: consultantState.crawled,
+    brief: consultantState.brief,
+    strategy: s
+  };
+  
+  api('/api/consultant.php?action=save', 'POST', payload)
+    .then(() => {
+      consultantState.isDirty = false;
+      document.getElementById('c-workspace-save-status').textContent = 'Draft Saved';
+      if (!isSilent) {
+        showToast('Strategy draft saved successfully!', 'success');
+      }
+    })
+    .catch(err => {
+      console.error('Failed to save draft:', err);
+      if (!isSilent) {
+        alert('Failed to save draft: ' + err.message);
+      }
+    });
+}
+
+function exportConsultantPPTX() {
+  if (consultantState.isDirty) {
+    saveConsultantStrategyDraft(true);
+  }
+  
+  const bName = consultantState.brandName || activeBrand.name;
+  const brandUrl = consultantState.brandUrl || '';
+  const primaryColor = consultantState.crawled.primaryColor || '#2B4EFF';
+  const secondaryColor = consultantState.crawled.secondaryColor || '#10B981';
+  
+  const s = consultantState.strategy || {};
+  
+  // Initialize PptxGenJS
+  const pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_WIDE'; // 16:9
+  
+  // Theme Setup
+  const COLOR_DARK = '111E35';
+  const COLOR_LIGHT = 'F4F7FB';
+  const FONT_PRIMARY = 'Plus Jakarta Sans';
+  
+  // Helper: Add Slide Header
+  function addSlideHeader(slide, title, subtitle) {
+    slide.background = { color: COLOR_LIGHT };
+    
+    // Header Bar Accent
+    slide.addShape('rect', { x: 0.5, y: 0.4, w: 0.15, h: 0.6, fill: { color: primaryColor } });
+    
+    // Title
+    slide.addText(title.toUpperCase(), {
+      x: 0.8, y: 0.4, w: 10.0, h: 0.35,
+      fontSize: 22, bold: true, color: COLOR_DARK, fontFace: FONT_PRIMARY,
+      valign: 'middle'
+    });
+    
+    // Subtitle
+    slide.addText(subtitle, {
+      x: 0.8, y: 0.75, w: 10.0, h: 0.25,
+      fontSize: 11, italic: true, color: '64748B', fontFace: FONT_PRIMARY,
+      valign: 'middle'
+    });
+    
+    // Confidentiality tag
+    slide.addText('MILLION-DOLLAR BRIEFING', {
+      x: 10.5, y: 0.4, w: 2.3, h: 0.3,
+      align: 'right', fontSize: 9, bold: true, color: secondaryColor, fontFace: FONT_PRIMARY
+    });
+  }
+  
+  // ── SLIDE 1: COVER SLIDE (Premium Deep Navy Theme) ──
+  const slide1 = pptx.addSlide();
+  slide1.background = { color: COLOR_DARK };
+  
+  // Design elements
+  slide1.addShape('rect', { x: 0, y: 0, w: 0.4, h: 7.5, fill: { color: primaryColor } });
+  slide1.addShape('rect', { x: 13.0, y: 0, w: 0.33, h: 7.5, fill: { color: secondaryColor } });
+  
+  slide1.addText('THE MILLION-DOLLAR STRATEGY PLAYBOOK', {
+    x: 1.0, y: 1.8, w: 11.0, h: 0.4,
+    fontSize: 14, bold: true, color: secondaryColor, fontFace: FONT_PRIMARY,
+    letterSpacing: 2
+  });
+  
+  slide1.addText(bName.toUpperCase(), {
+    x: 1.0, y: 2.3, w: 11.0, h: 0.9,
+    fontSize: 54, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY
+  });
+  
+  if (brandUrl) {
+    slide1.addText(brandUrl, {
+      x: 1.0, y: 3.2, w: 11.0, h: 0.3,
+      fontSize: 18, color: '818cf8', fontFace: FONT_PRIMARY, italic: true
+    });
+  }
+  
+  slide1.addText('Advisory Blueprint formulated by Steve Jobs, Elon Musk, Warren Buffett & Charlie Munger modeling.', {
+    x: 1.0, y: 4.8, w: 10.0, h: 0.4,
+    fontSize: 12, color: '94a3b8', fontFace: FONT_PRIMARY
+  });
+  
+  slide1.addText('CONFIDENTIAL DECK · DIGIFYCE GROWTH CONSULTING', {
+    x: 1.0, y: 6.4, w: 8.0, h: 0.3,
+    fontSize: 10, bold: true, color: '475569', fontFace: FONT_PRIMARY
+  });
+
+  // ── SLIDE 2: STEVE JOBS & ELON MUSK (Product & Cult Experience) ──
+  const slide2 = pptx.addSlide();
+  const jm = s.jobs_musk || {};
+  addSlideHeader(slide2, jm.title || 'Product & Innovation', jm.subtitle || 'Jobs & Musk Perspective');
+  
+  const jmRecs = jm.recommendations || [];
+  jmRecs.forEach((rec, idx) => {
+    if (!rec.trim()) return;
+    let y = 1.3 + (idx * 2.8);
+    if (y > 6.0) return; // safety boundary
+    
+    // Card container
+    slide2.addShape('rect', { x: 0.6, y: y, w: 12.1, h: 2.5, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
+    slide2.addShape('rect', { x: 0.6, y: y, w: 0.12, h: 2.5, fill: { color: primaryColor } });
+    
+    // Bullet/Label
+    slide2.addText(`PERSPECTIVE PILLAR 0${idx+1}`, { x: 1.0, y: y + 0.2, w: 11.0, h: 0.25, fontSize: 10, bold: true, color: '64748B', fontFace: FONT_PRIMARY });
+    
+    // Content Text
+    slide2.addText(rec, {
+      x: 1.0, y: y + 0.6, w: 11.3, h: 1.6,
+      fontSize: 13, lineSpacing: 22, color: COLOR_DARK, fontFace: FONT_PRIMARY,
+      valign: 'top'
+    });
+  });
+
+  // ── SLIDE 3: WARREN BUFFETT & CHARLIE MUNGER (Moats & Pricing Power) ──
+  const slide3 = pptx.addSlide();
+  const bm = s.buffett_munger || {};
+  addSlideHeader(slide3, bm.title || 'Economics & Value Moats', bm.subtitle || 'Buffett & Munger Perspective');
+  
+  const bmRecs = bm.recommendations || [];
+  bmRecs.forEach((rec, idx) => {
+    if (!rec.trim()) return;
+    let y = 1.3 + (idx * 2.8);
+    if (y > 6.0) return;
+    
+    slide3.addShape('rect', { x: 0.6, y: y, w: 12.1, h: 2.5, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
+    slide3.addShape('rect', { x: 0.6, y: y, w: 0.12, h: 2.5, fill: { color: '#F59E0B' } });
+    
+    slide3.addText(`PERSPECTIVE PILLAR 0${idx+1}`, { x: 1.0, y: y + 0.2, w: 11.0, h: 0.25, fontSize: 10, bold: true, color: '64748B', fontFace: FONT_PRIMARY });
+    
+    slide3.addText(rec, {
+      x: 1.0, y: y + 0.6, w: 11.3, h: 1.6,
+      fontSize: 13, lineSpacing: 22, color: COLOR_DARK, fontFace: FONT_PRIMARY,
+      valign: 'top'
+    });
+  });
+
+  // ── SLIDE 4: THE OMNICHANNEL ACQUISITION & RETENTION FUNNEL (Scale) ──
+  const slide4 = pptx.addSlide();
+  const af = s.agency_funnel || {};
+  addSlideHeader(slide4, af.title || 'Omnichannel Scale Funnel', af.subtitle || 'Dentsu/Deloitte Perspective');
+  
+  const afRecs = af.recommendations || [];
+  afRecs.forEach((rec, idx) => {
+    if (!rec.trim()) return;
+    let y = 1.3 + (idx * 2.8);
+    if (y > 6.0) return;
+    
+    slide4.addShape('rect', { x: 0.6, y: y, w: 12.1, h: 2.5, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
+    slide4.addShape('rect', { x: 0.6, y: y, w: 0.12, h: 2.5, fill: { color: '#2B4EFF' } });
+    
+    slide4.addText(`PERSPECTIVE PILLAR 0${idx+1}`, { x: 1.0, y: y + 0.2, w: 11.0, h: 0.25, fontSize: 10, bold: true, color: '64748B', fontFace: FONT_PRIMARY });
+    
+    slide4.addText(rec, {
+      x: 1.0, y: y + 0.6, w: 11.3, h: 1.6,
+      fontSize: 13, lineSpacing: 22, color: COLOR_DARK, fontFace: FONT_PRIMARY,
+      valign: 'top'
+    });
+  });
+
+  // ── SLIDE 5: OUT-OF-THE-BOX CROSS-POLLINATION PLAYBOOK ──
+  const slide5 = pptx.addSlide();
+  const cp = s.cross_pollination || {};
+  addSlideHeader(slide5, cp.title || 'Cross-Pollination Playbook', cp.subtitle || 'Unusual Industry Growth Hacks');
+  
+  const cpRecs = cp.recommendations || [];
+  cpRecs.forEach((rec, idx) => {
+    if (!rec.trim()) return;
+    let y = 1.3 + (idx * 2.8);
+    if (y > 6.0) return;
+    
+    slide5.addShape('rect', { x: 0.6, y: y, w: 12.1, h: 2.5, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
+    slide5.addShape('rect', { x: 0.6, y: y, w: 0.12, h: 2.5, fill: { color: '#10B981' } });
+    
+    slide5.addText(`PLAYBOOK CRITERIA 0${idx+1}`, { x: 1.0, y: y + 0.2, w: 11.0, h: 0.25, fontSize: 10, bold: true, color: '64748B', fontFace: FONT_PRIMARY });
+    
+    slide5.addText(rec, {
+      x: 1.0, y: y + 0.6, w: 11.3, h: 1.6,
+      fontSize: 13, lineSpacing: 22, color: COLOR_DARK, fontFace: FONT_PRIMARY,
+      valign: 'top'
+    });
+  });
+
+  // ── SLIDE 6: 90-DAY EXECUTION ROADMAP ──
+  const slide6 = pptx.addSlide();
+  const rp = s.action_plan || {};
+  addSlideHeader(slide6, rp.title || 'Execution Roadmap', rp.subtitle || '90-Day Deliverables Timeline');
+  
+  const rpRecs = rp.recommendations || [];
+  rpRecs.forEach((rec, idx) => {
+    if (!rec.trim()) return;
+    let x = 0.5 + (idx * 4.25);
+    if (x > 12.0) return;
+    
+    slide6.addShape('rect', { x: x, y: 1.3, w: 3.9, h: 5.6, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: 'E2E8F0', width: 1 } });
+    slide6.addShape('rect', { x: x, y: 1.3, w: 3.9, h: 0.45, fill: { color: primaryColor } });
+    
+    // Month label
+    slide6.addText(`MONTH 0${idx+1} TIMELINE`, {
+      x: x + 0.15, y: 1.35, w: 3.6, h: 0.35,
+      fontSize: 11, bold: true, color: 'FFFFFF', fontFace: FONT_PRIMARY,
+      valign: 'middle'
+    });
+    
+    // Recommendations list
+    slide6.addText(rec, {
+      x: x + 0.2, y: 1.9, w: 3.5, h: 4.8,
+      fontSize: 10.5, lineSpacing: 18, color: COLOR_DARK, fontFace: FONT_PRIMARY,
+      valign: 'top'
+    });
+  });
+
+  // Save/Download deck
+  const cleanFilename = `Strategy_Consultant_${bName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`;
+  pptx.writeFile({ fileName: cleanFilename })
+    .then(() => {
+      showToast('PowerPoint deck downloaded successfully!', 'success');
+    })
+    .catch(err => {
+      console.error('Failed to export PPTX:', err);
+      alert('Failed to export PPTX: ' + err.message);
+    });
+}
+
 
