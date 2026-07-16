@@ -778,6 +778,16 @@ function deferStratSave() {
   }, 1200);
 }
 
+function ensureString(val) {
+  if (Array.isArray(val)) {
+    return val.join(' ').trim();
+  }
+  if (typeof val === 'object' && val !== null) {
+    return JSON.stringify(val);
+  }
+  return (val || '').toString().trim();
+}
+
 function renderStrategyStep() {
   if (!activeBrand) return;
   const st = STRATEGY_STEPS[stratStep];
@@ -901,20 +911,29 @@ function renderStrategyStep() {
       let outputHtml = '';
       if (savedData && savedData.length > 0) {
         if (type === 'pillars') {
-          outputHtml = savedData.map(p => `
+          outputHtml = savedData.map(p => {
+            const pTitle = ensureString(p.title);
+            const pDesc = ensureString(p.description);
+            return `
             <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
               <div style="width:6px;height:6px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:5px"></div>
-              <div><div style="font-weight:700;color:var(--dark);font-size:13px;margin-bottom:3px">${p.title}</div>
-              <div style="font-size:12px;color:var(--mid)">${p.description}</div></div>
-            </div>`).join('');
+              <div><div style="font-weight:700;color:var(--dark);font-size:13px;margin-bottom:3px">${pTitle}</div>
+              <div style="font-size:12px;color:var(--mid)">${pDesc}</div></div>
+            </div>`;
+          }).join('');
         } else {
-          outputHtml = savedData.map((a, i) => `
+          outputHtml = savedData.map((a, i) => {
+            const aHead = ensureString(a.headline);
+            const aBody = ensureString(a.body);
+            const aCta = ensureString(a.cta);
+            return `
             <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
               <div style="width:22px;height:22px;border-radius:6px;background:var(--navy);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
-              <div><div style="font-weight:700;color:var(--dark);font-size:13px;margin-bottom:2px">${a.headline}</div>
-              <div style="font-size:12px;color:var(--mid);margin-bottom:3px">${a.body}</div>
-              ${a.cta ? `<div style="font-size:11px;color:var(--green);font-weight:600">${a.cta}</div>` : ''}</div>
-            </div>`).join('');
+              <div><div style="font-weight:700;color:var(--dark);font-size:13px;margin-bottom:2px">${aHead}</div>
+              <div style="font-size:12px;color:var(--mid);margin-bottom:3px">${aBody}</div>
+              ${aCta ? `<div style="font-size:11px;color:var(--green);font-weight:600">${aCta}</div>` : ''}</div>
+            </div>`;
+          }).join('');
         }
       }
       html += `<div class="ai-block">
@@ -1994,8 +2013,10 @@ async function genPPTX() {
       let x = 0.5 + (idx % 4) * 3.1;
       let y = 1.1 + Math.floor(idx / 4) * 2.8;
       s29.addShape('rect', { x, y, w: 2.9, h: 2.5, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: COLOR_PRIMARY, width: 2 } });
-      s29.addText(p.title || `Pillar ${idx + 1}`, { x: x + 0.15, y: y + 0.15, fontSize: 11, bold: true, color: COLOR_PRIMARY, fontFace: FONT_PRIMARY, w: 2.6, h: 0.35 });
-      s29.addText(p.description || '', { x: x + 0.15, y: y + 0.6, fontSize: 9.5, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 2.6, h: 1.7 });
+      const pTitle = ensureString(p.title) || `Pillar ${idx + 1}`;
+      const pDesc = ensureString(p.description);
+      s29.addText(pTitle, { x: x + 0.15, y: y + 0.15, fontSize: 11, bold: true, color: COLOR_PRIMARY, fontFace: FONT_PRIMARY, w: 2.6, h: 0.35 });
+      s29.addText(pDesc, { x: x + 0.15, y: y + 0.6, fontSize: 9.5, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 2.6, h: 1.7 });
     });
 
     // SLIDE 30: AI Sales Angles (Light Theme)
@@ -2005,10 +2026,13 @@ async function genPPTX() {
     angles.slice(0, 6).forEach((a, idx) => {
       let x = 0.5 + (idx % 3) * 4.25;
       let y = 1.1 + Math.floor(idx / 3) * 2.8;
-      s30.addShape('rect', { x, y, w: 3.9, h: 2.5, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: COLOR_AMBER, width: 2 } });
-      s30.addText(a.headline || `Angle ${idx + 1}`, { x: x + 0.2, y: y + 0.15, fontSize: 11, bold: true, color: COLOR_AMBER, fontFace: FONT_PRIMARY, w: 3.5, h: 0.35 });
-      s30.addText(a.body || '', { x: x + 0.2, y: y + 0.6, fontSize: 9.5, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 3.5, h: 1.4 });
-      s30.addText(`CTA: ${a.cta || 'Shop Now'}`, { x: x + 0.2, y: y + 2.0, fontSize: 9, bold: true, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 3.5, h: 0.3 });
+      s30.addShape('rect', { x, y: 1.1 + Math.floor(idx / 3) * 2.8, w: 3.9, h: 2.5, fill: { color: 'FFFFFF' }, rectRadius: 0.1, line: { color: COLOR_AMBER, width: 2 } });
+      const aHead = ensureString(a.headline) || `Angle ${idx + 1}`;
+      const aBody = ensureString(a.body);
+      const aCta = ensureString(a.cta) || 'Shop Now';
+      s30.addText(aHead, { x: x + 0.2, y: y + 0.15, fontSize: 11, bold: true, color: COLOR_AMBER, fontFace: FONT_PRIMARY, w: 3.5, h: 0.35 });
+      s30.addText(aBody, { x: x + 0.2, y: y + 0.6, fontSize: 9.5, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 3.5, h: 1.4 });
+      s30.addText(`CTA: ${aCta}`, { x: x + 0.2, y: y + 2.0, fontSize: 9, bold: true, color: COLOR_DARK, fontFace: FONT_PRIMARY, w: 3.5, h: 0.3 });
     });
 
     // 3. Trigger Download
