@@ -261,6 +261,7 @@ function selectBrand(id) {
   renderDashboard();
   if (curPage === 'pricing') loadBrandProducts();
   if (curPage === 'strategy') initStrategyPage();
+  if (curPage === 'consultant') initConsultantPage();
   if (curPage === 'reports') {
     const brandFilter = document.getElementById('reports-filter-brand');
     if (brandFilter) {
