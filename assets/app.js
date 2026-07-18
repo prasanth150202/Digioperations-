@@ -3149,6 +3149,7 @@ async function bgtLoadDashboard() {
 
 function renderBgtDashboard(data) {
   const el = document.getElementById('bgt-agency-cards');
+  if (!el) return;
   if (!data.length) { el.innerHTML = '<div style="color:var(--mid);font-size:13px">No brands assigned. Create a brand to get started.</div>'; return; }
 
   el.innerHTML = data.map(item => {
