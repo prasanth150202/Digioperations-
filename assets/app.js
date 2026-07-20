@@ -6018,12 +6018,41 @@ function closePoaBriefModal() {
   if (modal) modal.style.display = 'none';
 }
 
+let _poaBriefCurrentStep = 1;
+
 function switchPoaBriefTab(num) {
+  _poaBriefCurrentStep = num;
+  const stepLabels = [
+    'Next: Voice & Offers ➔',
+    'Next: Problems & Fixes ➔',
+    'Next: Audience & Objections ➔',
+    'Next: Competitors & Team ➔',
+    '🚀 Launch AI POA Generation'
+  ];
+
   for (let i = 1; i <= 5; i++) {
     const btn = document.getElementById(`poa-brief-tab-btn-${i}`);
     const tab = document.getElementById(`poa-brief-tab-${i}`);
     if (btn) btn.classList.toggle('active', i === num);
     if (tab) tab.style.display = (i === num) ? '' : 'none';
+  }
+
+  const nextBtn = document.getElementById('poa-brief-next-btn');
+  if (nextBtn) {
+    nextBtn.textContent = stepLabels[num - 1] || '🚀 Launch AI POA Generation';
+    if (num === 5) {
+      nextBtn.style.background = 'linear-gradient(135deg,#10B981,#059669)';
+    } else {
+      nextBtn.style.background = 'linear-gradient(135deg,#2B4EFF,#6366f1)';
+    }
+  }
+}
+
+function advancePoaBriefStep() {
+  if (_poaBriefCurrentStep < 5) {
+    switchPoaBriefTab(_poaBriefCurrentStep + 1);
+  } else {
+    submitPoaBriefAndGenerate();
   }
 }
 

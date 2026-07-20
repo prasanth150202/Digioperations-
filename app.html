@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<script src="assets/app.js?v=40"></script>
+<script src="assets/app.js?v=41"></script>
 <style>
 @media(max-width:1024px){ #sb-toggle{display:inline-flex!important} }
 </style>
@@ -1381,11 +1381,17 @@
         </div>
 
         <!-- Footer Actions -->
-        <div style="padding:16px 24px;background:#F8FAFC;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="padding:16px 24px;background:#F8FAFC;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
           <button class="btn" onclick="closePoaBriefModal()" style="border:1px solid var(--border);background:#fff;font-weight:700">Cancel</button>
-          <button class="btn primary" onclick="submitPoaBriefAndGenerate()" style="background:linear-gradient(135deg,#2B4EFF,#6366f1);border:none;box-shadow:0 4px 16px rgba(43,78,255,0.3);font-weight:800;padding:10px 22px">
-            🚀 Launch AI POA Generation
-          </button>
+          
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn" id="poa-brief-skip-btn" onclick="submitPoaBriefAndGenerate()" style="border:1px solid rgba(43,78,255,0.3);background:rgba(43,78,255,0.05);color:var(--blue);font-weight:700">
+              Skip & Launch Generation 🚀
+            </button>
+            <button class="btn primary" id="poa-brief-next-btn" onclick="advancePoaBriefStep()" style="background:linear-gradient(135deg,#2B4EFF,#6366f1);border:none;box-shadow:0 4px 16px rgba(43,78,255,0.3);font-weight:800;padding:10px 22px">
+              Next: Voice & Offers ➔
+            </button>
+          </div>
         </div>
 
       </div>
