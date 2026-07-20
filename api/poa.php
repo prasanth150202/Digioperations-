@@ -70,6 +70,70 @@ function getPoaDropdowns($brandId = null) {
     return $out;
 }
 
+// ── GET /api/poa.php?action=brand_context ──────────────────────────────────────
+if ($method === 'GET' && $action === 'brand_context') {
+    $brandId = $_GET['brand_id'] ?? '';
+    $month   = $_GET['month'] ?? date('Y-m');
+    if (!$brandId) json_err("Brand ID required");
+
+    $brand = dbGet("SELECT * FROM brands WHERE id = ?", [$brandId]);
+    if (!$brand) json_err("Brand not found");
+
+    $parts = explode('-', $month);
+    $yVal  = (int)($parts[0] ?? date('Y'));
+    $mVal  = (int)($parts[1] ?? date('m'));
+
+    $budgetMonth = dbGet("SELECT * FROM budget_months WHERE brand_id = ? AND year = ? AND month = ? LIMIT 1", [$brandId, $yVal, $mVal]);
+    if (!$budgetMonth) {
+        $budgetMonth = dbGet("SELECT * FROM budget_months WHERE brand_id = ? ORDER BY year DESC, month DESC LIMIT 1", [$brandId]);
+    }
+
+    $targetRevenue = (float)($budgetMonth['revenue_target'] ?? 400000);
+    $targetRoas    = (float)($budgetMonth['overall_roas'] ?? 3.5);
+    $targetBudget  = $targetRoas > 0 ? round($targetRevenue / $targetRoas, 2) : 100000;
+
+    // Calculate actuals to date if budget month exists
+    $actualSales = 0;
+    $actualSpend = 0;
+    if ($budgetMonth) {
+        $dayRows = dbAll("SELECT * FROM budget_days WHERE month_id = ?", [$budgetMonth['id']]);
+        foreach ($dayRows as $dr) {
+            $chData = json_decode($dr['channels_json'] ?? '{}', true);
+            foreach ($chData as $chVals) {
+                if (isset($chVals['sales'])) $actualSales += (float)$chVals['sales'];
+                if (isset($chVals['spend'])) $actualSpend += (float)$chVals['spend'];
+            }
+            // Legacy fallbacks
+            $actualSales += (float)($dr['meta_sales'] ?? 0) + (float)($dr['google_sales'] ?? 0) + (float)($dr['mp_sales'] ?? 0) + (float)($dr['ret_sales'] ?? 0);
+            $actualSpend += (float)($dr['meta_spend'] ?? 0) + (float)($dr['google_spend'] ?? 0) + (float)($dr['mp_spend'] ?? 0) + (float)($dr['ret_spend'] ?? 0);
+        }
+    }
+
+    // Products catalog
+    $productRows = dbAll("SELECT DISTINCT product_name FROM pricing_logs WHERE brand_id = ? AND product_name != '' LIMIT 10", [$brandId]);
+    $products = array_column($productRows, 'product_name');
+    if (empty($products)) $products = ['Hero Product A', 'Bestseller Combo B', 'Trial Pack C'];
+
+    // Consultant Intelligence
+    $intel = dbGet("SELECT * FROM consultant_generations WHERE brand_id = ? ORDER BY created_at DESC LIMIT 1", [$brandId]);
+    $crawled = json_decode($intel['crawled_json'] ?? '{}', true);
+
+    json_out([
+        'ok'             => true,
+        'brand_id'       => $brandId,
+        'brand_name'     => $brand['name'],
+        'month'          => $month,
+        'target_revenue' => $targetRevenue,
+        'target_budget'  => $targetBudget,
+        'target_roas'    => $targetRoas,
+        'actual_sales'   => round($actualSales, 2),
+        'actual_spend'   => round($actualSpend, 2),
+        'products'       => $products,
+        'category'       => $crawled['brand_overview']['category'] ?? 'D2C Ecommerce',
+        'mission'        => $crawled['brand_overview']['mission']  ?? 'Premium D2C Quality'
+    ]);
+}
+
 // ── GET /api/poa.php?action=list ─────────────────────────────────────────────
 if ($method === 'GET' && $action === 'list') {
     $brandId = $_GET['brand_id'] ?? '';
@@ -185,36 +249,72 @@ if ($method === 'POST' && $action === 'generate') {
     if (empty($brandIds)) json_err("Select at least one brand to generate POA");
 
     $results = [];
+    $parts = explode('-', $month);
+    $yVal  = (int)($parts[0] ?? date('Y'));
+    $mVal  = (int)($parts[1] ?? date('m'));
 
     foreach ($brandIds as $brandId) {
         $brand = dbGet("SELECT * FROM brands WHERE id = ?", [$brandId]);
         if (!$brand) continue;
 
-        // 1. Gather historical performance & budget data
-        $budgetMonth = dbGet("SELECT * FROM budget_months WHERE brand_id = ? AND label LIKE ? LIMIT 1", [$brandId, "%" . substr($month, 0, 7) . "%"]);
-        $intel       = dbGet("SELECT * FROM consultant_generations WHERE brand_id = ? ORDER BY created_at DESC LIMIT 1", [$brandId]);
-        
-        $crawledData = json_decode($intel['crawled_json'] ?? '{}', true);
-        $strategyData = json_decode($intel['strategy_json'] ?? '{}', true);
-        $dropdowns   = getPoaDropdowns($brandId);
+        // 1. Ingest actual brand sales numbers & monthly budget
+        $budgetMonth = dbGet("SELECT * FROM budget_months WHERE brand_id = ? AND year = ? AND month = ? LIMIT 1", [$brandId, $yVal, $mVal]);
+        if (!$budgetMonth) {
+            $budgetMonth = dbGet("SELECT * FROM budget_months WHERE brand_id = ? ORDER BY year DESC, month DESC LIMIT 1", [$brandId]);
+        }
 
-        // Build AI context prompt
-        $prompt = "You are a Senior D2C Growth Director and Media Buyer generating a comprehensive 6-sheet Monthly Plan of Action (POA) for the brand '{$brand['name']}' for the month of {$month}.\n\n";
-        $prompt .= "BRAND CONTEXT:\n";
+        $targetRevenue = (float)($b['override_target_revenue'] ?? $budgetMonth['revenue_target'] ?? 400000);
+        $targetRoas    = (float)($b['override_target_roas']    ?? $budgetMonth['overall_roas']   ?? 3.5);
+        $targetBudget  = $targetRoas > 0 ? round($targetRevenue / $targetRoas, 2) : 100000;
+
+        // Actual sales & spend calculations from budget_days
+        $actualSales = 0;
+        $actualSpend = 0;
+        if ($budgetMonth) {
+            $dayRows = dbAll("SELECT * FROM budget_days WHERE month_id = ?", [$budgetMonth['id']]);
+            foreach ($dayRows as $dr) {
+                $chData = json_decode($dr['channels_json'] ?? '{}', true);
+                foreach ($chData as $chVals) {
+                    if (isset($chVals['sales'])) $actualSales += (float)$chVals['sales'];
+                    if (isset($chVals['spend'])) $actualSpend += (float)$chVals['spend'];
+                }
+                $actualSales += (float)($dr['meta_sales'] ?? 0) + (float)($dr['google_sales'] ?? 0) + (float)($dr['mp_sales'] ?? 0) + (float)($dr['ret_sales'] ?? 0);
+                $actualSpend += (float)($dr['meta_spend'] ?? 0) + (float)($dr['google_spend'] ?? 0) + (float)($dr['mp_spend'] ?? 0) + (float)($dr['ret_spend'] ?? 0);
+            }
+        }
+
+        // Product catalog ingestion
+        $productRows = dbAll("SELECT DISTINCT product_name FROM pricing_logs WHERE brand_id = ? AND product_name != '' LIMIT 10", [$brandId]);
+        $products = array_column($productRows, 'product_name');
+        if (empty($products)) $products = ['Hero Product', 'Combo Pack', 'Starter Pack'];
+
+        // Brand intelligence ingestion
+        $intel = dbGet("SELECT * FROM consultant_generations WHERE brand_id = ? ORDER BY created_at DESC LIMIT 1", [$brandId]);
+        $crawled = json_decode($intel['crawled_json'] ?? '{}', true);
+        $dropdowns = getPoaDropdowns($brandId);
+
+        $brandCategory = $crawled['brand_overview']['category'] ?? 'D2C Ecommerce';
+        $brandMission  = $crawled['brand_overview']['mission']  ?? 'Premium D2C Quality';
+
+        // 2. Build deep AI prompt
+        $prompt = "You are a Senior D2C Growth Director and Media Buyer generating a 6-sheet Monthly Plan of Action (POA) for '{$brand['name']}' for {$month}.\n\n";
+        $prompt .= "INGESTED BRAND METRICS & SALES DATA:\n";
         $prompt .= "- Brand Name: {$brand['name']}\n";
-        $prompt .= "- Category: " . ($crawledData['brand_overview']['category'] ?? 'D2C Ecommerce') . "\n";
-        $prompt .= "- Mission/Tone: " . ($crawledData['brand_overview']['mission'] ?? 'Premium DTC Brand') . "\n";
-        $prompt .= "- Target Monthly Budget: ₹" . number_format($budgetMonth['target_budget'] ?? 100000) . "\n";
-        $prompt .= "- Target Revenue: ₹" . number_format($budgetMonth['target_revenue'] ?? 400000) . "\n";
-        $prompt .= "- Target ROAS: " . ($budgetMonth['target_roas'] ?? '3.50') . "x\n\n";
+        $prompt .= "- Category: {$brandCategory}\n";
+        $prompt .= "- Brand Mission: {$brandMission}\n";
+        $prompt .= "- Target Monthly Revenue: ₹" . number_format($targetRevenue) . "\n";
+        $prompt .= "- Target Monthly Ad Spend: ₹" . number_format($targetBudget) . "\n";
+        $prompt .= "- Target Blended ROAS: " . number_format($targetRoas, 2) . "x\n";
+        $prompt .= "- Actual Sales to Date: ₹" . number_format($actualSales) . "\n";
+        $prompt .= "- Actual Spend to Date: ₹" . number_format($actualSpend) . "\n";
+        $prompt .= "- Catalog Products: " . implode(', ', $products) . "\n\n";
 
-        $prompt .= "CUSTOM BRAND DROPDOWN OPTIONS TO PRIORITIZE:\n";
-        $prompt .= "- Content Styles: " . implode(', ', array_slice($dropdowns['content_styles'], 0, 10)) . "\n";
-        $prompt .= "- Creative Angles: " . implode(', ', array_slice($dropdowns['creative_angles'], 0, 10)) . "\n";
-        $prompt .= "- Website Task Areas: " . implode(', ', array_slice($dropdowns['website_areas'], 0, 8)) . "\n";
+        $prompt .= "CUSTOM BRAND DROPDOWNS TO PRIORITIZE:\n";
+        $prompt .= "- Content Styles: " . implode(', ', array_slice($dropdowns['content_styles'], 0, 8)) . "\n";
+        $prompt .= "- Creative Angles: " . implode(', ', array_slice($dropdowns['creative_angles'], 0, 8)) . "\n";
         $prompt .= "- Retention Channels: " . implode(', ', array_slice($dropdowns['retention_channels'], 0, 8)) . "\n\n";
 
-        $prompt .= "Return ONLY a valid JSON object matching the following structure:\n";
+        $prompt .= "Return ONLY a valid JSON object matching this exact structure:\n";
         $prompt .= "{\n";
         $prompt .= '  "overview": { "executive_summary": "...", "target_revenue": "...", "target_roas": "...", "primary_kpi": "Blended ROAS", "milestones": ["...", "..."], "team": { "Media Buyer": "...", "Copywriter": "..." } },' . "\n";
         $prompt .= '  "communication": [ { "product": "...", "priority": "High", "priority_reason": "Hero Product", "audience": "...", "pain_point": "...", "desired_action": "...", "value_prop": "...", "claims": "...", "angle": "...", "status": "Planned" } ],' . "\n";
@@ -226,60 +326,125 @@ if ($method === 'POST' && $action === 'generate') {
 
         $systemPrompt = "You are Digifyce AI Media Buyer, specialized in creating hyper-personalized D2C growth POAs. Output only strict JSON without markdown formatting backticks.";
 
+        $data = null;
         try {
             $raw = callAI($prompt, $systemPrompt, 0.4);
             $clean = trim(preg_replace('/^```json\s*|^```\s*|\s*```$/m', '', $raw));
             $data = json_decode($clean, true);
+        } catch (Throwable $aiErr) {
+            $data = null;
+        }
 
-            if (!$data || !isset($data['overview'])) {
-                // Fallback default structure
-                $data = [
-                    'overview' => [
-                        'executive_summary' => "Monthly execution plan focused on scaling ROAS to " . ($budgetMonth['target_roas'] ?? '3.5') . "x and optimizing customer acquisition for {$brand['name']}.",
-                        'target_revenue' => "₹" . number_format($budgetMonth['target_revenue'] ?? 400000),
-                        'target_roas' => ($budgetMonth['target_roas'] ?? '3.5') . "x",
-                        'primary_kpi' => 'Blended ROAS',
-                        'milestones' => ['Scale hero product campaigns', 'Launch CRO product page test', 'Deploy post-purchase retention flow'],
-                        'team' => ['Media Buyer' => $user['name'] ?? 'Media Team', 'Creative' => 'Creative Team']
+        // Fallback personalized data generator if AI fails or returns empty
+        if (!$data || !isset($data['overview'])) {
+            $p1 = $products[0] ?? 'Hero Product';
+            $p2 = $products[1] ?? 'Combo Pack';
+
+            $data = [
+                'overview' => [
+                    'executive_summary' => "Monthly Media Buyer Plan for {$brand['name']} targeting ₹" . number_format($targetRevenue) . " revenue at " . number_format($targetRoas, 2) . "x ROAS. Actual sales to date stand at ₹" . number_format($actualSales) . " across Meta, Google, and Retention channels.",
+                    'target_revenue' => "₹" . number_format($targetRevenue),
+                    'target_roas' => number_format($targetRoas, 2) . "x",
+                    'primary_kpi' => 'Blended ROAS',
+                    'milestones' => [
+                        "Scale Meta & Google prospecting campaigns to reach ₹" . number_format($targetBudget) . " spend target",
+                        "Launch CRO test on {$p1} landing page to lift conversion rate",
+                        "Deploy VIP retention automation flow for repeat purchases"
                     ],
-                    'communication' => [
-                        ['product' => 'Hero Product', 'priority' => 'High', 'priority_reason' => 'Bestseller', 'audience' => 'Target Customers', 'pain_point' => 'Daily Needs', 'desired_action' => 'Purchase Combo', 'value_prop' => '100% Natural & Convenient', 'claims' => 'Zero Preservatives', 'angle' => 'Problem–Solution', 'status' => 'Planned']
-                    ],
-                    'competitors' => [
-                        ['competitor' => 'Top Category Competitor', 'product' => 'Category Mix', 'offer' => '10% off', 'positioning' => 'Clean label', 'creative_angle' => 'UGC Demo', 'test_idea' => 'Test 15-second unboxing video']
-                    ],
-                    'website' => [
-                        ['page_area' => 'Home Page', 'problem' => 'Low mobile CTA visibility', 'required_change' => 'Sticky add-to-cart & trust badges', 'kpi_to_improve' => 'Conversion Rate', 'priority' => 'High', 'assigned_to' => 'Shopify Developer', 'status' => 'Planned']
-                    ],
-                    'creative' => [
-                        ['product' => 'Hero Product', 'angle' => 'Problem–Solution', 'content_style' => 'UGC / Product Demo', 'hook_idea' => 'Stop making this mistake with your daily routine!', 'offer' => 'Starter Combo', 'quantity' => 4, 'priority' => 'High', 'assigned_to' => 'Creative Team', 'status' => 'Planned']
-                    ],
-                    'retention' => [
-                        ['campaign' => 'Welcome Flow', 'campaign_type' => 'Post-Purchase Flow', 'trigger' => 'First Order', 'rfm_segment' => 'Prospects', 'objective' => 'Second Purchase', 'channel' => 'Email & WhatsApp', 'communication' => 'Usage guide + 15% next order perk', 'status' => 'Planned']
+                    'team' => [
+                        'Media Buyer' => $user['name'] ?? 'Media Team',
+                        'Copywriter' => 'Copywriting Team',
+                        'Designer' => 'Creative Team',
+                        'Shopify Developer' => 'Dev Team'
                     ]
-                ];
-            }
-
-            // Save to DB
-            $poaId = uuid4();
-            dbRun("INSERT INTO poa_generations (id, brand_id, brand_name, poa_month, overview_json, communication_json, competitors_json, website_json, creative_json, retention_json, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [$poaId, $brandId, $brand['name'], $month, json_encode($data['overview']), json_encode($data['communication']), json_encode($data['competitors']), json_encode($data['website']), json_encode($data['creative']), json_encode($data['retention']), $user['name'] ?? 'System']);
-
-            $results[] = [
-                'id'         => $poaId,
-                'brand_id'   => $brandId,
-                'brand_name' => $brand['name'],
-                'poa_month'  => $month,
-                'status'     => 'Generated'
-            ];
-
-        } catch (Throwable $e) {
-            $results[] = [
-                'brand_id'   => $brandId,
-                'brand_name' => $brand['name'],
-                'error'      => $e->getMessage()
+                ],
+                'communication' => [
+                    [
+                        'product' => $p1,
+                        'priority' => 'High',
+                        'priority_reason' => 'Hero Product',
+                        'audience' => 'Primary D2C Target Audience',
+                        'pain_point' => 'Daily routine barrier & lack of convenient solution',
+                        'desired_action' => 'Order Single / Starter Pack',
+                        'value_prop' => "100% Natural & Convenient {$brandCategory}",
+                        'claims' => 'Zero Artificial Flavours / Verified Ingredients',
+                        'angle' => 'Problem–Solution',
+                        'status' => 'Planned'
+                    ],
+                    [
+                        'product' => $p2,
+                        'priority' => 'Medium',
+                        'priority_reason' => 'AOV & Combo Booster',
+                        'audience' => 'Repeat & Bundle Buyers',
+                        'pain_point' => 'High individual product cost',
+                        'desired_action' => 'Upgrade to Family Combo',
+                        'value_prop' => 'Best Value Pack with Free Shipping',
+                        'claims' => 'Bundle Savings',
+                        'angle' => 'Price and Value',
+                        'status' => 'Planned'
+                    ]
+                ],
+                'competitors' => [
+                    [
+                        'competitor' => 'Top Category Competitor',
+                        'product' => 'Category Mix',
+                        'offer' => '10% off subscription',
+                        'positioning' => 'Convenient daily wellness',
+                        'creative_angle' => 'UGC / Product Demo',
+                        'test_idea' => 'Test 15-sec product preparation reel comparing speed & purity'
+                    ]
+                ],
+                'website' => [
+                    [
+                        'page_area' => 'Product Page',
+                        'problem' => 'Low add-to-cart rate on mobile devices',
+                        'required_change' => 'Add sticky add-to-cart bar with benefit badges',
+                        'kpi_to_improve' => 'Conversion Rate',
+                        'priority' => 'High',
+                        'assigned_to' => 'Shopify Developer',
+                        'status' => 'Planned'
+                    ]
+                ],
+                'creative' => [
+                    [
+                        'product' => $p1,
+                        'angle' => 'Problem–Solution',
+                        'content_style' => 'UGC / Product Demo',
+                        'hook_idea' => "Stop using sugary alternatives — try {$p1}!",
+                        'offer' => 'Starter Combo Offer',
+                        'quantity' => 4,
+                        'priority' => 'High',
+                        'assigned_to' => 'Creative Team',
+                        'status' => 'Planned'
+                    ]
+                ],
+                'retention' => [
+                    [
+                        'campaign' => 'Post-Purchase Welcome Flow',
+                        'campaign_type' => 'Post-Purchase Flow',
+                        'trigger' => 'First Order Delivered',
+                        'rfm_segment' => 'Prospects',
+                        'objective' => 'Second Purchase',
+                        'channel' => 'WhatsApp & Email',
+                        'communication' => 'Usage guide + 15% discount for 2nd order within 14 days',
+                        'status' => 'Planned'
+                    ]
+                ]
             ];
         }
+
+        // Save to DB
+        $poaId = uuid4();
+        dbRun("INSERT INTO poa_generations (id, brand_id, brand_name, poa_month, overview_json, communication_json, competitors_json, website_json, creative_json, retention_json, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [$poaId, $brandId, $brand['name'], $month, json_encode($data['overview']), json_encode($data['communication']), json_encode($data['competitors']), json_encode($data['website']), json_encode($data['creative']), json_encode($data['retention']), $user['name'] ?? 'System']);
+
+        $results[] = [
+            'id'         => $poaId,
+            'brand_id'   => $brandId,
+            'brand_name' => $brand['name'],
+            'poa_month'  => $month,
+            'status'     => 'Generated'
+        ];
     }
 
     json_out(['ok' => true, 'results' => $results]);
@@ -301,9 +466,7 @@ if ($method === 'GET' && $action === 'export_xlsx') {
     $web       = json_decode($poa['website_json']       ?: '[]', true);
     $creat     = json_decode($poa['creative_json']      ?: '[]', true);
     $ret       = json_decode($poa['retention_json']     ?: '[]', true);
-    $dropdowns = getPoaDropdowns($poa['brand_id']);
 
-    // Build CSV / Tabular HTML spreadsheet output for native Excel compatibility
     $filename = "Media_Buyer_POA_" . preg_replace('/\s+/', '_', $brandName) . "_" . $month . ".xls";
 
     header("Content-Type: application/vnd.ms-excel; charset=utf-8");

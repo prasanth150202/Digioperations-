@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<script src="assets/app.js?v=36"></script>
+<script src="assets/app.js?v=37"></script>
 <style>
 @media(max-width:1024px){ #sb-toggle{display:inline-flex!important} }
 </style>
@@ -865,7 +865,7 @@
       </div>
 
       <!-- Batch Brand Selection Strip -->
-      <div class="card" style="padding:16px 20px;margin-bottom:20px;background:rgba(255,255,255,0.6)">
+      <div class="card" style="padding:16px 20px;margin-bottom:16px;background:rgba(255,255,255,0.6)">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
           <div>
             <div style="font-size:12px;font-weight:800;color:var(--dark);margin-bottom:2px">Select Brands for Monthly Execution Plan:</div>
@@ -874,6 +874,44 @@
           <div id="poa-brand-chips" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <!-- Populated dynamically -->
           </div>
+        </div>
+      </div>
+
+      <!-- Ingested Brand Sales Metrics & Inputs Strip -->
+      <div id="poa-brand-context-bar" class="card" style="padding:18px 22px;margin-bottom:20px;background:linear-gradient(135deg,rgba(43,78,255,0.03),rgba(99,102,241,0.02));border:1px solid rgba(43,78,255,0.15)">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:16px">📊</span>
+            <div>
+              <div style="font-size:13px;font-weight:800;color:var(--dark)">Ingested Brand Sales Metrics & Data Sources</div>
+              <div style="font-size:11px;color:var(--mid)">Live financial targets, sales history, catalog items, and brand intelligence fed into AI POA generation.</div>
+            </div>
+          </div>
+          <span class="pill" style="background:rgba(16,185,129,0.1);color:#10B981;font-weight:700;font-size:11px">● Live Ingested Data</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px">
+          <div style="background:#fff;padding:10px 14px;border:1px solid var(--border);border-radius:8px">
+            <div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase">Target Revenue Goal</div>
+            <input type="text" id="poa-ctx-target-rev" style="font-size:14px;font-weight:800;color:var(--blue);border:none;outline:none;width:100%;background:transparent" placeholder="₹400,000">
+          </div>
+          <div style="background:#fff;padding:10px 14px;border:1px solid var(--border);border-radius:8px">
+            <div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase">Target Monthly Spend</div>
+            <input type="text" id="poa-ctx-target-budget" style="font-size:14px;font-weight:800;color:var(--dark);border:none;outline:none;width:100%;background:transparent" placeholder="₹100,000">
+          </div>
+          <div style="background:#fff;padding:10px 14px;border:1px solid var(--border);border-radius:8px">
+            <div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase">Target Blended ROAS</div>
+            <input type="text" id="poa-ctx-target-roas" style="font-size:14px;font-weight:800;color:#10B981;border:none;outline:none;width:100%;background:transparent" placeholder="3.5x">
+          </div>
+          <div style="background:#fff;padding:10px 14px;border:1px solid var(--border);border-radius:8px">
+            <div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase">Actual Sales to Date</div>
+            <div style="font-size:14px;font-weight:800;color:var(--dark)" id="poa-ctx-actual-sales">₹0</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--mid)">
+          <div><strong>Ingested Catalog:</strong> <span id="poa-ctx-products-list">Loading products...</span></div>
+          <div><strong>Category & Positioning:</strong> <span id="poa-ctx-category">D2C Ecommerce</span></div>
         </div>
       </div>
 

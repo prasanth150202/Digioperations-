@@ -5915,6 +5915,25 @@ function loadPoaForCurrentSelection() {
     return;
   }
 
+  // Load Brand Sales Context & Ingested Data
+  api(`/api/poa?action=brand_context&brand_id=${brandId}&month=${month}`).then(ctx => {
+    if (ctx && ctx.ok) {
+      const revEl    = document.getElementById('poa-ctx-target-rev');
+      const budEl    = document.getElementById('poa-ctx-target-budget');
+      const roasEl   = document.getElementById('poa-ctx-target-roas');
+      const actualEl = document.getElementById('poa-ctx-actual-sales');
+      const prodsEl  = document.getElementById('poa-ctx-products-list');
+      const catEl    = document.getElementById('poa-ctx-category');
+
+      if (revEl)    revEl.value = '₹' + Number(ctx.target_revenue).toLocaleString();
+      if (budEl)    budEl.value = '₹' + Number(ctx.target_budget).toLocaleString();
+      if (roasEl)   roasEl.value = ctx.target_roas + 'x';
+      if (actualEl) actualEl.textContent = '₹' + Number(ctx.actual_sales).toLocaleString();
+      if (prodsEl)  prodsEl.textContent = (ctx.products || []).join(', ');
+      if (catEl)    catEl.textContent = (ctx.category || 'D2C Ecommerce') + (ctx.mission ? ' · ' + ctx.mission : '');
+    }
+  }).catch(() => {});
+
   api(`/api/poa?action=load&brand_id=${brandId}&month=${month}`).then(res => {
     if (res && res.ok && !res.empty) {
       _poaCurrentId = res.id;
@@ -5984,12 +6003,15 @@ async function startPoaBatchGeneration() {
     logEl.scrollTop = logEl.scrollHeight;
   }
 
-  appendLog(`🚀 Starting Multi-Brand AI Generation for ${_poaSelectedBrands.length} brand(s)...`, 'var(--blue)');
+  const revInput  = document.getElementById('poa-ctx-target-rev')?.value.replace(/[^0-9.]/g, '');
+  const roasInput = document.getElementById('poa-ctx-target-roas')?.value.replace(/[^0-9.]/g, '');
 
   try {
     const res = await api('/api/poa?action=generate', 'POST', {
       brand_ids: _poaSelectedBrands,
-      month: month
+      month: month,
+      override_target_revenue: revInput ? parseFloat(revInput) : null,
+      override_target_roas: roasInput ? parseFloat(roasInput) : null
     });
 
     if (pBar) pBar.style.width = '100%';
