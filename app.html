@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<script src="assets/app.js?v=38"></script>
+<script src="assets/app.js?v=39"></script>
 <style>
 @media(max-width:1024px){ #sb-toggle{display:inline-flex!important} }
 </style>
@@ -1242,7 +1242,152 @@
               💾 Save Progress
             </button>
           </div>
+      </div>
+    </div>
+
+    <!-- PRE-GENERATION STRATEGY BRIEFING MODAL -->
+    <div class="modal-overlay" id="modal-poa-brief" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center">
+      <div class="modal-box" style="background:#fff;border-radius:14px;width:90%;max-width:850px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,0.3);overflow:hidden">
+        
+        <!-- Header -->
+        <div style="padding:18px 24px;background:linear-gradient(135deg,#0B192C,#1E293B);color:#fff;display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:20px">🎯</span>
+            <div>
+              <div style="font-size:15px;font-weight:800" id="poa-brief-modal-title">Monthly Strategy Briefing & Inputs</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.7)">Customize your campaign goals, brand tone, focus products, problems & desired fixes before AI generation.</div>
+            </div>
+          </div>
+          <button onclick="closePoaBriefModal()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;opacity:0.8">✕</button>
         </div>
+
+        <!-- Body Tabs -->
+        <div style="padding:12px 24px;background:#F8FAFC;border-bottom:1px solid var(--border);display:flex;gap:6px;overflow-x:auto">
+          <button class="btn sm active" id="poa-brief-tab-btn-1" onclick="switchPoaBriefTab(1)">📊 Targets & Goals</button>
+          <button class="btn sm" id="poa-brief-tab-btn-2" onclick="switchPoaBriefTab(2)">💬 Voice & Offers</button>
+          <button class="btn sm" id="poa-brief-tab-btn-3" onclick="switchPoaBriefTab(3)">🚨 Problems & Fixes</button>
+          <button class="btn sm" id="poa-brief-tab-btn-4" onclick="switchPoaBriefTab(4)">🎯 Audience & Objections</button>
+          <button class="btn sm" id="poa-brief-tab-btn-5" onclick="switchPoaBriefTab(5)">🏆 Competitors & Team</button>
+        </div>
+
+        <!-- Form Content -->
+        <div style="padding:24px;overflow-y:auto;flex:1">
+
+          <!-- TAB 1: Financial & KPI Targets -->
+          <div id="poa-brief-tab-1" class="poa-brief-tab-content">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+              <div class="field">
+                <label style="font-weight:700">Target Monthly Revenue (₹)</label>
+                <input type="text" id="poa-brief-revenue" placeholder="e.g. ₹500,000">
+              </div>
+              <div class="field">
+                <label style="font-weight:700">Target Blended ROAS (x)</label>
+                <input type="text" id="poa-brief-roas" placeholder="e.g. 4.0x">
+              </div>
+              <div class="field">
+                <label style="font-weight:700">Target Blended CPA (₹)</label>
+                <input type="text" id="poa-brief-cpa" placeholder="e.g. ₹450">
+              </div>
+              <div class="field">
+                <label style="font-weight:700">Target Average Order Value (AOV ₹)</label>
+                <input type="text" id="poa-brief-aov" placeholder="e.g. ₹1,250">
+              </div>
+            </div>
+            <div class="field">
+              <label style="font-weight:700">Primary Campaign Goal</label>
+              <select id="poa-brief-primary-goal">
+                <option value="Scale Customer Acquisition & New Traffic">Scale Cold Customer Acquisition</option>
+                <option value="Boost Repeat Purchases & Retention LTV">Boost Repeat Purchases & Retention LTV</option>
+                <option value="Launch New Hero Product SKU">Launch New Hero Product SKU</option>
+                <option value="Clear Inventory & Seasonal Stock">Clear Inventory & Seasonal Stock</option>
+                <option value="Improve Checkout & Mobile Conversion Rate">Improve Checkout & Mobile Conversion Rate</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- TAB 2: Voice, Offers & SKUs -->
+          <div id="poa-brief-tab-2" class="poa-brief-tab-content" style="display:none">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+              <div class="field">
+                <label style="font-weight:700">Brand Communication Tone & Voice</label>
+                <select id="poa-brief-tone">
+                  <option value="Empathetic, Warm & Trustworthy">Empathetic, Warm & Trustworthy</option>
+                  <option value="High Energy, Bold & Hype">High Energy, Bold & Hype</option>
+                  <option value="Clinical, Doctor-Backed & Scientific">Clinical, Doctor-Backed & Scientific</option>
+                  <option value="Premium, Elegant & Elite Luxury">Premium, Elegant & Elite Luxury</option>
+                  <option value="Minimalist, Direct & Honest">Minimalist, Direct & Honest</option>
+                  <option value="Playful, Witty & Humorous">Playful, Witty & Humorous</option>
+                </select>
+              </div>
+              <div class="field">
+                <label style="font-weight:700">Max Permissible Discount / Margin Loss Cap (%)</label>
+                <input type="text" id="poa-brief-discount-cap" placeholder="e.g. 20%">
+              </div>
+            </div>
+            <div class="field" style="margin-bottom:14px">
+              <label style="font-weight:700">Focus SKUs / Products to Push This Month</label>
+              <input type="text" id="poa-brief-products" placeholder="e.g. Hapli Organic Porridge, Combo Pack">
+            </div>
+            <div class="field">
+              <label style="font-weight:700">Monthly Hero Offer / Promo Hook</label>
+              <input type="text" id="poa-brief-offer" placeholder="e.g. Buy 2 Get 1 Free or Flat 20% Off + Free Shipping">
+            </div>
+          </div>
+
+          <!-- TAB 3: Problems & Desired Fixes -->
+          <div id="poa-brief-tab-3" class="poa-brief-tab-content" style="display:none">
+            <div class="field" style="margin-bottom:16px">
+              <label style="font-weight:700;color:#ef4444">Current Brand Problems & Performance Bottlenecks</label>
+              <textarea id="poa-brief-problems" style="width:100%;min-height:90px;font-size:12px;padding:10px;border:1px solid var(--border);border-radius:8px" placeholder="e.g. Meta CAC spiked 25% this week, high cart abandonment on mobile PDPs, low 2nd purchase retention rate."></textarea>
+            </div>
+            <div class="field">
+              <label style="font-weight:700;color:#10B981">Required Strategic Fixes & Priority Focus Areas</label>
+              <textarea id="poa-brief-fixes" style="width:100%;min-height:90px;font-size:12px;padding:10px;border:1px solid var(--border);border-radius:8px" placeholder="e.g. Deploy sticky Add-to-Cart bar on PDP, test 4 UGC unboxing reels, launch WhatsApp post-purchase welcome sequence."></textarea>
+            </div>
+          </div>
+
+          <!-- TAB 4: Audience & Objections -->
+          <div id="poa-brief-tab-4" class="poa-brief-tab-content" style="display:none">
+            <div class="field" style="margin-bottom:14px">
+              <label style="font-weight:700">Primary Target Demographics & Persona</label>
+              <input type="text" id="poa-brief-audience" placeholder="e.g. Health-conscious parents (25-40 yrs), Tier 1 metro cities">
+            </div>
+            <div class="field" style="margin-bottom:14px">
+              <label style="font-weight:700">Core Customer Pain Points & Friction</label>
+              <textarea id="poa-brief-pain-points" style="width:100%;min-height:70px;font-size:12px;padding:10px;border:1px solid var(--border);border-radius:8px" placeholder="e.g. Hard to find clean infant food with no preservatives; busy morning routines."></textarea>
+            </div>
+            <div class="field">
+              <label style="font-weight:700">Top Purchase Objections & Hesitations to Counter</label>
+              <input type="text" id="poa-brief-objections" placeholder="e.g. Taste concern, price vs quantity, delivery speed trust">
+            </div>
+          </div>
+
+          <!-- TAB 5: Competitors & Team -->
+          <div id="poa-brief-tab-5" class="poa-brief-tab-content" style="display:none">
+            <div class="field" style="margin-bottom:14px">
+              <label style="font-weight:700">Top Competitors to Audit & Benchmark</label>
+              <input type="text" id="poa-brief-competitors" placeholder="e.g. Slurrp Farm, Beaba, Early Foods">
+            </div>
+            <div class="field" style="margin-bottom:14px">
+              <label style="font-weight:700">Weekly Creative Output Target (Qty)</label>
+              <input type="number" id="poa-brief-creative-qty" value="4" placeholder="4">
+            </div>
+            <div class="field">
+              <label style="font-weight:700">Assigned Lead Media Buyer & Team</label>
+              <input type="text" id="poa-brief-team-lead" placeholder="e.g. Senior Growth Buyer & Creative Team">
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer Actions -->
+        <div style="padding:16px 24px;background:#F8FAFC;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+          <button class="btn" onclick="closePoaBriefModal()" style="border:1px solid var(--border);background:#fff;font-weight:700">Cancel</button>
+          <button class="btn primary" onclick="submitPoaBriefAndGenerate()" style="background:linear-gradient(135deg,#2B4EFF,#6366f1);border:none;box-shadow:0 4px 16px rgba(43,78,255,0.3);font-weight:800;padding:10px 22px">
+            🚀 Launch AI POA Generation
+          </button>
+        </div>
+
       </div>
     </div>
 

@@ -5972,12 +5972,50 @@ function loadPoaForCurrentSelection() {
   }).catch(() => {});
 }
 
-// ── BATCH AI GENERATION ───────────────────────────────────────────────────────
-async function startPoaBatchGeneration() {
+// ── BATCH AI GENERATION & BRIEFING MODAL ──────────────────────────────────────
+function startPoaBatchGeneration() {
   if (!_poaSelectedBrands.length) {
     alert('Please select at least one brand to generate POA.');
     return;
   }
+
+  const brandId = _poaSelectedBrands[0];
+  const brand = (window.brandsData || []).find(b => b.id === brandId);
+  const bName = brand ? brand.name : 'Selected Brand';
+
+  const modalTitle = document.getElementById('poa-brief-modal-title');
+  if (modalTitle) modalTitle.textContent = `Monthly Strategy Briefing & Inputs — ${bName}`;
+
+  // Pre-fill fields from Context Bar
+  const revVal  = document.getElementById('poa-ctx-target-rev')?.value || '';
+  const roasVal = document.getElementById('poa-ctx-target-roas')?.value || '';
+  const prods   = document.getElementById('poa-ctx-products-list')?.textContent || '';
+
+  if (revVal && document.getElementById('poa-brief-revenue'))  document.getElementById('poa-brief-revenue').value = revVal;
+  if (roasVal && document.getElementById('poa-brief-roas'))    document.getElementById('poa-brief-roas').value = roasVal;
+  if (prods && document.getElementById('poa-brief-products')) document.getElementById('poa-brief-products').value = prods;
+
+  switchPoaBriefTab(1);
+  const modal = document.getElementById('modal-poa-brief');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closePoaBriefModal() {
+  const modal = document.getElementById('modal-poa-brief');
+  if (modal) modal.style.display = 'none';
+}
+
+function switchPoaBriefTab(num) {
+  for (let i = 1; i <= 5; i++) {
+    const btn = document.getElementById(`poa-brief-tab-btn-${i}`);
+    const tab = document.getElementById(`poa-brief-tab-${i}`);
+    if (btn) btn.classList.toggle('active', i === num);
+    if (tab) tab.style.display = (i === num) ? '' : 'none';
+  }
+}
+
+async function submitPoaBriefAndGenerate() {
+  closePoaBriefModal();
 
   const month = document.getElementById('poa-month-select').value || new Date().toISOString().slice(0,7);
   const feedEl  = document.getElementById('poa-gen-feed');
@@ -6003,27 +6041,43 @@ async function startPoaBatchGeneration() {
     logEl.scrollTop = logEl.scrollHeight;
   }
 
-  const revInput  = document.getElementById('poa-ctx-target-rev')?.value.replace(/[^0-9.]/g, '');
-  const roasInput = document.getElementById('poa-ctx-target-roas')?.value.replace(/[^0-9.]/g, '');
+  const briefPayload = {
+    brand_ids: _poaSelectedBrands,
+    month: month,
+    override_target_revenue: document.getElementById('poa-brief-revenue')?.value.replace(/[^0-9.]/g, '') || null,
+    override_target_roas: document.getElementById('poa-brief-roas')?.value.replace(/[^0-9.]/g, '') || null,
+    target_cpa: document.getElementById('poa-brief-cpa')?.value || '',
+    target_aov: document.getElementById('poa-brief-aov')?.value || '',
+    primary_goal: document.getElementById('poa-brief-primary-goal')?.value || '',
+    brand_tone: document.getElementById('poa-brief-tone')?.value || '',
+    discount_cap: document.getElementById('poa-brief-discount-cap')?.value || '',
+    focus_products: document.getElementById('poa-brief-products')?.value || '',
+    monthly_offer: document.getElementById('poa-brief-offer')?.value || '',
+    brand_problems: document.getElementById('poa-brief-problems')?.value || '',
+    desired_fixes: document.getElementById('poa-brief-fixes')?.value || '',
+    target_audience: document.getElementById('poa-brief-audience')?.value || '',
+    pain_points: document.getElementById('poa-brief-pain-points')?.value || '',
+    objections: document.getElementById('poa-brief-objections')?.value || '',
+    competitors: document.getElementById('poa-brief-competitors')?.value || '',
+    creative_qty: document.getElementById('poa-brief-creative-qty')?.value || 4,
+    team_lead: document.getElementById('poa-brief-team-lead')?.value || ''
+  };
+
+  appendLog(`🚀 Starting AI Generation with Briefing Inputs for ${_poaSelectedBrands.length} brand(s)...`, 'var(--blue)');
 
   try {
-    const res = await api('/api/poa?action=generate', 'POST', {
-      brand_ids: _poaSelectedBrands,
-      month: month,
-      override_target_revenue: revInput ? parseFloat(revInput) : null,
-      override_target_roas: roasInput ? parseFloat(roasInput) : null
-    });
+    const res = await api('/api/poa?action=generate', 'POST', briefPayload);
 
     if (pBar) pBar.style.width = '100%';
     if (pPct) pPct.textContent = '100%';
 
     if (res && res.ok && res.results) {
-      appendLog('✅ Generation complete for all selected brands!', '#10B981');
+      appendLog('✅ Hyper-Personalized POA Generation complete!', '#10B981');
       setTimeout(() => {
         if (feedEl) feedEl.style.display = 'none';
         if (btn) btn.disabled = false;
         loadPoaForCurrentSelection();
-        showToast('Plan of Action generated!', 'success');
+        showToast('Plan of Action generated with brief inputs!', 'success');
       }, 1000);
     } else {
       appendLog('❌ Generation failed: ' + (res?.error || 'Unknown error'), '#ef4444');

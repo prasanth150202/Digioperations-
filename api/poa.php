@@ -296,23 +296,36 @@ if ($method === 'POST' && $action === 'generate') {
         $brandCategory = $crawled['brand_overview']['category'] ?? 'D2C Ecommerce';
         $brandMission  = $crawled['brand_overview']['mission']  ?? 'Premium D2C Quality';
 
+        // Read user strategy brief inputs
+        $bTone      = !empty($b['brand_tone']) ? $b['brand_tone'] : 'Empathetic, Warm & Trustworthy';
+        $bOffer     = !empty($b['monthly_offer']) ? $b['monthly_offer'] : 'Special Monthly Combo Offer';
+        $bProblems  = !empty($b['brand_problems']) ? $b['brand_problems'] : 'Meta CAC spike & mobile PDP drop-off';
+        $bFixes     = !empty($b['desired_fixes']) ? $b['desired_fixes'] : 'Sticky Add-to-Cart bar on PDP & UGC video testing';
+        $bAudience  = !empty($b['target_audience']) ? $b['target_audience'] : 'Target D2C Segment';
+        $bPain      = !empty($b['pain_points']) ? $b['pain_points'] : 'Convenience and product quality concerns';
+        $bComp      = !empty($b['competitors']) ? $b['competitors'] : 'Category Leader Competitors';
+
+        if (!empty($b['focus_products'])) {
+            $userProds = array_map('trim', explode(',', $b['focus_products']));
+            if (!empty($userProds)) $products = array_merge($userProds, $products);
+        }
+
         // 2. Build deep AI prompt
         $prompt = "You are a Senior D2C Growth Director and Media Buyer generating a 6-sheet Monthly Plan of Action (POA) for '{$brand['name']}' for {$month}.\n\n";
-        $prompt .= "INGESTED BRAND METRICS & SALES DATA:\n";
+        $prompt .= "INGESTED BRAND METRICS & STRATEGY BRIEF:\n";
         $prompt .= "- Brand Name: {$brand['name']}\n";
-        $prompt .= "- Category: {$brandCategory}\n";
-        $prompt .= "- Brand Mission: {$brandMission}\n";
+        $prompt .= "- Category & Mission: {$brandCategory} · {$brandMission}\n";
+        $prompt .= "- Communication Tone: {$bTone}\n";
         $prompt .= "- Target Monthly Revenue: ₹" . number_format($targetRevenue) . "\n";
         $prompt .= "- Target Monthly Ad Spend: ₹" . number_format($targetBudget) . "\n";
         $prompt .= "- Target Blended ROAS: " . number_format($targetRoas, 2) . "x\n";
-        $prompt .= "- Actual Sales to Date: ₹" . number_format($actualSales) . "\n";
-        $prompt .= "- Actual Spend to Date: ₹" . number_format($actualSpend) . "\n";
-        $prompt .= "- Catalog Products: " . implode(', ', $products) . "\n\n";
-
-        $prompt .= "CUSTOM BRAND DROPDOWNS TO PRIORITIZE:\n";
-        $prompt .= "- Content Styles: " . implode(', ', array_slice($dropdowns['content_styles'], 0, 8)) . "\n";
-        $prompt .= "- Creative Angles: " . implode(', ', array_slice($dropdowns['creative_angles'], 0, 8)) . "\n";
-        $prompt .= "- Retention Channels: " . implode(', ', array_slice($dropdowns['retention_channels'], 0, 8)) . "\n\n";
+        $prompt .= "- Monthly Hero Offer: {$bOffer}\n";
+        $prompt .= "- CURRENT BRAND PROBLEMS / BOTTLENECKS: {$bProblems}\n";
+        $prompt .= "- REQUIRED STRATEGIC FIXES & PRIORITIES: {$bFixes}\n";
+        $prompt .= "- Primary Target Audience: {$bAudience}\n";
+        $prompt .= "- Core Customer Pain Points: {$bPain}\n";
+        $prompt .= "- Competitor Benchmarks: {$bComp}\n";
+        $prompt .= "- Focus Catalog Products: " . implode(', ', array_unique($products)) . "\n\n";
 
         $prompt .= "Return ONLY a valid JSON object matching this exact structure:\n";
         $prompt .= "{\n";
@@ -342,17 +355,17 @@ if ($method === 'POST' && $action === 'generate') {
 
             $data = [
                 'overview' => [
-                    'executive_summary' => "Monthly Media Buyer Plan for {$brand['name']} targeting ₹" . number_format($targetRevenue) . " revenue at " . number_format($targetRoas, 2) . "x ROAS. Actual sales to date stand at ₹" . number_format($actualSales) . " across Meta, Google, and Retention channels.",
+                    'executive_summary' => "Monthly Growth Plan for {$brand['name']} targeting ₹" . number_format($targetRevenue) . " revenue at " . number_format($targetRoas, 2) . "x ROAS. Strategy directly addresses bottlenecks: '{$bProblems}' by deploying fixes: '{$bFixes}'. Tone: {$bTone}.",
                     'target_revenue' => "₹" . number_format($targetRevenue),
                     'target_roas' => number_format($targetRoas, 2) . "x",
                     'primary_kpi' => 'Blended ROAS',
                     'milestones' => [
-                        "Scale Meta & Google prospecting campaigns to reach ₹" . number_format($targetBudget) . " spend target",
-                        "Launch CRO test on {$p1} landing page to lift conversion rate",
-                        "Deploy VIP retention automation flow for repeat purchases"
+                        "Scale Meta & Google ads to reach ₹" . number_format($targetBudget) . " spend target",
+                        "Execute priority fix: {$bFixes}",
+                        "Launch promo offer '{$bOffer}' to drive cold acquisition & AOV"
                     ],
                     'team' => [
-                        'Media Buyer' => $user['name'] ?? 'Media Team',
+                        'Media Buyer' => $b['team_lead'] ?? ($user['name'] ?? 'Media Team'),
                         'Copywriter' => 'Copywriting Team',
                         'Designer' => 'Creative Team',
                         'Shopify Developer' => 'Dev Team'
@@ -363,22 +376,22 @@ if ($method === 'POST' && $action === 'generate') {
                         'product' => $p1,
                         'priority' => 'High',
                         'priority_reason' => 'Hero Product',
-                        'audience' => 'Primary D2C Target Audience',
-                        'pain_point' => 'Daily routine barrier & lack of convenient solution',
-                        'desired_action' => 'Order Single / Starter Pack',
-                        'value_prop' => "100% Natural & Convenient {$brandCategory}",
-                        'claims' => 'Zero Artificial Flavours / Verified Ingredients',
+                        'audience' => $bAudience,
+                        'pain_point' => $bPain,
+                        'desired_action' => 'Order Starter Pack with Offer',
+                        'value_prop' => "100% Quality {$brandCategory}",
+                        'claims' => 'Verified Quality / Verified Ingredients',
                         'angle' => 'Problem–Solution',
                         'status' => 'Planned'
                     ],
                     [
                         'product' => $p2,
                         'priority' => 'Medium',
-                        'priority_reason' => 'AOV & Combo Booster',
+                        'priority_reason' => 'AOV & Bundle Booster',
                         'audience' => 'Repeat & Bundle Buyers',
                         'pain_point' => 'High individual product cost',
-                        'desired_action' => 'Upgrade to Family Combo',
-                        'value_prop' => 'Best Value Pack with Free Shipping',
+                        'desired_action' => 'Upgrade to Combo Pack',
+                        'value_prop' => 'Best Value Bundle Offer',
                         'claims' => 'Bundle Savings',
                         'angle' => 'Price and Value',
                         'status' => 'Planned'
@@ -386,19 +399,19 @@ if ($method === 'POST' && $action === 'generate') {
                 ],
                 'competitors' => [
                     [
-                        'competitor' => 'Top Category Competitor',
+                        'competitor' => $bComp,
                         'product' => 'Category Mix',
-                        'offer' => '10% off subscription',
-                        'positioning' => 'Convenient daily wellness',
+                        'offer' => 'Standard Category Discount',
+                        'positioning' => 'Clean category positioning',
                         'creative_angle' => 'UGC / Product Demo',
-                        'test_idea' => 'Test 15-sec product preparation reel comparing speed & purity'
+                        'test_idea' => "Test 15-sec comparison reel highlighting {$brand['name']}'s unique benefit over {$bComp}"
                     ]
                 ],
                 'website' => [
                     [
                         'page_area' => 'Product Page',
-                        'problem' => 'Low add-to-cart rate on mobile devices',
-                        'required_change' => 'Add sticky add-to-cart bar with benefit badges',
+                        'problem' => $bProblems,
+                        'required_change' => $bFixes,
                         'kpi_to_improve' => 'Conversion Rate',
                         'priority' => 'High',
                         'assigned_to' => 'Shopify Developer',
@@ -410,9 +423,9 @@ if ($method === 'POST' && $action === 'generate') {
                         'product' => $p1,
                         'angle' => 'Problem–Solution',
                         'content_style' => 'UGC / Product Demo',
-                        'hook_idea' => "Stop using sugary alternatives — try {$p1}!",
-                        'offer' => 'Starter Combo Offer',
-                        'quantity' => 4,
+                        'hook_idea' => "Tired of {$bPain}? Try {$p1} with {$bOffer}!",
+                        'offer' => $bOffer,
+                        'quantity' => (int)($b['creative_qty'] ?? 4),
                         'priority' => 'High',
                         'assigned_to' => 'Creative Team',
                         'status' => 'Planned'
@@ -420,13 +433,13 @@ if ($method === 'POST' && $action === 'generate') {
                 ],
                 'retention' => [
                     [
-                        'campaign' => 'Post-Purchase Welcome Flow',
+                        'campaign' => 'Post-Purchase Welcome Sequence',
                         'campaign_type' => 'Post-Purchase Flow',
-                        'trigger' => 'First Order Delivered',
+                        'trigger' => 'Order Delivered',
                         'rfm_segment' => 'Prospects',
                         'objective' => 'Second Purchase',
                         'channel' => 'WhatsApp & Email',
-                        'communication' => 'Usage guide + 15% discount for 2nd order within 14 days',
+                        'communication' => "Usage guide + {$bOffer} for 2nd order within 14 days",
                         'status' => 'Planned'
                     ]
                 ]
