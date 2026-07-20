@@ -6163,14 +6163,22 @@ function renderPoaCommunication() {
           <option value="Low" ${r.priority==='Low'?'selected':''}>Low</option>
         </select>
       </td>
+      <td><input type="text" value="${escHtml(r.priority_reason||'')}" oninput="updatePoaCommCell(${i},'priority_reason',this.value)" style="width:100%"></td>
       <td><input type="text" value="${escHtml(r.audience||'')}" oninput="updatePoaCommCell(${i},'audience',this.value)" style="width:100%"></td>
       <td><input type="text" value="${escHtml(r.pain_point||'')}" oninput="updatePoaCommCell(${i},'pain_point',this.value)" style="width:100%"></td>
       <td><input type="text" value="${escHtml(r.value_prop||'')}" oninput="updatePoaCommCell(${i},'value_prop',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.claims||'')}" oninput="updatePoaCommCell(${i},'claims',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.packaging_claims||'')}" oninput="updatePoaCommCell(${i},'packaging_claims',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.questions||'')}" oninput="updatePoaCommCell(${i},'questions',this.value)" style="width:100%"></td>
       <td>
         <select onchange="updatePoaCommCell(${i},'angle',this.value)" style="width:100%">
           ${angles.map(a => `<option value="${a}" ${r.angle===a?'selected':''}>${a}</option>`).join('')}
         </select>
       </td>
+      <td><input type="text" value="${escHtml(r.content_focus||'')}" oninput="updatePoaCommCell(${i},'content_focus',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.offer_format||'')}" oninput="updatePoaCommCell(${i},'offer_format',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.compliance||'')}" oninput="updatePoaCommCell(${i},'compliance',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.verification||'Draft')}" oninput="updatePoaCommCell(${i},'verification',this.value)" style="width:100%"></td>
       <td>
         <select onchange="updatePoaCommCell(${i},'status',this.value)" style="width:100%">
           ${statuses.map(s => `<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
@@ -6183,7 +6191,7 @@ function renderPoaCommunication() {
 
 function addPoaCommRow() {
   if (!_poaData.communication) _poaData.communication = [];
-  _poaData.communication.push({ product: 'New Product', priority: 'High', audience: 'Target Segment', pain_point: 'Problem statement', value_prop: 'Core Benefit', angle: 'Problem–Solution', status: 'Planned' });
+  _poaData.communication.push({ product: 'New Product', priority: 'High', priority_reason: 'Hero Product', audience: 'Target Segment', pain_point: 'Problem statement', value_prop: 'Core Benefit', claims: 'Key claims', packaging_claims: 'Packaging notes', questions: 'Objections', angle: 'Problem–Solution', content_focus: 'Demo', offer_format: 'Single Pack', compliance: 'Verified', verification: 'Draft', status: 'Planned' });
   renderPoaCommunication();
   markPoaDirty();
 }
@@ -6215,12 +6223,18 @@ function renderPoaCompetitors() {
     <tr>
       <td><input type="text" value="${escHtml(r.competitor||'')}" oninput="updatePoaCompCell(${i},'competitor',this.value)" style="width:100%"></td>
       <td><input type="text" value="${escHtml(r.product||'')}" oninput="updatePoaCompCell(${i},'product',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.product_link||'')}" oninput="updatePoaCompCell(${i},'product_link',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.pack_price||'')}" oninput="updatePoaCompCell(${i},'pack_price',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.unit_price||'')}" oninput="updatePoaCompCell(${i},'unit_price',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.offer||'')}" oninput="updatePoaCompCell(${i},'offer',this.value)" style="width:100%"></td>
       <td><input type="text" value="${escHtml(r.positioning||'')}" oninput="updatePoaCompCell(${i},'positioning',this.value)" style="width:100%"></td>
       <td>
         <select onchange="updatePoaCompCell(${i},'creative_angle',this.value)" style="width:100%">
           ${angles.map(a => `<option value="${a}" ${r.creative_angle===a?'selected':''}>${a}</option>`).join('')}
         </select>
       </td>
+      <td><input type="text" value="${escHtml(r.landing_page_strength||'Strong')}" oninput="updatePoaCompCell(${i},'landing_page_strength',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.customer_concern||'')}" oninput="updatePoaCompCell(${i},'customer_concern',this.value)" style="width:100%"></td>
       <td><input type="text" value="${escHtml(r.test_idea||'')}" oninput="updatePoaCompCell(${i},'test_idea',this.value)" style="width:100%"></td>
       <td><button class="btn sm" onclick="removePoaCompRow(${i})" style="color:#ef4444">✕</button></td>
     </tr>
@@ -6229,7 +6243,7 @@ function renderPoaCompetitors() {
 
 function addPoaCompRow() {
   if (!_poaData.competitors) _poaData.competitors = [];
-  _poaData.competitors.push({ competitor: 'Competitor Name', product: 'Product Mix', positioning: 'Clean positioning', creative_angle: 'Problem–Solution', test_idea: 'Test concept' });
+  _poaData.competitors.push({ competitor: 'Competitor Name', product: 'Product Mix', product_link: '', pack_price: '₹499', unit_price: '₹1/g', offer: '10% off', positioning: 'Clean positioning', creative_angle: 'Problem–Solution', landing_page_strength: 'Strong', customer_concern: 'Value & Speed', test_idea: 'Test concept' });
   renderPoaCompetitors();
   markPoaDirty();
 }
@@ -6267,7 +6281,9 @@ function renderPoaWebsite() {
           ${areas.map(a => `<option value="${a}" ${r.page_area===a?'selected':''}>${a}</option>`).join('')}
         </select>
       </td>
+      <td><input type="text" value="${escHtml(r.page_url||'')}" oninput="updatePoaWebCell(${i},'page_url',this.value)" style="width:100%"></td>
       <td><input type="text" value="${escHtml(r.problem||'')}" oninput="updatePoaWebCell(${i},'problem',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.evidence||'')}" oninput="updatePoaWebCell(${i},'evidence',this.value)" style="width:100%"></td>
       <td><input type="text" value="${escHtml(r.required_change||'')}" oninput="updatePoaWebCell(${i},'required_change',this.value)" style="width:100%"></td>
       <td>
         <select onchange="updatePoaWebCell(${i},'kpi_to_improve',this.value)" style="width:100%">
@@ -6286,6 +6302,9 @@ function renderPoaWebsite() {
           ${roles.map(role => `<option value="${role}" ${r.assigned_to===role?'selected':''}>${role}</option>`).join('')}
         </select>
       </td>
+      <td><input type="date" value="${escHtml(r.deadline||'')}" onchange="updatePoaWebCell(${i},'deadline',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.completion_link||'')}" oninput="updatePoaWebCell(${i},'completion_link',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.result||'')}" oninput="updatePoaWebCell(${i},'result',this.value)" style="width:100%"></td>
       <td>
         <select onchange="updatePoaWebCell(${i},'status',this.value)" style="width:100%">
           ${statuses.map(s => `<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
@@ -6298,7 +6317,7 @@ function renderPoaWebsite() {
 
 function addPoaWebRow() {
   if (!_poaData.website) _poaData.website = [];
-  _poaData.website.push({ page_area: 'Home Page', problem: 'CRO issue', required_change: 'Optimized element', kpi_to_improve: 'Conversion Rate', priority: 'High', assigned_to: 'Website Developer', status: 'Planned' });
+  _poaData.website.push({ page_area: 'Home Page', page_url: '', problem: 'CRO issue', evidence: 'Analytics data', required_change: 'Optimized element', kpi_to_improve: 'Conversion Rate', priority: 'High', assigned_to: 'Website Developer', deadline: '', completion_link: '', result: '', status: 'Planned' });
   renderPoaWebsite();
   markPoaDirty();
 }
@@ -6346,10 +6365,23 @@ function renderPoaCreative() {
       <td><input type="text" value="${escHtml(r.offer||'')}" oninput="updatePoaCreatCell(${i},'offer',this.value)" style="width:100%"></td>
       <td><input type="number" value="${r.quantity||1}" oninput="updatePoaCreatCell(${i},'quantity',this.value)" style="width:100%"></td>
       <td>
+        <select onchange="updatePoaCreatCell(${i},'priority',this.value)" style="width:100%">
+          <option value="High" ${r.priority==='High'?'selected':''}>High</option>
+          <option value="Medium" ${r.priority==='Medium'?'selected':''}>Medium</option>
+          <option value="Low" ${r.priority==='Low'?'selected':''}>Low</option>
+        </select>
+      </td>
+      <td>
         <select onchange="updatePoaCreatCell(${i},'assigned_to',this.value)" style="width:100%">
           ${roles.map(role => `<option value="${role}" ${r.assigned_to===role?'selected':''}>${role}</option>`).join('')}
         </select>
       </td>
+      <td><input type="date" value="${escHtml(r.deadline||'')}" onchange="updatePoaCreatCell(${i},'deadline',this.value)" style="width:100%"></td>
+      <td><input type="number" value="${r.delivered_qty||0}" oninput="updatePoaCreatCell(${i},'delivered_qty',this.value)" style="width:100%"></td>
+      <td><input type="number" value="${r.live_qty||0}" oninput="updatePoaCreatCell(${i},'live_qty',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.ad_link||'')}" oninput="updatePoaCreatCell(${i},'ad_link',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.result||'Not Tested')}" oninput="updatePoaCreatCell(${i},'result',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.next_action||'')}" oninput="updatePoaCreatCell(${i},'next_action',this.value)" style="width:100%"></td>
       <td>
         <select onchange="updatePoaCreatCell(${i},'status',this.value)" style="width:100%">
           ${statuses.map(s => `<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
@@ -6362,7 +6394,7 @@ function renderPoaCreative() {
 
 function addPoaCreatRow() {
   if (!_poaData.creative) _poaData.creative = [];
-  _poaData.creative.push({ product: 'Hero Product', angle: 'Problem–Solution', content_style: 'UGC / Product Demo', hook_idea: 'Creative hook idea', offer: 'Standard Combo', quantity: 3, priority: 'High', assigned_to: 'Creative Team', status: 'Planned' });
+  _poaData.creative.push({ product: 'Hero Product', angle: 'Problem–Solution', content_style: 'UGC / Product Demo', hook_idea: 'Creative hook idea', offer: 'Standard Combo', quantity: 3, priority: 'High', assigned_to: 'Creative Team', deadline: '', delivered_qty: 0, live_qty: 0, ad_link: '', result: 'Not Tested', next_action: '', status: 'Planned' });
   renderPoaCreative();
   markPoaDirty();
 }
@@ -6391,6 +6423,7 @@ function renderPoaRetention() {
   const types    = _poaDropdowns.retention_types || [];
   const rfmSegs  = _poaDropdowns.retention_rfm || [];
   const channels = _poaDropdowns.retention_channels || [];
+  const roles    = _poaDropdowns.team_roles || [];
   const statuses = _poaDropdowns.statuses || [];
 
   tbody.innerHTML = rows.map((r, i) => `
@@ -6407,12 +6440,27 @@ function renderPoaRetention() {
           ${rfmSegs.map(s => `<option value="${s}" ${r.rfm_segment===s?'selected':''}>${s}</option>`).join('')}
         </select>
       </td>
+      <td><input type="text" value="${escHtml(r.objective||'First Purchase')}" oninput="updatePoaRetCell(${i},'objective',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.customer_segment||'')}" oninput="updatePoaRetCell(${i},'customer_segment',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.eligibility||'')}" oninput="updatePoaRetCell(${i},'eligibility',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.exclusions||'')}" oninput="updatePoaRetCell(${i},'exclusions',this.value)" style="width:100%"></td>
       <td>
         <select onchange="updatePoaRetCell(${i},'channel',this.value)" style="width:100%">
           ${channels.map(ch => `<option value="${ch}" ${r.channel===ch?'selected':''}>${ch}</option>`).join('')}
         </select>
       </td>
       <td><input type="text" value="${escHtml(r.communication||'')}" oninput="updatePoaRetCell(${i},'communication',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.offer_benefit||'')}" oninput="updatePoaRetCell(${i},'offer_benefit',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.content_idea||'')}" oninput="updatePoaRetCell(${i},'content_idea',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.cta_link||'')}" oninput="updatePoaRetCell(${i},'cta_link',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.frequency||'')}" oninput="updatePoaRetCell(${i},'frequency',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.primary_kpi||'Revenue')}" oninput="updatePoaRetCell(${i},'primary_kpi',this.value)" style="width:100%"></td>
+      <td>
+        <select onchange="updatePoaRetCell(${i},'owner',this.value)" style="width:100%">
+          ${roles.map(role => `<option value="${role}" ${r.owner===role?'selected':''}>${role}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="text" value="${escHtml(r.result||'')}" oninput="updatePoaRetCell(${i},'result',this.value)" style="width:100%"></td>
       <td>
         <select onchange="updatePoaRetCell(${i},'status',this.value)" style="width:100%">
           ${statuses.map(s => `<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
@@ -6425,9 +6473,24 @@ function renderPoaRetention() {
 
 function addPoaRetRow() {
   if (!_poaData.retention) _poaData.retention = [];
-  _poaData.retention.push({ campaign: 'Welcome Flow', campaign_type: 'Scheduled Campaign', trigger: 'First Order', rfm_segment: 'Prospects', channel: 'Email Campaign', communication: 'Welcome offer', status: 'Planned' });
+  _poaData.retention.push({ campaign: 'Welcome Flow', campaign_type: 'Scheduled Campaign', trigger: 'First Order', rfm_segment: 'Prospects', objective: 'First Purchase', customer_segment: 'New leads', eligibility: 'All new buyers', exclusions: 'Unsubscribed', channel: 'Email Campaign', communication: 'Welcome offer', offer_benefit: '15% Off', content_idea: 'Brand story', cta_link: '', frequency: 'Day 1, 3, 5', primary_kpi: 'Revenue', owner: 'Retention Team', result: '', status: 'Planned' });
   renderPoaRetention();
   markPoaDirty();
+}
+
+function updatePoaRetCell(idx, field, val) {
+  if (_poaData.retention && _poaData.retention[idx]) {
+    _poaData.retention[idx][field] = val;
+    markPoaDirty();
+  }
+}
+
+function removePoaRetRow(idx) {
+  if (_poaData.retention) {
+    _poaData.retention.splice(idx, 1);
+    renderPoaRetention();
+    markPoaDirty();
+  }
 }
 
 function updatePoaRetCell(idx, field, val) {

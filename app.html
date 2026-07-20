@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<script src="assets/app.js?v=37"></script>
+<script src="assets/app.js?v=38"></script>
 <style>
 @media(max-width:1024px){ #sb-toggle{display:inline-flex!important} }
 </style>
@@ -1013,21 +1013,29 @@
           <div class="card" style="padding:0;overflow:hidden">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:#fff">
               <div>
-                <h4 style="font-size:14px;font-weight:800;color:var(--dark)">Product & Communication Matrix</h4>
-                <p style="font-size:11px;color:var(--mid);margin-top:2px">Product prioritization, target audience pain points, positioning claims, and core messaging angles.</p>
+                <h4 style="font-size:14px;font-weight:800;color:var(--dark)">Product & Communication Matrix (1:1 Template Columns)</h4>
+                <p style="font-size:11px;color:var(--mid);margin-top:2px">Product prioritization, audience pain points, claims, compliance safeguards, and communication angles.</p>
               </div>
               <button class="btn sm primary" onclick="addPoaCommRow()">+ Add Product Angle</button>
             </div>
             <div style="overflow-x:auto">
-              <table class="bgt-table" style="min-width:1100px">
+              <table class="bgt-table" style="min-width:1800px">
                 <thead>
                   <tr>
                     <th style="width:140px">Product</th>
-                    <th style="width:100px">Priority</th>
-                    <th style="width:140px">Target Audience</th>
-                    <th>Pain Point & Barrier</th>
-                    <th>Desired Action & Value Prop</th>
-                    <th style="width:130px">Creative Angle</th>
+                    <th style="width:110px">Monthly Priority</th>
+                    <th style="width:130px">Priority Reason</th>
+                    <th style="width:140px">Primary Audience</th>
+                    <th style="width:180px">Customer Pain Point & Barrier</th>
+                    <th style="width:180px">Desired Action & Value Prop</th>
+                    <th style="width:150px">Key Claims</th>
+                    <th style="width:150px">Packaging Claims</th>
+                    <th style="width:170px">Customer Questions & Objections</th>
+                    <th style="width:150px">Primary Communication Angle</th>
+                    <th style="width:140px">Content Focus</th>
+                    <th style="width:130px">Offer / Product Format</th>
+                    <th style="width:170px">Compliance Notes & Safeguards</th>
+                    <th style="width:130px">Verification Status</th>
                     <th style="width:110px">Status</th>
                     <th style="width:50px"></th>
                   </tr>
@@ -1043,20 +1051,26 @@
           <div class="card" style="padding:0;overflow:hidden">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:#fff">
               <div>
-                <h4 style="font-size:14px;font-weight:800;color:var(--dark)">Competitor Audit & Testing Angles</h4>
-                <p style="font-size:11px;color:var(--mid);margin-top:2px">Competitor offers, positioning gaps, creative angles, and actionable test ideas.</p>
+                <h4 style="font-size:14px;font-weight:800;color:var(--dark)">Competitor Audit & Testing Matrix (1:1 Template Columns)</h4>
+                <p style="font-size:11px;color:var(--mid);margin-top:2px">Competitor offers, pack pricing, positioning gaps, landing page strength, and test angles.</p>
               </div>
               <button class="btn sm primary" onclick="addPoaCompRow()">+ Add Competitor Audit</button>
             </div>
             <div style="overflow-x:auto">
-              <table class="bgt-table" style="min-width:1000px">
+              <table class="bgt-table" style="min-width:1600px">
                 <thead>
                   <tr>
-                    <th style="width:140px">Competitor</th>
-                    <th style="width:140px">Product Focus</th>
-                    <th>Current Offer & Positioning</th>
-                    <th style="width:140px">Key Angle</th>
-                    <th>What We Can Test</th>
+                    <th style="width:130px">Competitor</th>
+                    <th style="width:130px">Product / Category</th>
+                    <th style="width:140px">Product Link</th>
+                    <th style="width:90px">Pack Price</th>
+                    <th style="width:90px">Unit Price</th>
+                    <th style="width:130px">Current Offer</th>
+                    <th style="width:160px">Positioning / Main Message</th>
+                    <th style="width:140px">Key Creative Angle</th>
+                    <th style="width:130px">Landing Page Strength</th>
+                    <th style="width:160px">Customer Concern Targeted</th>
+                    <th style="width:180px">What We Can Test</th>
                     <th style="width:50px"></th>
                   </tr>
                 </thead>
@@ -1071,21 +1085,26 @@
           <div class="card" style="padding:0;overflow:hidden">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:#fff">
               <div>
-                <h4 style="font-size:14px;font-weight:800;color:var(--dark)">Website Changes & CRO Task Backlog</h4>
-                <p style="font-size:11px;color:var(--mid);margin-top:2px">UX improvements, funnel fixes, conversion optimization items, and assignments.</p>
+                <h4 style="font-size:14px;font-weight:800;color:var(--dark)">Website Changes & CRO Backlog (1:1 Template Columns)</h4>
+                <p style="font-size:11px;color:var(--mid);margin-top:2px">Page reference, UX problems, supporting data, required changes, deadlines, completion links, and status.</p>
               </div>
               <button class="btn sm primary" onclick="addPoaWebRow()">+ Add CRO Task</button>
             </div>
             <div style="overflow-x:auto">
-              <table class="bgt-table" style="min-width:1050px">
+              <table class="bgt-table" style="min-width:1600px">
                 <thead>
                   <tr>
                     <th style="width:130px">Page / Area</th>
-                    <th>Current Problem</th>
-                    <th>Required Change</th>
+                    <th style="width:140px">Page URL / Ref</th>
+                    <th style="width:160px">Current Problem</th>
+                    <th style="width:160px">Supporting Data / Evidence</th>
+                    <th style="width:170px">Required Change</th>
                     <th style="width:140px">KPI to Improve</th>
-                    <th style="width:100px">Priority</th>
+                    <th style="width:90px">Priority</th>
                     <th style="width:130px">Assigned To</th>
+                    <th style="width:110px">Deadline</th>
+                    <th style="width:130px">Completion Link</th>
+                    <th style="width:150px">Result / Learning</th>
                     <th style="width:110px">Status</th>
                     <th style="width:50px"></th>
                   </tr>
@@ -1101,22 +1120,29 @@
           <div class="card" style="padding:0;overflow:hidden">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:#fff">
               <div>
-                <h4 style="font-size:14px;font-weight:800;color:var(--dark)">Ad Creative Production & Media Queue</h4>
-                <p style="font-size:11px;color:var(--mid);margin-top:2px">Planned ad concepts, hooks, production quantities, media buyer deployment, and status.</p>
+                <h4 style="font-size:14px;font-weight:800;color:var(--dark)">Ad Creative Production Queue (1:1 Template Columns)</h4>
+                <p style="font-size:11px;color:var(--mid);margin-top:2px">Ad concepts, content styles, hooks, production quantities, delivered & live counts, ad links, and results.</p>
               </div>
               <button class="btn sm primary" onclick="addPoaCreatRow()">+ Add Creative Concept</button>
             </div>
             <div style="overflow-x:auto">
-              <table class="bgt-table" style="min-width:1150px">
+              <table class="bgt-table" style="min-width:1700px">
                 <thead>
                   <tr>
                     <th style="width:130px">Product</th>
                     <th style="width:130px">Creative Angle</th>
                     <th style="width:140px">Content Style</th>
-                    <th>Hook / Concept Idea</th>
+                    <th style="width:170px">Hook / Idea</th>
                     <th style="width:120px">Offer</th>
                     <th style="width:60px">Qty</th>
-                    <th style="width:120px">Owner</th>
+                    <th style="width:90px">Priority</th>
+                    <th style="width:120px">Assigned To</th>
+                    <th style="width:100px">Deadline</th>
+                    <th style="width:70px">Delivered</th>
+                    <th style="width:70px">Live Qty</th>
+                    <th style="width:130px">Ad / File Link</th>
+                    <th style="width:100px">Result</th>
+                    <th style="width:130px">Next Action</th>
                     <th style="width:110px">Status</th>
                     <th style="width:50px"></th>
                   </tr>
@@ -1132,21 +1158,32 @@
           <div class="card" style="padding:0;overflow:hidden">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:#fff">
               <div>
-                <h4 style="font-size:14px;font-weight:800;color:var(--dark)">Retention, Email & WhatsApp Roadmap</h4>
-                <p style="font-size:11px;color:var(--mid);margin-top:2px">RFM segment campaigns, automation flows, broadcast schedules, and retention offers.</p>
+                <h4 style="font-size:14px;font-weight:800;color:var(--dark)">Retention & CRM Campaign Roadmap (1:1 Template Columns)</h4>
+                <p style="font-size:11px;color:var(--mid);margin-top:2px">RFM segments, eligibility rules, exclusions, channels, offers, CTA links, frequency, and learnings.</p>
               </div>
               <button class="btn sm primary" onclick="addPoaRetRow()">+ Add Retention Campaign</button>
             </div>
             <div style="overflow-x:auto">
-              <table class="bgt-table" style="min-width:1150px">
+              <table class="bgt-table" style="min-width:2100px">
                 <thead>
                   <tr>
-                    <th style="width:140px">Campaign Name</th>
+                    <th style="width:140px">Campaign / Journey</th>
                     <th style="width:130px">Campaign Type</th>
-                    <th style="width:120px">Trigger / Date</th>
-                    <th style="width:110px">RFM Segment</th>
+                    <th style="width:110px">Date / Trigger</th>
+                    <th style="width:120px">Shopify RFM Segment</th>
+                    <th style="width:120px">Objective</th>
+                    <th style="width:150px">Customer Segment</th>
+                    <th style="width:140px">Eligibility Rules</th>
+                    <th style="width:120px">Exclusions</th>
                     <th style="width:120px">Channel</th>
-                    <th>Communication & Offer</th>
+                    <th style="width:160px">Communication</th>
+                    <th style="width:130px">Offer / Benefit</th>
+                    <th style="width:140px">Content Idea</th>
+                    <th style="width:120px">CTA / Link</th>
+                    <th style="width:120px">Frequency / Seq</th>
+                    <th style="width:110px">Primary KPI</th>
+                    <th style="width:110px">Owner</th>
+                    <th style="width:140px">Result / Learning</th>
                     <th style="width:110px">Status</th>
                     <th style="width:50px"></th>
                   </tr>
