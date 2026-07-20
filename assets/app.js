@@ -5902,11 +5902,16 @@ function loadPoaDropdowns() {
 
 function loadPoaForCurrentSelection() {
   const monthSel = document.getElementById('poa-month-select');
-  const month = monthSel ? monthSel.value : date('Y-m');
+  const month = monthSel ? monthSel.value : new Date().toISOString().slice(0,7);
   const brandId = _poaSelectedBrands[0];
 
+  const wsEl    = document.getElementById('poa-workspace');
+  const emptyEl = document.getElementById('poa-empty-state');
+  const feedEl  = document.getElementById('poa-gen-feed');
+
   if (!brandId) {
-    document.getElementById('poa-workspace').style.display = 'none';
+    if (wsEl) wsEl.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'none';
     return;
   }
 
@@ -5926,11 +5931,24 @@ function loadPoaForCurrentSelection() {
         retention:     res.retention || []
       };
       renderPoaWorkspace();
-      document.getElementById('poa-workspace').style.display = '';
+      if (wsEl) wsEl.style.display = '';
+      if (emptyEl) emptyEl.style.display = 'none';
     } else {
       _poaCurrentId = null;
       _poaData = null;
-      document.getElementById('poa-workspace').style.display = 'none';
+      if (wsEl) wsEl.style.display = 'none';
+      
+      const brand = (window.brandsData || []).find(b => b.id === brandId);
+      const bName = brand ? brand.name : 'Selected Brand';
+      
+      const tEl = document.getElementById('poa-empty-title');
+      const dEl = document.getElementById('poa-empty-desc');
+      if (tEl) tEl.textContent = `No Plan of Action Generated Yet for ${bName}`;
+      if (dEl) dEl.textContent = `Click below to generate a comprehensive 6-sheet Monthly Media Buyer Execution Plan for ${bName} (${month}) using AI.`;
+
+      if (emptyEl && (!feedEl || feedEl.style.display === 'none')) {
+        emptyEl.style.display = '';
+      }
     }
   }).catch(() => {});
 }
@@ -5943,12 +5961,14 @@ async function startPoaBatchGeneration() {
   }
 
   const month = document.getElementById('poa-month-select').value || new Date().toISOString().slice(0,7);
-  const feedEl = document.getElementById('poa-gen-feed');
-  const btn    = document.getElementById('btn-generate-poa');
-  const logEl  = document.getElementById('poa-feed-log');
-  const pBar   = document.getElementById('poa-feed-progress-bar');
-  const pPct   = document.getElementById('poa-feed-pct');
+  const feedEl  = document.getElementById('poa-gen-feed');
+  const emptyEl = document.getElementById('poa-empty-state');
+  const btn     = document.getElementById('btn-generate-poa');
+  const logEl   = document.getElementById('poa-feed-log');
+  const pBar    = document.getElementById('poa-feed-progress-bar');
+  const pPct    = document.getElementById('poa-feed-pct');
 
+  if (emptyEl) emptyEl.style.display = 'none';
   if (feedEl) feedEl.style.display = '';
   if (btn) btn.disabled = true;
   if (logEl) logEl.innerHTML = '';
