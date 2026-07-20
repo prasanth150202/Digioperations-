@@ -8,6 +8,7 @@ const NAV = [
   { group:'Tools', items:[
     { id:'strategy',  label:'Strategy Builder',  icon:'🧠', sub:'AI-powered strategy docs' },
     { id:'consultant',label:'AI Consultant',     icon:'👔', sub:'Next-Gen Brand Intelligence' },
+    { id:'poa',       label:'Media Buyer POA',   icon:'📋', sub:'Multi-brand POA & workspace' },
     { id:'pricing',   label:'Pricing Calculator',icon:'💰', sub:'Margin & price analysis'  },
     { id:'catalog',   label:'Price Catalog',     icon:'📋', sub:'Searchable price lookup'  },
     { id:'budget',    label:'Budget Tracker',    icon:'📊', sub:'Monthly performance & ROAS'},
@@ -163,6 +164,7 @@ function showPage(id) {
     dashboard: 'Dashboard', 
     strategy: 'Strategy Builder', 
     consultant: 'AI Consultant',
+    poa: 'Media Buyer POA',
     pricing: 'Pricing Calculator', 
     catalog: 'Price Catalog', 
     budget: 'Budget Tracker', 
@@ -174,6 +176,7 @@ function showPage(id) {
   updateTopbarRight();
   if (id === 'strategy') initStrategyPage();
   if (id === 'consultant') initConsultantPage();
+  if (id === 'poa')        initPoaPage();
   if (id === 'pricing')  { renderPricingBrands(); backToBrands(); }
   if (id === 'catalog')  { renderCatalogBrands(); backToCatalogBrands(); }
   if (id === 'admin')    renderAdmin();
@@ -5816,3 +5819,722 @@ function injectConsultantStyles(){
   s.textContent='.c-step{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--mid);padding:6px 10px;border-radius:8px;transition:all .2s;font-size:12px}.c-step.active{color:var(--blue);background:rgba(43,78,255,.07);font-weight:700}.c-step.done{color:#10B981}.c-step-num{width:20px;height:20px;border-radius:50%;background:var(--border);color:var(--mid);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}.c-step.active .c-step-num{background:var(--blue);color:#fff}.c-step.done .c-step-num{background:#10B981;color:#fff}.c-step-arrow{color:var(--border);font-size:12px}.export-card:hover{border-color:var(--blue)!important;transform:translateY(-2px);box-shadow:0 8px 24px rgba(43,78,255,.12)}.c-doc-tab:hover{color:var(--dark)!important;background:var(--off)}';
   document.head.appendChild(s);
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MONTHLY MEDIA BUYER PLAN OF ACTION (POA) ENGINE — Controller
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _poaCurrentId       = null;
+let _poaActiveTab       = 'overview';
+let _poaData            = null;
+let _poaDropdowns       = {};
+let _poaSelectedBrands  = [];
+
+function initPoaPage() {
+  const monthSel = document.getElementById('poa-month-select');
+  if (monthSel && !monthSel.value) {
+    const now = new Date();
+    const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    monthSel.value = ym;
+  }
+
+  // Load available brands
+  api('/api/budget/brands').then(res => {
+    const brands = Array.isArray(res) ? res : (res.brands || []);
+    renderPoaBrandChips(brands);
+  }).catch(() => {
+    if (window.brandsData) renderPoaBrandChips(window.brandsData);
+  });
+
+  // Load dropdown options
+  loadPoaDropdowns();
+}
+
+function renderPoaBrandChips(brands) {
+  const chipsEl = document.getElementById('poa-brand-chips');
+  if (!chipsEl) return;
+
+  if (!brands.length) {
+    chipsEl.innerHTML = '<span style="font-size:12px;color:var(--mid)">No brands available</span>';
+    return;
+  }
+
+  if (!_poaSelectedBrands.length && activeBrand) {
+    _poaSelectedBrands = [activeBrand.id];
+  }
+
+  chipsEl.innerHTML = brands.map(b => {
+    const isSel = _poaSelectedBrands.includes(b.id);
+    return `
+      <label style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px solid ${isSel ? 'var(--blue)' : 'var(--border)'};background:${isSel ? 'rgba(43,78,255,0.08)' : '#fff'};cursor:pointer;font-size:12px;font-weight:${isSel ? '700' : '600'};color:${isSel ? 'var(--blue)' : 'var(--dark)'}">
+        <input type="checkbox" value="${b.id}" ${isSel ? 'checked' : ''} onchange="togglePoaBrandSelection('${b.id}')" style="accent-color:var(--blue)">
+        ${b.name}
+      </label>
+    `;
+  }).join('');
+
+  loadPoaForCurrentSelection();
+}
+
+function togglePoaBrandSelection(brandId) {
+  if (_poaSelectedBrands.includes(brandId)) {
+    _poaSelectedBrands = _poaSelectedBrands.filter(id => id !== brandId);
+  } else {
+    _poaSelectedBrands.push(brandId);
+  }
+
+  // Update UI chips
+  const brands = window.brandsData || [];
+  renderPoaBrandChips(brands);
+}
+
+function loadPoaDropdowns() {
+  const brandId = _poaSelectedBrands[0] || null;
+  api('/api/poa?action=dropdowns&brand_id=' + (brandId || '')).then(res => {
+    if (res && res.dropdowns) {
+      _poaDropdowns = res.dropdowns;
+      renderCustomDropdownsList();
+    }
+  }).catch(() => {});
+}
+
+function loadPoaForCurrentSelection() {
+  const monthSel = document.getElementById('poa-month-select');
+  const month = monthSel ? monthSel.value : date('Y-m');
+  const brandId = _poaSelectedBrands[0];
+
+  if (!brandId) {
+    document.getElementById('poa-workspace').style.display = 'none';
+    return;
+  }
+
+  api(`/api/poa?action=load&brand_id=${brandId}&month=${month}`).then(res => {
+    if (res && res.ok && !res.empty) {
+      _poaCurrentId = res.id;
+      _poaData = {
+        id:            res.id,
+        brand_id:      res.brand_id,
+        brand_name:    res.brand_name,
+        poa_month:     res.poa_month,
+        overview:      res.overview || {},
+        communication: res.communication || [],
+        competitors:   res.competitors || [],
+        website:       res.website || [],
+        creative:      res.creative || [],
+        retention:     res.retention || []
+      };
+      renderPoaWorkspace();
+      document.getElementById('poa-workspace').style.display = '';
+    } else {
+      _poaCurrentId = null;
+      _poaData = null;
+      document.getElementById('poa-workspace').style.display = 'none';
+    }
+  }).catch(() => {});
+}
+
+// ── BATCH AI GENERATION ───────────────────────────────────────────────────────
+async function startPoaBatchGeneration() {
+  if (!_poaSelectedBrands.length) {
+    alert('Please select at least one brand to generate POA.');
+    return;
+  }
+
+  const month = document.getElementById('poa-month-select').value || new Date().toISOString().slice(0,7);
+  const feedEl = document.getElementById('poa-gen-feed');
+  const btn    = document.getElementById('btn-generate-poa');
+  const logEl  = document.getElementById('poa-feed-log');
+  const pBar   = document.getElementById('poa-feed-progress-bar');
+  const pPct   = document.getElementById('poa-feed-pct');
+
+  if (feedEl) feedEl.style.display = '';
+  if (btn) btn.disabled = true;
+  if (logEl) logEl.innerHTML = '';
+  if (pBar) pBar.style.width = '10%';
+  if (pPct) pPct.textContent = '10%';
+
+  function appendLog(msg, color) {
+    if (!logEl) return;
+    const d = document.createElement('div');
+    if (color) d.style.color = color;
+    d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    logEl.appendChild(d);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  appendLog(`🚀 Starting Multi-Brand AI Generation for ${_poaSelectedBrands.length} brand(s)...`, 'var(--blue)');
+
+  try {
+    const res = await api('/api/poa?action=generate', 'POST', {
+      brand_ids: _poaSelectedBrands,
+      month: month
+    });
+
+    if (pBar) pBar.style.width = '100%';
+    if (pPct) pPct.textContent = '100%';
+
+    if (res && res.ok && res.results) {
+      appendLog('✅ Generation complete for all selected brands!', '#10B981');
+      setTimeout(() => {
+        if (feedEl) feedEl.style.display = 'none';
+        if (btn) btn.disabled = false;
+        loadPoaForCurrentSelection();
+        showToast('Plan of Action generated!', 'success');
+      }, 1000);
+    } else {
+      appendLog('❌ Generation failed: ' + (res?.error || 'Unknown error'), '#ef4444');
+      if (btn) btn.disabled = false;
+    }
+  } catch (e) {
+    appendLog('❌ Error: ' + e.message, '#ef4444');
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ── RENDER WORKSPACE ──────────────────────────────────────────────────────────
+function renderPoaWorkspace() {
+  if (!_poaData) return;
+  switchPoaTab(_poaActiveTab);
+}
+
+function switchPoaTab(tabId) {
+  _poaActiveTab = tabId;
+  const tabs = ['overview','communication','competitors','website','creative','retention','dropdowns'];
+  tabs.forEach(t => {
+    const btn = document.getElementById('poa-tab-btn-' + t);
+    const content = document.getElementById('poa-tab-' + t);
+    if (btn) btn.classList.toggle('active', t === tabId);
+    if (content) content.style.display = (t === tabId) ? '' : 'none';
+  });
+
+  if (tabId === 'overview') renderPoaOverview();
+  else if (tabId === 'communication') renderPoaCommunication();
+  else if (tabId === 'competitors') renderPoaCompetitors();
+  else if (tabId === 'website') renderPoaWebsite();
+  else if (tabId === 'creative') renderPoaCreative();
+  else if (tabId === 'retention') renderPoaRetention();
+  else if (tabId === 'dropdowns') renderCustomDropdownsList();
+}
+
+function markPoaDirty() {
+  const st = document.getElementById('poa-save-status');
+  if (st) { st.textContent = 'Unsaved changes'; st.style.color = '#f59e0b'; }
+}
+
+// ── TAB 1: OVERVIEW ───────────────────────────────────────────────────────────
+function renderPoaOverview() {
+  const ov = _poaData?.overview || {};
+
+  const summaryEl = document.getElementById('poa-ov-exec-summary');
+  if (summaryEl) summaryEl.value = ov.executive_summary || '';
+
+  const revEl = document.getElementById('poa-ov-target-rev');
+  if (revEl) revEl.value = ov.target_revenue || '';
+
+  const roasEl = document.getElementById('poa-ov-target-roas');
+  if (roasEl) roasEl.value = ov.target_roas || '';
+
+  // Primary KPI select
+  const kpiSel = document.getElementById('poa-ov-primary-kpi');
+  if (kpiSel) {
+    const options = _poaDropdowns.website_kpis || ['Blended ROAS', 'Revenue', 'Conversion Rate', 'CAC', 'AOV'];
+    kpiSel.innerHTML = options.map(o => `<option value="${o}" ${o === (ov.primary_kpi || 'Blended ROAS') ? 'selected' : ''}>${o}</option>`).join('');
+  }
+
+  // Milestones
+  renderPoaMilestonesList(ov.milestones || []);
+
+  // Team roles
+  renderPoaTeamList(ov.team || {});
+}
+
+function renderPoaMilestonesList(list) {
+  const container = document.getElementById('poa-ov-milestones-list');
+  if (!container) return;
+
+  container.innerHTML = list.map((m, i) => `
+    <div style="display:flex;align-items:center;gap:8px">
+      <input type="text" value="${escHtml(m)}" oninput="updatePoaMilestone(${i}, this.value)" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none">
+      <button class="btn sm" onclick="removePoaMilestone(${i})" style="color:#ef4444">✕</button>
+    </div>
+  `).join('');
+}
+
+function addPoaMilestone() {
+  if (!_poaData.overview.milestones) _poaData.overview.milestones = [];
+  _poaData.overview.milestones.push('New strategic milestone');
+  renderPoaMilestonesList(_poaData.overview.milestones);
+  markPoaDirty();
+}
+
+function updatePoaMilestone(idx, val) {
+  if (_poaData.overview.milestones) _poaData.overview.milestones[idx] = val;
+  markPoaDirty();
+}
+
+function removePoaMilestone(idx) {
+  if (_poaData.overview.milestones) {
+    _poaData.overview.milestones.splice(idx, 1);
+    renderPoaMilestonesList(_poaData.overview.milestones);
+    markPoaDirty();
+  }
+}
+
+function renderPoaTeamList(teamObj) {
+  const container = document.getElementById('poa-ov-team-list');
+  if (!container) return;
+
+  const roles = _poaDropdowns.team_roles || ['Media Buyer', 'Copywriter', 'Designer', 'Shopify Developer'];
+
+  container.innerHTML = roles.slice(0, 6).map(role => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <span style="font-size:12px;font-weight:600;color:var(--dark);min-width:110px">${role}</span>
+      <input type="text" value="${escHtml(teamObj[role] || '')}" placeholder="Assign member..." oninput="updatePoaTeamRole('${role}', this.value)" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;outline:none">
+    </div>
+  `).join('');
+}
+
+function updatePoaTeamRole(role, name) {
+  if (!_poaData.overview.team) _poaData.overview.team = {};
+  _poaData.overview.team[role] = name;
+  markPoaDirty();
+}
+
+// ── TAB 2: COMMUNICATION ──────────────────────────────────────────────────────
+function renderPoaCommunication() {
+  const tbody = document.getElementById('poa-comm-tbody');
+  if (!tbody) return;
+
+  const rows = _poaData?.communication || [];
+  const angles = _poaDropdowns.creative_angles || [];
+  const statuses = _poaDropdowns.statuses || [];
+
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td><input type="text" value="${escHtml(r.product||'')}" oninput="updatePoaCommCell(${i},'product',this.value)" style="width:100%"></td>
+      <td>
+        <select onchange="updatePoaCommCell(${i},'priority',this.value)" style="width:100%">
+          <option value="High" ${r.priority==='High'?'selected':''}>High</option>
+          <option value="Medium" ${r.priority==='Medium'?'selected':''}>Medium</option>
+          <option value="Low" ${r.priority==='Low'?'selected':''}>Low</option>
+        </select>
+      </td>
+      <td><input type="text" value="${escHtml(r.audience||'')}" oninput="updatePoaCommCell(${i},'audience',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.pain_point||'')}" oninput="updatePoaCommCell(${i},'pain_point',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.value_prop||'')}" oninput="updatePoaCommCell(${i},'value_prop',this.value)" style="width:100%"></td>
+      <td>
+        <select onchange="updatePoaCommCell(${i},'angle',this.value)" style="width:100%">
+          ${angles.map(a => `<option value="${a}" ${r.angle===a?'selected':''}>${a}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select onchange="updatePoaCommCell(${i},'status',this.value)" style="width:100%">
+          ${statuses.map(s => `<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td><button class="btn sm" onclick="removePoaCommRow(${i})" style="color:#ef4444">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function addPoaCommRow() {
+  if (!_poaData.communication) _poaData.communication = [];
+  _poaData.communication.push({ product: 'New Product', priority: 'High', audience: 'Target Segment', pain_point: 'Problem statement', value_prop: 'Core Benefit', angle: 'Problem–Solution', status: 'Planned' });
+  renderPoaCommunication();
+  markPoaDirty();
+}
+
+function updatePoaCommCell(idx, field, val) {
+  if (_poaData.communication && _poaData.communication[idx]) {
+    _poaData.communication[idx][field] = val;
+    markPoaDirty();
+  }
+}
+
+function removePoaCommRow(idx) {
+  if (_poaData.communication) {
+    _poaData.communication.splice(idx, 1);
+    renderPoaCommunication();
+    markPoaDirty();
+  }
+}
+
+// ── TAB 3: COMPETITORS ────────────────────────────────────────────────────────
+function renderPoaCompetitors() {
+  const tbody = document.getElementById('poa-comp-tbody');
+  if (!tbody) return;
+
+  const rows = _poaData?.competitors || [];
+  const angles = _poaDropdowns.creative_angles || [];
+
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td><input type="text" value="${escHtml(r.competitor||'')}" oninput="updatePoaCompCell(${i},'competitor',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.product||'')}" oninput="updatePoaCompCell(${i},'product',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.positioning||'')}" oninput="updatePoaCompCell(${i},'positioning',this.value)" style="width:100%"></td>
+      <td>
+        <select onchange="updatePoaCompCell(${i},'creative_angle',this.value)" style="width:100%">
+          ${angles.map(a => `<option value="${a}" ${r.creative_angle===a?'selected':''}>${a}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="text" value="${escHtml(r.test_idea||'')}" oninput="updatePoaCompCell(${i},'test_idea',this.value)" style="width:100%"></td>
+      <td><button class="btn sm" onclick="removePoaCompRow(${i})" style="color:#ef4444">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function addPoaCompRow() {
+  if (!_poaData.competitors) _poaData.competitors = [];
+  _poaData.competitors.push({ competitor: 'Competitor Name', product: 'Product Mix', positioning: 'Clean positioning', creative_angle: 'Problem–Solution', test_idea: 'Test concept' });
+  renderPoaCompetitors();
+  markPoaDirty();
+}
+
+function updatePoaCompCell(idx, field, val) {
+  if (_poaData.competitors && _poaData.competitors[idx]) {
+    _poaData.competitors[idx][field] = val;
+    markPoaDirty();
+  }
+}
+
+function removePoaCompRow(idx) {
+  if (_poaData.competitors) {
+    _poaData.competitors.splice(idx, 1);
+    renderPoaCompetitors();
+    markPoaDirty();
+  }
+}
+
+// ── TAB 4: WEBSITE & CRO ──────────────────────────────────────────────────────
+function renderPoaWebsite() {
+  const tbody = document.getElementById('poa-web-tbody');
+  if (!tbody) return;
+
+  const rows = _poaData?.website || [];
+  const areas = _poaDropdowns.website_areas || [];
+  const kpis  = _poaDropdowns.website_kpis || [];
+  const roles = _poaDropdowns.team_roles || [];
+  const statuses = _poaDropdowns.statuses || [];
+
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td>
+        <select onchange="updatePoaWebCell(${i},'page_area',this.value)" style="width:100%">
+          ${areas.map(a => `<option value="${a}" ${r.page_area===a?'selected':''}>${a}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="text" value="${escHtml(r.problem||'')}" oninput="updatePoaWebCell(${i},'problem',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.required_change||'')}" oninput="updatePoaWebCell(${i},'required_change',this.value)" style="width:100%"></td>
+      <td>
+        <select onchange="updatePoaWebCell(${i},'kpi_to_improve',this.value)" style="width:100%">
+          ${kpis.map(k => `<option value="${k}" ${r.kpi_to_improve===k?'selected':''}>${k}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select onchange="updatePoaWebCell(${i},'priority',this.value)" style="width:100%">
+          <option value="High" ${r.priority==='High'?'selected':''}>High</option>
+          <option value="Medium" ${r.priority==='Medium'?'selected':''}>Medium</option>
+          <option value="Low" ${r.priority==='Low'?'selected':''}>Low</option>
+        </select>
+      </td>
+      <td>
+        <select onchange="updatePoaWebCell(${i},'assigned_to',this.value)" style="width:100%">
+          ${roles.map(role => `<option value="${role}" ${r.assigned_to===role?'selected':''}>${role}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select onchange="updatePoaWebCell(${i},'status',this.value)" style="width:100%">
+          ${statuses.map(s => `<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td><button class="btn sm" onclick="removePoaWebRow(${i})" style="color:#ef4444">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function addPoaWebRow() {
+  if (!_poaData.website) _poaData.website = [];
+  _poaData.website.push({ page_area: 'Home Page', problem: 'CRO issue', required_change: 'Optimized element', kpi_to_improve: 'Conversion Rate', priority: 'High', assigned_to: 'Website Developer', status: 'Planned' });
+  renderPoaWebsite();
+  markPoaDirty();
+}
+
+function updatePoaWebCell(idx, field, val) {
+  if (_poaData.website && _poaData.website[idx]) {
+    _poaData.website[idx][field] = val;
+    markPoaDirty();
+  }
+}
+
+function removePoaWebRow(idx) {
+  if (_poaData.website) {
+    _poaData.website.splice(idx, 1);
+    renderPoaWebsite();
+    markPoaDirty();
+  }
+}
+
+// ── TAB 5: CREATIVE QUEUE ─────────────────────────────────────────────────────
+function renderPoaCreative() {
+  const tbody = document.getElementById('poa-creat-tbody');
+  if (!tbody) return;
+
+  const rows = _poaData?.creative || [];
+  const angles = _poaDropdowns.creative_angles || [];
+  const styles = _poaDropdowns.content_styles || [];
+  const roles  = _poaDropdowns.team_roles || [];
+  const statuses = _poaDropdowns.statuses || [];
+
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td><input type="text" value="${escHtml(r.product||'')}" oninput="updatePoaCreatCell(${i},'product',this.value)" style="width:100%"></td>
+      <td>
+        <select onchange="updatePoaCreatCell(${i},'angle',this.value)" style="width:100%">
+          ${angles.map(a => `<option value="${a}" ${r.angle===a?'selected':''}>${a}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select onchange="updatePoaCreatCell(${i},'content_style',this.value)" style="width:100%">
+          ${styles.map(s => `<option value="${s}" ${r.content_style===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="text" value="${escHtml(r.hook_idea||'')}" oninput="updatePoaCreatCell(${i},'hook_idea',this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escHtml(r.offer||'')}" oninput="updatePoaCreatCell(${i},'offer',this.value)" style="width:100%"></td>
+      <td><input type="number" value="${r.quantity||1}" oninput="updatePoaCreatCell(${i},'quantity',this.value)" style="width:100%"></td>
+      <td>
+        <select onchange="updatePoaCreatCell(${i},'assigned_to',this.value)" style="width:100%">
+          ${roles.map(role => `<option value="${role}" ${r.assigned_to===role?'selected':''}>${role}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select onchange="updatePoaCreatCell(${i},'status',this.value)" style="width:100%">
+          ${statuses.map(s => `<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td><button class="btn sm" onclick="removePoaCreatRow(${i})" style="color:#ef4444">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function addPoaCreatRow() {
+  if (!_poaData.creative) _poaData.creative = [];
+  _poaData.creative.push({ product: 'Hero Product', angle: 'Problem–Solution', content_style: 'UGC / Product Demo', hook_idea: 'Creative hook idea', offer: 'Standard Combo', quantity: 3, priority: 'High', assigned_to: 'Creative Team', status: 'Planned' });
+  renderPoaCreative();
+  markPoaDirty();
+}
+
+function updatePoaCreatCell(idx, field, val) {
+  if (_poaData.creative && _poaData.creative[idx]) {
+    _poaData.creative[idx][field] = val;
+    markPoaDirty();
+  }
+}
+
+function removePoaCreatRow(idx) {
+  if (_poaData.creative) {
+    _poaData.creative.splice(idx, 1);
+    renderPoaCreative();
+    markPoaDirty();
+  }
+}
+
+// ── TAB 6: RETENTION & CRM ────────────────────────────────────────────────────
+function renderPoaRetention() {
+  const tbody = document.getElementById('poa-ret-tbody');
+  if (!tbody) return;
+
+  const rows = _poaData?.retention || [];
+  const types    = _poaDropdowns.retention_types || [];
+  const rfmSegs  = _poaDropdowns.retention_rfm || [];
+  const channels = _poaDropdowns.retention_channels || [];
+  const statuses = _poaDropdowns.statuses || [];
+
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td><input type="text" value="${escHtml(r.campaign||'')}" oninput="updatePoaRetCell(${i},'campaign',this.value)" style="width:100%"></td>
+      <td>
+        <select onchange="updatePoaRetCell(${i},'campaign_type',this.value)" style="width:100%">
+          ${types.map(t => `<option value="${t}" ${r.campaign_type===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="text" value="${escHtml(r.trigger||'')}" oninput="updatePoaRetCell(${i},'trigger',this.value)" style="width:100%"></td>
+      <td>
+        <select onchange="updatePoaRetCell(${i},'rfm_segment',this.value)" style="width:100%">
+          ${rfmSegs.map(s => `<option value="${s}" ${r.rfm_segment===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select onchange="updatePoaRetCell(${i},'channel',this.value)" style="width:100%">
+          ${channels.map(ch => `<option value="${ch}" ${r.channel===ch?'selected':''}>${ch}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="text" value="${escHtml(r.communication||'')}" oninput="updatePoaRetCell(${i},'communication',this.value)" style="width:100%"></td>
+      <td>
+        <select onchange="updatePoaRetCell(${i},'status',this.value)" style="width:100%">
+          ${statuses.map(s => `<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td><button class="btn sm" onclick="removePoaRetRow(${i})" style="color:#ef4444">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function addPoaRetRow() {
+  if (!_poaData.retention) _poaData.retention = [];
+  _poaData.retention.push({ campaign: 'Welcome Flow', campaign_type: 'Scheduled Campaign', trigger: 'First Order', rfm_segment: 'Prospects', channel: 'Email Campaign', communication: 'Welcome offer', status: 'Planned' });
+  renderPoaRetention();
+  markPoaDirty();
+}
+
+function updatePoaRetCell(idx, field, val) {
+  if (_poaData.retention && _poaData.retention[idx]) {
+    _poaData.retention[idx][field] = val;
+    markPoaDirty();
+  }
+}
+
+function removePoaRetRow(idx) {
+  if (_poaData.retention) {
+    _poaData.retention.splice(idx, 1);
+    renderPoaRetention();
+    markPoaDirty();
+  }
+}
+
+// ── TAB 7: CUSTOM DROPDOWNS MANAGER ───────────────────────────────────────────
+function renderCustomDropdownsList() {
+  const container = document.getElementById('poa-dd-options-container');
+  const catSel = document.getElementById('poa-dd-category-filter');
+  if (!container || !catSel) return;
+
+  const category = catSel.value;
+  const options = _poaDropdowns[category] || [];
+
+  container.innerHTML = options.map(opt => `
+    <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#fff;border:1px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;color:var(--dark)">
+      <span>${escHtml(opt)}</span>
+    </div>
+  `).join('');
+}
+
+async function submitNewCustomDropdownOption() {
+  const valEl = document.getElementById('poa-dd-new-value');
+  const catSel = document.getElementById('poa-dd-category-filter');
+  const value = valEl ? valEl.value.trim() : '';
+  const category = catSel ? catSel.value : '';
+
+  if (!value) return;
+
+  const brandId = _poaSelectedBrands[0] || null;
+
+  try {
+    const res = await api('/api/poa?action=save_dropdowns', 'POST', {
+      brand_id: brandId,
+      category: category,
+      value: value
+    });
+
+    if (res && res.dropdowns) {
+      _poaDropdowns = res.dropdowns;
+      valEl.value = '';
+      renderCustomDropdownsList();
+      showToast('Custom dropdown option added!', 'success');
+    }
+  } catch (e) {
+    showToast('Failed to add option: ' + e.message, 'error');
+  }
+}
+
+// ── PERSISTENCE & SAVE PROGRESS ───────────────────────────────────────────────
+async function savePoaProgress(silent = false) {
+  if (!_poaData) return;
+
+  // Sync overview inputs
+  const execEl = document.getElementById('poa-ov-exec-summary');
+  const revEl  = document.getElementById('poa-ov-target-rev');
+  const roasEl = document.getElementById('poa-ov-target-roas');
+  const kpiEl  = document.getElementById('poa-ov-primary-kpi');
+
+  if (execEl) _poaData.overview.executive_summary = execEl.value;
+  if (revEl)  _poaData.overview.target_revenue    = revEl.value;
+  if (roasEl) _poaData.overview.target_roas       = roasEl.value;
+  if (kpiEl)  _poaData.overview.primary_kpi       = kpiEl.value;
+
+  try {
+    const res = await api('/api/poa?action=save', 'POST', _poaData);
+    if (res && res.id) {
+      _poaCurrentId = res.id;
+      _poaData.id = res.id;
+      const st = document.getElementById('poa-save-status');
+      if (st) { st.textContent = 'Saved ✓'; st.style.color = '#10B981'; }
+      if (!silent) showToast('POA execution progress saved!', 'success');
+    }
+  } catch (e) {
+    if (!silent) showToast('Save failed: ' + e.message, 'error');
+  }
+}
+
+// ── HISTORY MODAL ─────────────────────────────────────────────────────────────
+function openPoaHistoryModal() {
+  const modal = document.getElementById('mo-poa-history');
+  const listEl = document.getElementById('poa-history-list');
+  if (modal) modal.style.display = 'flex';
+
+  const brandId = _poaSelectedBrands[0] || '';
+
+  api('/api/poa?action=list&brand_id=' + brandId).then(res => {
+    if (res && res.list) {
+      listEl.innerHTML = res.list.map(item => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff;border:1px solid var(--border);border-radius:8px">
+          <div>
+            <div style="font-size:13px;font-weight:800;color:var(--dark)">${item.brand_name} — ${item.poa_month}</div>
+            <div style="font-size:11px;color:var(--mid);margin-top:2px">Created by ${item.created_by || 'System'} on ${new Date(item.created_at).toLocaleDateString()}</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn sm primary" onclick="loadPoaFromHistory('${item.id}')">Load Workspace</button>
+            <button class="btn sm" onclick="exportPoaXLSXById('${item.id}')">Download XLSX</button>
+          </div>
+        </div>
+      `).join('');
+    }
+  }).catch(() => {});
+}
+
+function loadPoaFromHistory(id) {
+  closeMo('mo-poa-history');
+  api('/api/poa?action=load&id=' + id).then(res => {
+    if (res && res.ok) {
+      _poaCurrentId = res.id;
+      _poaData = {
+        id:            res.id,
+        brand_id:      res.brand_id,
+        brand_name:    res.brand_name,
+        poa_month:     res.poa_month,
+        overview:      res.overview || {},
+        communication: res.communication || [],
+        competitors:   res.competitors || [],
+        website:       res.website || [],
+        creative:      res.creative || [],
+        retention:     res.retention || []
+      };
+      renderPoaWorkspace();
+      document.getElementById('poa-workspace').style.display = '';
+      showToast('Loaded POA from history!', 'success');
+    }
+  }).catch(() => {});
+}
+
+// ── EXPORT XLSX ───────────────────────────────────────────────────────────────
+function exportPoaXLSX() {
+  if (!_poaCurrentId) {
+    alert('Please save or load a POA first.');
+    return;
+  }
+  exportPoaXLSXById(_poaCurrentId);
+}
+
+function exportPoaXLSXById(id) {
+  window.open('/api/poa?action=export_xlsx&id=' + id, '_blank');
+}
+

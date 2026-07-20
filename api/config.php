@@ -197,6 +197,44 @@ function db(): PDO {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
         } catch (Throwable $migrationErr) {}
 
+        // Self-healing migration for poa_generations table
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `poa_generations` (
+              `id`                 VARCHAR(36)  NOT NULL PRIMARY KEY,
+              `brand_id`           VARCHAR(36)  NOT NULL,
+              `brand_name`         VARCHAR(255) NOT NULL,
+              `poa_month`          VARCHAR(20)  NOT NULL,
+              `overview_json`      LONGTEXT     NOT NULL,
+              `communication_json` LONGTEXT     NOT NULL,
+              `competitors_json`   LONGTEXT     NOT NULL,
+              `website_json`       LONGTEXT     NOT NULL,
+              `creative_json`      LONGTEXT     NOT NULL,
+              `retention_json`     LONGTEXT     NOT NULL,
+              `status`             VARCHAR(50)  NOT NULL DEFAULT 'Active',
+              `created_by`         VARCHAR(255) NOT NULL DEFAULT '',
+              `created_at`         DATETIME     NOT NULL DEFAULT NOW(),
+              `updated_at`         DATETIME     NOT NULL DEFAULT NOW() ON UPDATE NOW(),
+              KEY `idx_poa_brand_month` (`brand_id`, `poa_month`),
+              CONSTRAINT `fk_poa_brand` FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        } catch (Throwable $migrationErr) {}
+
+        // Self-healing migration for poa_dropdown_lists table
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `poa_dropdown_lists` (
+              `id`                 VARCHAR(36)  NOT NULL PRIMARY KEY,
+              `brand_id`           VARCHAR(36)  DEFAULT NULL,
+              `list_category`      VARCHAR(100) NOT NULL,
+              `item_value`         VARCHAR(255) NOT NULL,
+              `item_description`   TEXT         DEFAULT NULL,
+              `is_active`          TINYINT(1)   NOT NULL DEFAULT 1,
+              `sort_order`         INT          NOT NULL DEFAULT 0,
+              `created_at`         DATETIME     NOT NULL DEFAULT NOW(),
+              KEY `idx_pdl_category` (`list_category`),
+              KEY `idx_pdl_brand`    (`brand_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        } catch (Throwable $migrationErr) {}
+
         // Add modules_json column to existing tables (self-healing)
         try {
             $cols = $pdo->query("SHOW COLUMNS FROM `consultant_generations` LIKE 'modules_json'")->fetchAll();

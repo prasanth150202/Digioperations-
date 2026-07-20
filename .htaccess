@@ -61,7 +61,8 @@ Options -MultiViews
   RewriteRule ^api/budget/months/([^/]+)/settings/?$               api/budget.php?action=settings&month=$1   [QSA,L]
   RewriteRule ^api/budget/compare/?$                               api/budget.php?action=compare              [QSA,L]
 
-  # Route /api/reports and /api/public-report
+  # Route /api/reports, /api/public-report, and /api/poa
+  RewriteRule ^api/poa/?$                                          api/poa.php                                [QSA,L]
   RewriteRule ^api/reports/?$                                      api/reports.php                            [QSA,L]
   RewriteRule ^api/public-report/?$                                api/public-report.php                      [QSA,L]
 
