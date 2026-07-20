@@ -266,6 +266,10 @@ function selectBrand(id) {
   if (curPage === 'pricing') loadBrandProducts();
   if (curPage === 'strategy') initStrategyPage();
   if (curPage === 'consultant') initConsultantPage();
+  if (curPage === 'poa') {
+    _poaSelectedBrands = activeBrand ? [activeBrand.id] : [];
+    initPoaPage();
+  }
   if (curPage === 'reports') {
     const brandFilter = document.getElementById('reports-filter-brand');
     if (brandFilter) {
@@ -5840,12 +5844,17 @@ function initPoaPage() {
     monthSel.value = ym;
   }
 
+  if (activeBrand && !_poaSelectedBrands.length) {
+    _poaSelectedBrands = [activeBrand.id];
+  }
+
   // Load available brands
-  api('/api/budget/brands').then(res => {
+  api('/api/budget?action=brands').then(res => {
     const brands = Array.isArray(res) ? res : (res.brands || []);
     renderPoaBrandChips(brands);
   }).catch(() => {
-    if (window.brandsData) renderPoaBrandChips(window.brandsData);
+    const fallback = (allBrands && allBrands.length) ? allBrands : (window.brandsData || (activeBrand ? [activeBrand] : []));
+    renderPoaBrandChips(fallback);
   });
 
   // Load dropdown options
@@ -5856,16 +5865,20 @@ function renderPoaBrandChips(brands) {
   const chipsEl = document.getElementById('poa-brand-chips');
   if (!chipsEl) return;
 
-  if (!brands.length) {
+  const validBrands = (Array.isArray(brands) && brands.length) 
+    ? brands 
+    : ((allBrands && allBrands.length) ? allBrands : (window.brandsData || (activeBrand ? [activeBrand] : [])));
+
+  if (!validBrands.length) {
     chipsEl.innerHTML = '<span style="font-size:12px;color:var(--mid)">No brands available</span>';
     return;
   }
 
-  if (!_poaSelectedBrands.length && activeBrand) {
+  if (activeBrand && (!_poaSelectedBrands.length || !_poaSelectedBrands.includes(activeBrand.id))) {
     _poaSelectedBrands = [activeBrand.id];
   }
 
-  chipsEl.innerHTML = brands.map(b => {
+  chipsEl.innerHTML = validBrands.map(b => {
     const isSel = _poaSelectedBrands.includes(b.id);
     return `
       <label style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px solid ${isSel ? 'var(--blue)' : 'var(--border)'};background:${isSel ? 'rgba(43,78,255,0.08)' : '#fff'};cursor:pointer;font-size:12px;font-weight:${isSel ? '700' : '600'};color:${isSel ? 'var(--blue)' : 'var(--dark)'}">
