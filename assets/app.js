@@ -6581,14 +6581,6 @@ function updatePoaRetCell(idx, field, val) {
   }
 }
 
-function removePoaRetRow(idx) {
-  if (_poaData.retention) {
-    _poaData.retention.splice(idx, 1);
-    renderPoaRetention();
-    markPoaDirty();
-  }
-}
-
 function updatePoaRetCell(idx, field, val) {
   if (_poaData.retention && _poaData.retention[idx]) {
     _poaData.retention[idx][field] = val;
