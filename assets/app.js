@@ -195,6 +195,7 @@ function renderSidebar() {
     if (g.adminOnly && CU.role !== 'superadmin') return;
     const items = g.items.filter(i => {
       if (CU.role === 'superadmin') return true;
+      if (i.id === 'poa') return true;
       const pages = Array.isArray(CU.pages) ? CU.pages : [];
       if (i.id === 'catalog' && pages.includes('pricing')) return true;
       if (i.id === 'consultant' && pages.includes('strategy')) return true;
