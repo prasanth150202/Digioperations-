@@ -153,12 +153,18 @@ if ($method === 'GET' && $action === 'load') {
     $brandId = $_GET['brand_id'] ?? '';
     $month   = $_GET['month'] ?? '';
 
+    $poa = null;
     if ($id) {
         $poa = dbGet("SELECT * FROM poa_generations WHERE id = ?", [$id]);
-    } else if ($brandId && $month) {
-        $poa = dbGet("SELECT * FROM poa_generations WHERE brand_id = ? AND poa_month = ? ORDER BY created_at DESC LIMIT 1", [$brandId, $month]);
+    } else if ($brandId) {
+        if ($month) {
+            $poa = dbGet("SELECT * FROM poa_generations WHERE brand_id = ? AND (poa_month = ? OR poa_month LIKE ?) ORDER BY created_at DESC LIMIT 1", [$brandId, $month, "%" . substr($month, 0, 7) . "%"]);
+        }
+        if (!$poa) {
+            $poa = dbGet("SELECT * FROM poa_generations WHERE brand_id = ? ORDER BY created_at DESC LIMIT 1", [$brandId]);
+        }
     } else {
-        json_err("ID or brand_id and month required");
+        json_err("ID or brand_id required");
     }
 
     if (!$poa) {

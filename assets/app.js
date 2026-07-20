@@ -5978,7 +5978,8 @@ function loadPoaForCurrentSelection() {
       if (tEl) tEl.textContent = `No Plan of Action Generated Yet for ${bName}`;
       if (dEl) dEl.textContent = `Click below to generate a comprehensive 6-sheet Monthly Media Buyer Execution Plan for ${bName} (${month}) using AI.`;
 
-      if (emptyEl && (!feedEl || feedEl.style.display === 'none')) {
+      if (emptyEl) {
+        if (feedEl) feedEl.style.display = 'none';
         emptyEl.style.display = '';
       }
     }
