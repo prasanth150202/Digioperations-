@@ -1,0 +1,798 @@
+<?php
+require_once __DIR__ . '/config.php';
+ini_set('memory_limit', '512M');
+set_time_limit(240);
+
+// CLI vs Web authentication helper
+$user = null;
+if (php_sapi_name() === 'cli') {
+    // CLI execution
+    $brandSlug = '';
+    $opts = getopt('', ['brand:', 'start:', 'end:', 'sync_all::']);
+    $slug = $opts['brand'] ?? '';
+    $startDate = $opts['start'] ?? date('Y-m-d', strtotime('-1 day'));
+    $endDate = $opts['end'] ?? date('Y-m-d', strtotime('-1 day'));
+    $action = 'sync';
+    
+    if (!$slug) {
+        die("Usage: php api/sync.php --brand=brand-slug [--start=YYYY-MM-DD] [--end=YYYY-MM-DD]\n");
+    }
+    $brand = dbGet('SELECT * FROM brands WHERE slug=?', [$slug]);
+    if (!$brand) die("Error: Brand not found.\n");
+} else {
+    // Web execution
+    $user = requireAuth();
+    $slug = $_GET['brand_id'] ?? '';
+    $startDate = $_GET['start_date'] ?? '';
+    $endDate = $_GET['end_date'] ?? '';
+    $action = $_GET['action'] ?? '';
+    
+    if (!$slug) json_err('Brand slug required');
+    if (!canAccessBrand($user, $slug)) json_err('Access denied', 403);
+    
+    // Support lookup by ID or slug
+    $brand = dbGet('SELECT * FROM brands WHERE slug=? OR id=?', [$slug, $slug]);
+    if (!$brand) json_err('Brand not found', 404);
+}
+
+// ── GET CONFIGURATION TOKENS ──
+$int = json_decode($brand['integrations_json'] ?? '{}', true);
+
+// If testing connections, use payload from body
+if ($action === 'test_connections') {
+    $body = body();
+    if (!empty($body)) $int = $body;
+}
+
+// ── GOOGLE CLIENT REFRESH TOKEN HELPER ──
+function getGoogleAccessToken() {
+    $clientId = getSetting('google_client_id');
+    $clientSecret = getSetting('google_client_secret');
+    $refreshToken = getSetting('google_refresh_token');
+    
+    if (empty($clientId) || empty($clientSecret) || empty($refreshToken)) {
+        return null;
+    }
+    
+    $ch = curl_init("https://oauth2.googleapis.com/token");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+        'client_id' => $clientId,
+        'client_secret' => $clientSecret,
+        'refresh_token' => $refreshToken,
+        'grant_type' => 'refresh_token'
+    ]));
+    
+    $resp = curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($status !== 200) return null;
+    $data = json_decode($resp, true);
+    return $data['access_token'] ?? null;
+}
+
+// ── ACTION: TEST CONNECTIONS ──
+if ($action === 'test_connections') {
+    $res = ['shopify' => 'disabled', 'meta' => 'disabled', 'google_ads' => 'disabled', 'ga4' => 'disabled', 'gsc' => 'disabled'];
+    
+    // 1. Shopify
+    if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !empty($int['shopify_access_token'])) {
+        $sub = $int['shopify_subdomain'];
+        $tok = $int['shopify_access_token'];
+        if ($tok === str_repeat('·', 8)) {
+            // Retrieve actual token from DB
+            $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
+            $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
+            $tok = $dbInt['shopify_access_token'] ?? '';
+        }
+        
+        $ch = curl_init("https://{$sub}.myshopify.com/admin/api/2025-01/shop.json");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-Shopify-Access-Token: {$tok}"]);
+        curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        $res['shopify'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
+    }
+    
+    // 2. Meta
+    if (!empty($int['meta_access_token']) && !empty($int['meta_ad_account_ids'])) {
+        $tok = $int['meta_access_token'];
+        if ($tok === str_repeat('·', 8)) {
+            $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
+            $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
+            $tok = $dbInt['meta_access_token'] ?? '';
+        }
+        $accts = array_filter(array_map('trim', explode(',', $int['meta_ad_account_ids'])));
+        if (!empty($accts)) {
+            $testAcct = $accts[0];
+            $ch = curl_init("https://graph.facebook.com/v21.0/{$testAcct}/insights?limit=1&access_token={$tok}");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            $res['meta'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
+        }
+    }
+    
+    // 3. Google API access
+    $gAccessToken = getGoogleAccessToken();
+    if ($gAccessToken) {
+        // Test Google Ads
+        if (!empty($int['google_ads_enabled']) && !empty($int['google_ads_customer_id'])) {
+            $cust = str_replace('-', '', $int['google_ads_customer_id']);
+            $devTok = getSetting('google_developer_token');
+            $mcc = !empty($int['google_ads_mcc_id']) ? str_replace('-', '', $int['google_ads_mcc_id']) : $cust;
+            
+            $q = "SELECT campaign.id FROM campaign LIMIT 1";
+            $ch = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer {$gAccessToken}",
+                "developer-token: {$devTok}",
+                "login-customer-id: {$mcc}",
+                "Content-Type: application/json"
+            ]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['query' => $q]));
+            curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            $res['google_ads'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
+        }
+        
+        // Test GA4
+        if (!empty($int['ga4_property_id'])) {
+            $gaPid = $int['ga4_property_id'];
+            $ch = curl_init("https://analyticsdata.googleapis.com/v1beta/properties/{$gaPid}:runReport");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer {$gAccessToken}",
+                "Content-Type: application/json"
+            ]);
+            // Empty payload request
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+                'dateRanges' => [['startDate' => date('Y-m-d'), 'endDate' => date('Y-m-d')]],
+                'metrics' => [['name' => 'sessions']]
+            ]));
+            curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            $res['ga4'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
+        }
+        
+        // Test GSC
+        if (!empty($int['gsc_site_url'])) {
+            $gscUrl = urlencode($int['gsc_site_url']);
+            $ch = curl_init("https://www.googleapis.com/webmasters/v3/sites/{$gscUrl}/searchAnalytics/query");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer {$gAccessToken}",
+                "Content-Type: application/json"
+            ]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+                'startDate' => date('Y-m-d', strtotime('-7 days')),
+                'endDate' => date('Y-m-d', strtotime('-1 day')),
+                'rowLimit' => 1
+            ]));
+            curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            $res['gsc'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
+        }
+    } else {
+        $res['google_ads'] = $res['ga4'] = $res['gsc'] = 'Failed (Google OAuth unauthorized)';
+    }
+    
+    json_out(array_merge(['ok' => true], $res));
+}
+
+// ── CORE SYNC EXECUTION ──
+if (empty($startDate) || empty($endDate)) {
+    if (php_sapi_name() === 'cli') die("Error: start and end dates required.\n");
+    json_err('start_date and end_date required');
+}
+
+// Resolve password / token obfuscation values
+$shopifyToken = $int['shopify_access_token'] ?? '';
+if ($shopifyToken === str_repeat('·', 8)) {
+    $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
+    $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
+    $shopifyToken = $dbInt['shopify_access_token'] ?? '';
+}
+
+$metaToken = $int['meta_access_token'] ?? '';
+if ($metaToken === str_repeat('·', 8)) {
+    $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
+    $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
+    $metaToken = $dbInt['meta_access_token'] ?? '';
+}
+
+// 1. Google OAuth Client Access
+$gAccessToken = getGoogleAccessToken();
+
+// Create datetime periods array
+$dates = [];
+$curr = strtotime($startDate);
+$last = strtotime($endDate);
+while ($curr <= $last) {
+    $dates[] = date('Y-m-d', $curr);
+    $curr = strtotime('+1 day', $curr);
+}
+
+// Stats outputs
+$syncShopifyCount = 0;
+$syncMetaCount = 0;
+$syncGoogleAdsCount = 0;
+$syncGA4Count = 0;
+$syncGSCCount = 0;
+
+$metaCampaigns = [];
+$metaCreatives = [];
+$googleCampaigns = [];
+$ga4Channels = [];
+$gscPages = [];
+$gscQueries = [];
+$shopifyProducts = [];
+$shopifyLocations = [];
+$shopifyCampaigns = [];
+
+// ── CRAWL THIRD-PARTY APIS FOR RANGE ──
+
+// A. Shopify Rest API
+if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !empty($shopifyToken)) {
+    $sub = $int['shopify_subdomain'];
+    $url = "https://{$sub}.myshopify.com/admin/api/2025-01/orders.json?status=any&created_at_min={$startDate}T00:00:00%2B05:30&created_at_max={$endDate}T23:59:59%2B05:30&limit=250";
+    
+    $orders = [];
+    while ($url) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "X-Shopify-Access-Token: {$shopifyToken}",
+            "Content-Type: application/json"
+        ]);
+        $resp = curl_exec($ch);
+        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        
+        // Read link headers for pagination
+        $headerText = '';
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($ch, $header) use (&$headerText) {
+            $headerText .= $header;
+            return strlen($header);
+        });
+        curl_exec($ch);
+        curl_close($ch);
+        
+        if ($status !== 200) {
+            if (php_sapi_name() === 'cli') echo "Shopify sync failed: " . $resp . "\n";
+            break;
+        }
+        
+        $data = json_decode($resp, true);
+        $orders = array_merge($orders, $data['orders'] ?? []);
+        
+        // Link header regex pagination check
+        $url = null;
+        if (preg_match('/<([^>]+)>;\s*rel="next"/', $headerText, $match)) {
+            $url = $match[1];
+        }
+    }
+    
+    // Group Shopify orders by date (Kolkata offset time)
+    $shopifyDaily = [];
+    $prodAgg = [];
+    $cityAgg = [];
+    $utmAgg = [];
+    
+    $seenCustomers = [];
+    $newCustomersCount = 0;
+    
+    foreach ($orders as $order) {
+        if (!empty($order['cancelled_at'])) continue;
+        
+        $date = substr($order['created_at'], 0, 10);
+        if (!isset($shopifyDaily[$date])) {
+            $shopifyDaily[$date] = ['sales' => 0, 'orders' => 0, 'new_cust' => 0];
+        }
+        
+        $subtotal = (float)($order['subtotal_price'] ?? 0.0);
+        $shopifyDaily[$date]['sales'] += $subtotal;
+        $shopifyDaily[$date]['orders'] += 1;
+        
+        // Track customer acquisition
+        if (!empty($order['customer'])) {
+            $cid = $order['customer']['id'];
+            if (!in_array($cid, $seenCustomers)) {
+                $seenCustomers[] = $cid;
+                $isNew = ($order['customer']['orders_count'] === 1) || 
+                         (!empty($order['customer']['created_at']) && substr($order['customer']['created_at'], 0, 7) === substr($order['created_at'], 0, 7));
+                if ($isNew) {
+                    $shopifyDaily[$date]['new_cust'] += 1;
+                    $newCustomersCount++;
+                }
+            }
+        }
+        
+        // Aggregates for reports (products, cities)
+        foreach ($order['line_items'] ?? [] as $item) {
+            $name = trim($item['title'] ?? '');
+            if (empty($name)) continue;
+            $qty = (int)($item['quantity'] ?? 0);
+            $price = (float)($item['price'] ?? 0.0);
+            if (!isset($prodAgg[$name])) $prodAgg[$name] = ['name' => $name, 'orders' => 0, 'revenue' => 0];
+            $prodAgg[$name]['orders'] += $qty;
+            $prodAgg[$name]['revenue'] += ($qty * $price);
+        }
+        
+        $addr = $order['shipping_address'] ?? $order['billing_address'] ?? [];
+        $city = trim($addr['city'] ?? 'Unknown');
+        $prov = trim($addr['province'] ?? '');
+        $loc = $prov ? $city . ', ' . $prov : $city;
+        if (!isset($cityAgg[$loc])) $cityAgg[$loc] = ['location' => $loc, 'orders' => 0, 'revenue' => 0];
+        $cityAgg[$loc]['orders'] += 1;
+        $cityAgg[$loc]['revenue'] += $subtotal;
+        
+        // UTM campaign mapping (referral, search)
+        $landing = $order['landing_site'] ?? '';
+        $referring = $order['referring_site'] ?? '';
+        
+        $utmSource = 'Direct';
+        $utmCampaign = 'Direct / Organic';
+        
+        if (preg_match('/utm_source=([^&]+)/', $landing, $m)) $utmSource = urldecode($m[1]);
+        if (preg_match('/utm_campaign=([^&]+)/', $landing, $m)) $utmCampaign = urldecode($m[1]);
+        
+        if ($utmSource === 'Direct' && !empty($referring)) {
+            if (preg_match('/instagram\.com|facebook\.com/i', $referring)) {
+                $utmSource = 'Social Organic';
+                $utmCampaign = 'Referral';
+            } else if (preg_match('/google\./i', $referring)) {
+                $utmSource = 'Google Organic';
+                $utmCampaign = 'Search';
+            }
+        }
+        
+        $key = $utmSource . ' / ' . $utmCampaign;
+        if (!isset($utmAgg[$key])) $utmAgg[$key] = ['source' => $utmSource, 'campaign' => $utmCampaign, 'orders' => 0, 'revenue' => 0];
+        $utmAgg[$key]['orders'] += 1;
+        $utmAgg[$key]['revenue'] += $subtotal;
+    }
+    
+    // Sort and slice top products/cities
+    usort($prodAgg, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
+    $shopifyProducts = array_slice($prodAgg, 0, 8);
+    
+    usort($cityAgg, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
+    $shopifyLocations = array_slice($cityAgg, 0, 8);
+    
+    usort($utmAgg, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
+    $shopifyCampaigns = array_slice($utmAgg, 0, 10);
+    
+    $syncShopifyCount = count($orders);
+}
+
+// B. Meta Ads insights
+if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
+    $accts = array_filter(array_map('trim', explode(',', $int['meta_ad_account_ids'])));
+    $timeRange = json_encode(['since' => $startDate, 'until' => $endDate]);
+    
+    $metaDaily = [];
+    
+    foreach ($accts as $acct) {
+        // 1. Campaign Breakdown
+        $cf = urlencode("campaign_name,spend,impressions,clicks,actions,action_values");
+        $curlUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$cf}&level=campaign&time_range=" . urlencode($timeRange) . "&limit=100&access_token={$metaToken}";
+        
+        $ch = curl_init($curlUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $resp = curl_exec($ch);
+        curl_close($ch);
+        
+        $campaignData = json_decode($resp, true);
+        foreach ($campaignData['data'] ?? [] as $row) {
+            $spend = (float)($row['spend'] ?? 0.0);
+            $revenue = 0.0;
+            $orders = 0;
+            foreach ($row['action_values'] ?? [] as $av) {
+                if ($av['action_type'] === 'purchase') $revenue = (float)$av['value'];
+            }
+            foreach ($row['actions'] ?? [] as $ac) {
+                if ($ac['action_type'] === 'purchase') $orders = (int)$ac['value'];
+            }
+            $metaCampaigns[] = [
+                'channel' => 'META',
+                'name' => $row['campaign_name'] ?? 'Campaign',
+                'spent' => round($spend),
+                'sales' => round($revenue),
+                'orders' => $orders,
+                'roas' => $spend > 0 ? number_format($revenue / $spend, 1) . 'x' : '—',
+                'account' => $acct
+            ];
+        }
+        
+        // 2. Creative Ad breakdown
+        $adf = urlencode("ad_name,spend,ctr,actions,action_values");
+        $adUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$adf}&level=ad&limit=50&time_range=" . urlencode($timeRange) . "&access_token={$metaToken}";
+        
+        $chAd = curl_init($adUrl);
+        curl_setopt($chAd, CURLOPT_RETURNTRANSFER, true);
+        $respAd = curl_exec($chAd);
+        curl_close($chAd);
+        
+        $adData = json_decode($respAd, true);
+        foreach ($adData['data'] ?? [] as $ad) {
+            $adOrders = 0;
+            $adRevenue = 0.0;
+            $adSpend = (float)($ad['spend'] ?? 0.0);
+            foreach ($ad['actions'] ?? [] as $ac) {
+                if ($ac['action_type'] === 'purchase') $adOrders = (int)$ac['value'];
+            }
+            foreach ($ad['action_values'] ?? [] as $av) {
+                if ($av['action_type'] === 'purchase') $adRevenue = (float)$av['value'];
+            }
+            if ($adOrders > 0) {
+                $metaCreatives[] = [
+                    'name' => $ad['ad_name'] ?? 'Ad Creative',
+                    'ctr' => number_format((float)($ad['ctr'] ?? 0.0), 1) . '%',
+                    'cpa' => $adOrders > 0 ? '₹' . Math.round($adSpend / $adOrders) : '—',
+                    'orders' => $adOrders,
+                    'revenue' => round($adRevenue)
+                ];
+            }
+        }
+        
+        // 3. Daily Breakdown logs
+        $df = urlencode("date_start,spend,impressions,clicks,actions,action_values");
+        $dailyUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$df}&level=account&time_increment=1&time_range=" . urlencode($timeRange) . "&limit=100&access_token={$metaToken}";
+        
+        $chD = curl_init($dailyUrl);
+        curl_setopt($chD, CURLOPT_RETURNTRANSFER, true);
+        $respD = curl_exec($chD);
+        curl_close($chD);
+        
+        $dailyData = json_decode($respD, true);
+        foreach ($dailyData['data'] ?? [] as $d) {
+            $day = $d['date_start'];
+            if (!isset($metaDaily[$day])) {
+                $metaDaily[$day] = ['spend' => 0, 'sales' => 0, 'orders' => 0, 'clicks' => 0, 'impressions' => 0];
+            }
+            $dspend = (float)($d['spend'] ?? 0.0);
+            $drev = 0.0;
+            $dorders = 0;
+            foreach ($d['action_values'] ?? [] as $av) {
+                if ($av['action_type'] === 'purchase') $drev = (float)$av['value'];
+            }
+            foreach ($d['actions'] ?? [] as $ac) {
+                if ($ac['action_type'] === 'purchase') $dorders = (int)$ac['value'];
+            }
+            $metaDaily[$day]['spend'] += $dspend;
+            $metaDaily[$day]['sales'] += $drev;
+            $metaDaily[$day]['orders'] += $dorders;
+            $metaDaily[$day]['clicks'] += (int)($d['clicks'] ?? 0);
+            $metaDaily[$day]['impressions'] += (int)($d['impressions'] ?? 0);
+        }
+    }
+    
+    usort($metaCreatives, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
+    $metaCreatives = array_slice($metaCreatives, 0, 3);
+    $syncMetaCount = count($metaCampaigns);
+}
+
+// C. Google Ads API
+if ($gAccessToken && !empty($int['google_ads_enabled']) && !empty($int['google_ads_customer_id'])) {
+    $cust = str_replace('-', '', $int['google_ads_customer_id']);
+    $devTok = getSetting('google_developer_token');
+    $mcc = !empty($int['google_ads_mcc_id']) ? str_replace('-', '', $int['google_ads_mcc_id']) : $cust;
+    
+    // 1. Fetch campaigns details
+    $q = "SELECT campaign.name, metrics.cost_micros, metrics.conversions, metrics.conversions_value, metrics.impressions, metrics.clicks FROM campaign WHERE segments.date BETWEEN '{$startDate}' AND '{$endDate}' AND campaign.status = 'ENABLED' ORDER BY metrics.cost_micros DESC LIMIT 50";
+    
+    $ch = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Authorization: Bearer {$gAccessToken}",
+        "developer-token: {$devTok}",
+        "login-customer-id: {$mcc}",
+        "Content-Type: application/json"
+    ]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['query' => $q]));
+    $resp = curl_exec($ch);
+    curl_close($ch);
+    
+    $json = json_decode($resp, true);
+    foreach ($json['results'] ?? [] as $row) {
+        $m = $row['metrics'] ?? [];
+        $spend = (float)($m['cost_micros'] ?? 0.0) / 1e6;
+        $revenue = (float)($m['conversions_value'] ?? 0.0);
+        $orders = (int)($m['conversions'] ?? 0);
+        $googleCampaigns[] = [
+            'channel' => 'GOOGLE',
+            'name' => $row['campaign']['name'] ?? 'Campaign',
+            'spent' => round($spend),
+            'sales' => round($revenue),
+            'orders' => $orders,
+            'roas' => $spend > 0 ? number_format($revenue / $spend, 1) . 'x' : '—'
+        ];
+    }
+    
+    // 2. Fetch daily logs
+    $qDaily = "SELECT segments.date, metrics.cost_micros, metrics.conversions, metrics.conversions_value, metrics.impressions, metrics.clicks FROM campaign WHERE segments.date BETWEEN '{$startDate}' AND '{$endDate}'";
+    $chD = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+    curl_setopt($chD, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($chD, CURLOPT_POST, true);
+    curl_setopt($chD, CURLOPT_HTTPHEADER, [
+        "Authorization: Bearer {$gAccessToken}",
+        "developer-token: {$devTok}",
+        "login-customer-id: {$mcc}",
+        "Content-Type: application/json"
+    ]);
+    curl_setopt($chD, CURLOPT_POSTFIELDS, json_encode(['query' => $qDaily]));
+    $respD = curl_exec($chD);
+    curl_close($chD);
+    
+    $googleDaily = [];
+    $jsonD = json_decode($respD, true);
+    foreach ($jsonD['results'] ?? [] as $row) {
+        $m = $row['metrics'] ?? [];
+        $day = $row['segments']['date'];
+        if (!isset($googleDaily[$day])) {
+            $googleDaily[$day] = ['spend' => 0, 'sales' => 0, 'orders' => 0, 'clicks' => 0, 'impressions' => 0];
+        }
+        $googleDaily[$day]['spend'] += (float)($m['cost_micros'] ?? 0.0) / 1e6;
+        $googleDaily[$day]['sales'] += (float)($m['conversions_value'] ?? 0.0);
+        $googleDaily[$day]['orders'] += (int)($m['conversions'] ?? 0);
+        $googleDaily[$day]['clicks'] += (int)($m['clicks'] ?? 0);
+        $googleDaily[$day]['impressions'] += (int)($m['impressions'] ?? 0);
+    }
+    
+    $syncGoogleAdsCount = count($googleCampaigns);
+}
+
+// D. GA4 API
+if ($gAccessToken && !empty($int['ga4_property_id'])) {
+    $gaPid = $int['ga4_property_id'];
+    
+    // 1. Fetch channel grouping metrics
+    $ch = curl_init("https://analyticsdata.googleapis.com/v1beta/properties/{$gaPid}:runReport");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Authorization: Bearer {$gAccessToken}",
+        "Content-Type: application/json"
+    ]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+        'dateRanges' => [['startDate' => $startDate, 'endDate' => $endDate]],
+        'dimensions' => [['name' => 'sessionDefaultChannelGrouping']],
+        'metrics' => [['name' => 'sessions'], ['name' => 'conversions'], ['name' => 'totalRevenue']]
+    ]));
+    $resp = curl_exec($ch);
+    curl_close($ch);
+    
+    $ga4Data = json_decode($resp, true);
+    $lmap = [
+        'Organic Search' => 'SEO / Search',
+        'Direct' => 'Direct',
+        'Organic Social' => 'Social Organic',
+        'Referral' => 'Referral'
+    ];
+    
+    foreach ($ga4Data['rows'] ?? [] as $row) {
+        $orig = $row['dimensionValues'][0]['value'] ?? '';
+        $lbl = $lmap[$orig] ?? null;
+        if (!$lbl) continue;
+        
+        $sessions = (int)($row['metricValues'][0]['value'] ?? 0);
+        $orders = (int)($row['metricValues'][1]['value'] ?? 0);
+        $revenue = (float)($row['metricValues'][2]['value'] ?? 0.0);
+        
+        $ga4Channels[$lbl] = [
+            'sessions' => $sessions,
+            'convRate' => $sessions > 0 ? number_format(($orders / $sessions) * 100, 2) : '0.00',
+            'revenue' => round($revenue)
+        ];
+    }
+    
+    // Fill empty defaults
+    foreach (['SEO / Search', 'Direct', 'Social Organic', 'Referral'] as $lbl) {
+        if (!isset($ga4Channels[$lbl])) {
+            $ga4Channels[$lbl] = ['sessions' => 0, 'convRate' => '0.00', 'revenue' => 0];
+        }
+    }
+    
+    $syncGA4Count = count($ga4Data['rows'] ?? []);
+}
+
+// E. GSC API
+if ($gAccessToken && !empty($int['gsc_site_url'])) {
+    $gscUrl = urlencode($int['gsc_site_url']);
+    
+    // Query landing pages (limit 5)
+    $chPages = curl_init("https://www.googleapis.com/webmasters/v3/sites/{$gscUrl}/searchAnalytics/query");
+    curl_setopt($chPages, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($chPages, CURLOPT_POST, true);
+    curl_setopt($chPages, CURLOPT_HTTPHEADER, [
+        "Authorization: Bearer {$gAccessToken}",
+        "Content-Type: application/json"
+    ]);
+    curl_setopt($chPages, CURLOPT_POSTFIELDS, json_encode([
+        'startDate' => $startDate,
+        'endDate' => $endDate,
+        'dimensions' => ['page'],
+        'rowLimit' => 5
+    ]));
+    $respPages = curl_exec($chPages);
+    curl_close($chPages);
+    
+    $pagesData = json_decode($respPages, true);
+    foreach ($pagesData['rows'] ?? [] as $r) {
+        $gscPages[] = [
+            'page' => $r['keys'][0],
+            'clicks' => $r['clicks'],
+            'impressions' => $r['impressions'],
+            'ctr' => number_format($r['ctr'] * 100, 1) . '%',
+            'position' => number_format($r['position'], 1)
+        ];
+    }
+    
+    // Query organic search keywords (limit 5)
+    $chQueries = curl_init("https://www.googleapis.com/webmasters/v3/sites/{$gscUrl}/searchAnalytics/query");
+    curl_setopt($chQueries, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($chQueries, CURLOPT_POST, true);
+    curl_setopt($chQueries, CURLOPT_HTTPHEADER, [
+        "Authorization: Bearer {$gAccessToken}",
+        "Content-Type: application/json"
+    ]);
+    curl_setopt($chQueries, CURLOPT_POSTFIELDS, json_encode([
+        'startDate' => $startDate,
+        'endDate' => $endDate,
+        'dimensions' => ['query'],
+        'rowLimit' => 5
+    ]));
+    $respQueries = curl_exec($chQueries);
+    curl_close($chQueries);
+    
+    $queriesData = json_decode($respQueries, true);
+    foreach ($queriesData['rows'] ?? [] as $r) {
+        $gscQueries[] = [
+            'query' => $r['keys'][0],
+            'clicks' => $r['clicks'],
+            'impressions' => $r['impressions'],
+            'ctr' => number_format($r['ctr'] * 100, 1) . '%',
+            'position' => number_format($r['position'], 1)
+        ];
+    }
+    
+    $syncGSCCount = count($gscQueries);
+}
+
+// ── SAVE DAY-LEVEL STATISTICS TO DATABASE ──
+// Retrieve brand active month
+$monthLabel = substr($startDate, 0, 7);
+$monthRow = dbGet('SELECT id FROM budget_months WHERE brand_id=? AND month_label=?', [$brand['id'], $monthLabel]);
+if (!$monthRow) {
+    $monthId = uuid4();
+    dbRun('INSERT INTO budget_months (id, brand_id, month_label, budget_allocated, target_roas, created_at) VALUES (?,?,?,?,?,NOW())', [$monthId, $brand['id'], $monthLabel, 0, 3.0]);
+} else {
+    $monthId = $monthRow['id'];
+}
+
+foreach ($dates as $date) {
+    // 1. Get or create budget day row
+    $dayRow = dbGet('SELECT id, channels_json FROM budget_days WHERE month_id=? AND day_date=?', [$monthId, $date]);
+    
+    $existingChannels = [];
+    if ($dayRow && !empty($dayRow['channels_json'])) {
+        $existingChannels = json_decode($dayRow['channels_json'], true) ?: [];
+    }
+    
+    // Shopify storefront values
+    $shopifySales = 0.0;
+    $shopifyOrders = 0;
+    $customersAcquired = 0;
+    
+    if (isset($shopifyDaily[$date])) {
+        $shopifySales = $shopifyDaily[$date]['sales'];
+        $shopifyOrders = $shopifyDaily[$date]['orders'];
+        $customersAcquired = $shopifyDaily[$date]['new_cust'];
+        
+        $existingChannels['shopify'] = [
+            'spend' => 0.0,
+            'sales' => $shopifySales,
+            'conversions' => $shopifyOrders,
+            'customers_acquired' => $customersAcquired,
+            'roas' => 0.0
+        ];
+    }
+    
+    // Meta Ads daily values
+    $metaSpend = 0.0;
+    $metaSales = 0.0;
+    $metaOrders = 0;
+    $metaClicks = 0;
+    $metaImpressions = 0;
+    
+    if (isset($metaDaily[$date])) {
+        $metaSpend = $metaDaily[$date]['spend'];
+        $metaSales = $metaDaily[$date]['sales'];
+        $metaOrders = $metaDaily[$date]['orders'];
+        $metaClicks = $metaDaily[$date]['clicks'];
+        $metaImpressions = $metaDaily[$date]['impressions'];
+        
+        $existingChannels['meta'] = [
+            'spend' => $metaSpend,
+            'sales' => $metaSales,
+            'conversions' => $metaOrders,
+            'clicks' => $metaClicks,
+            'sessions' => $metaImpressions,
+            'roas' => $metaSpend > 0 ? $metaSales / $metaSpend : 0.0
+        ];
+    }
+    
+    // Google Ads daily values
+    $googleSpend = 0.0;
+    $googleSales = 0.0;
+    $googleOrders = 0;
+    $googleClicks = 0;
+    $googleImpressions = 0;
+    
+    if (isset($googleDaily[$date])) {
+        $googleSpend = $googleDaily[$date]['spend'];
+        $googleSales = $googleDaily[$date]['sales'];
+        $googleOrders = $googleDaily[$date]['orders'];
+        $googleClicks = $googleDaily[$date]['clicks'];
+        $googleImpressions = $googleDaily[$date]['impressions'];
+        
+        $existingChannels['google'] = [
+            'spend' => $googleSpend,
+            'sales' => $googleSales,
+            'conversions' => $googleOrders,
+            'clicks' => $googleClicks,
+            'sessions' => $googleImpressions,
+            'roas' => $googleSpend > 0 ? $googleSales / $googleSpend : 0.0
+        ];
+    }
+    
+    $chJson = json_encode($existingChannels);
+    $dayNum = date('j', strtotime($date));
+    
+    if ($dayRow) {
+        dbRun('UPDATE budget_days SET channels_json=? WHERE id=?', [$chJson, $dayRow['id']]);
+    } else {
+        dbRun(
+            'INSERT INTO budget_days (id, month_id, day_number, day_date, spend_real, sales_real, conversions_real, posts_real, channels_json) VALUES (?,?,?,?,?,?,?,?,?)',
+            [uuid4(), $monthId, $dayNum, $date, 0.0, 0.0, 0, 0, $chJson]
+        );
+    }
+}
+
+// ── COMPILE METADATA PACKAGE FOR MONTHLY REPORTS CREATOR ──
+$outData = [
+    'ok' => true,
+    'sync_shopify' => $syncShopifyCount,
+    'sync_meta' => $syncMetaCount,
+    'sync_google_ads' => $syncGoogleAdsCount,
+    'sync_ga4' => $syncGA4Count,
+    'sync_gsc' => $syncGSCCount,
+    'meta_campaigns' => $metaCampaigns,
+    'meta_creatives' => $metaCreatives,
+    'google_campaigns' => $googleCampaigns,
+    'ga4_channels' => $ga4Channels,
+    'gsc_pages' => $gscPages,
+    'gsc_queries' => $gscQueries,
+    'shopify_products' => $shopifyProducts,
+    'shopify_locations' => $shopifyLocations,
+    'shopify_campaigns' => $shopifyCampaigns
+];
+
+if (php_sapi_name() === 'cli') {
+    echo "Sync complete!\n";
+    echo json_encode($outData, JSON_PRETTY_PRINT) . "\n";
+} else {
+    json_out($outData);
+}

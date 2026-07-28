@@ -13,6 +13,7 @@ const NAV = [
     { id:'catalog',   label:'Price Catalog',     icon:'📋', sub:'Searchable price lookup'  },
     { id:'budget',    label:'Budget Tracker',    icon:'📊', sub:'Monthly performance & ROAS'},
     { id:'reports',   label:'Weekly Report Generator', icon:'📄', sub:'Weekly summaries' },
+    { id:'monthly_reports', label:'Monthly Report Generator', icon:'📊', sub:'Widescreen monthly summaries' },
   ]},
   { group:'Admin', adminOnly:true, items:[
     { id:'admin',     label:'User Management',   icon:'👥', sub:'Users & permissions'      },
@@ -109,7 +110,7 @@ async function api(methodOrUrl, urlOrBody, body) {
   renderSidebar();
   renderDashboard();
   const _hashPage = window.location.hash.slice(1);
-  const _validPages = ['dashboard','strategy','consultant','pricing','catalog','budget','reports','admin','activity'];
+  const _validPages = ['dashboard','strategy','consultant','pricing','catalog','budget','reports','monthly_reports','admin','activity'];
   showPage(_validPages.includes(_hashPage) ? _hashPage : 'dashboard');
 
   // Show add product / new brand buttons for editors
@@ -117,9 +118,11 @@ async function api(methodOrUrl, urlOrBody, body) {
     const ap = document.getElementById('add-prod-btn');
     const nb = document.getElementById('new-brand-btn');
     const nb2 = document.getElementById('mo-new-brand-btn');
+    const bsc = document.getElementById('btn-sync-shopify-catalog');
     if (ap) ap.style.display = '';
     if (nb) nb.style.display = '';
     if (nb2) nb2.style.display = '';
+    if (bsc) bsc.style.display = '';
   }
 
   // Load settings if superadmin
@@ -169,6 +172,7 @@ function showPage(id) {
     catalog: 'Price Catalog', 
     budget: 'Budget Tracker', 
     reports: 'Weekly Report Generator',
+    monthly_reports: 'Monthly Report Generator',
     admin: 'User Management',
     activity: 'Activity Logs'
   };
@@ -182,6 +186,7 @@ function showPage(id) {
   if (id === 'admin')    renderAdmin();
   if (id === 'budget')   initBudget();
   if (id === 'reports')  initReportsPage();
+  if (id === 'monthly_reports') initMonthlyReportsPage();
   if (id === 'activity') initActivityPage();
 }
 
@@ -2791,7 +2796,12 @@ async function renderAdminBrands() {
       <td>${b.platform || '—'}</td>
       <td style="font-family:var(--fm);font-weight:600">${b.product_count || 0}</td>
       <td style="font-size:11px;color:var(--mid)">${channels}</td>
-      <td><button class="btn sm danger" onclick="deleteBrand('${b.slug}','${b.name.replace(/'/g,"\\'")}')">🗑 Delete</button></td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn sm secondary" onclick="editBrandIntegrations('${b.slug}')">⚙ Integrations</button>
+          <button class="btn sm danger" onclick="deleteBrand('${b.slug}','${b.name.replace(/'/g,"\\'")}')">🗑 Delete</button>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -2837,6 +2847,35 @@ async function renderAdmin() {
     const ok = document.getElementById('ai-oai-key');
     if (ak) ak.value = s.anthropic_api_key || '';
     if (ok) ok.value = s.openai_api_key || '';
+
+    // Load Google credentials
+    const googleClientId = document.getElementById('google-client-id');
+    const googleClientSecret = document.getElementById('google-client-secret');
+    const googleDevToken = document.getElementById('google-developer-token');
+    const googleOAuthStatus = document.getElementById('google-oauth-status');
+
+    if (googleClientId) googleClientId.value = s.google_client_id || '';
+    if (googleClientSecret) googleClientSecret.value = s.google_client_secret ? '••••••••••••••••' : '';
+    if (googleDevToken) googleDevToken.value = s.google_developer_token ? '••••••••••••••••' : '';
+    
+    if (googleOAuthStatus) {
+      if (s.google_refresh_token) {
+        googleOAuthStatus.textContent = 'Authorized (Saved)';
+        googleOAuthStatus.className = 'badge success';
+        googleOAuthStatus.style.background = '#e6fffa';
+        googleOAuthStatus.style.color = '#00a389';
+      } else if (s.google_client_id) {
+        googleOAuthStatus.textContent = 'Pending Authorization';
+        googleOAuthStatus.className = 'badge warning';
+        googleOAuthStatus.style.background = '#fffbeb';
+        googleOAuthStatus.style.color = '#d97706';
+      } else {
+        googleOAuthStatus.textContent = 'Unconfigured';
+        googleOAuthStatus.className = 'badge gray';
+        googleOAuthStatus.style.background = '#f1f5f9';
+        googleOAuthStatus.style.color = '#64748b';
+      }
+    }
 
     selectPrimaryProvider(s.ai_provider || 'anthropic', false);
   }
@@ -4900,7 +4939,7 @@ function renderReportsListTable() {
 
   const filtered = allReportsCache.filter(h => {
     const matchesBrand = !brandFilterVal || h.brand_id === brandFilterVal;
-    const matchesType = !typeFilterVal || h.report_type === typeFilterVal;
+    const matchesType = h.report_type === 'weekly' || !h.report_type;
     return matchesBrand && matchesType;
   });
 
@@ -6731,5 +6770,416 @@ function exportPoaXLSX() {
 
 function exportPoaXLSXById(id) {
   window.open('/api/poa?action=export_xlsx&id=' + id, '_blank');
+}
+
+// ── GOOGLE GLOBAL SETTINGS ───────────────────────────────────────────────────
+let _googleGlobalSaveTimer = null;
+function saveGoogleGlobalKeys() {
+  clearTimeout(_googleGlobalSaveTimer);
+  _googleGlobalSaveTimer = setTimeout(async () => {
+    const keys = {
+      google_client_id: document.getElementById('google-client-id').value.trim(),
+      google_client_secret: document.getElementById('google-client-secret').value.trim(),
+      google_developer_token: document.getElementById('google-developer-token').value.trim()
+    };
+    try {
+      await api('/api/admin?action=settings', 'POST', keys);
+    } catch(e) {
+      console.error(e);
+    }
+  }, 1200);
+}
+
+function startGoogleOAuth() {
+  const clientId = document.getElementById('google-client-id').value.trim();
+  if (!clientId) {
+    alert('Please enter a Google Client ID and save it first.');
+    return;
+  }
+  window.location.href = '/api/google-auth.php?action=authorize';
+}
+
+// ── BRAND CONNECTIONS & INTEGRATIONS MODAL ──────────────────────────────────
+let _editBrandSlug = null;
+async function editBrandIntegrations(slug) {
+  _editBrandSlug = slug;
+  const brand = await api('/api/brands/' + slug);
+  if (!brand) return;
+  
+  document.getElementById('edit-brand-subtitle').textContent = `Configure API integrations for ${brand.name}`;
+  
+  let int = {};
+  try {
+    int = typeof brand.integrations_json === 'object' ? brand.integrations_json : JSON.parse(brand.integrations_json || '{}');
+  } catch(e) {}
+  
+  // Reset fields
+  document.getElementById('int-shopify-enabled').checked = !!int.shopify_enabled;
+  document.getElementById('int-shopify-subdomain').value = int.shopify_subdomain || '';
+  document.getElementById('int-shopify-token').value = int.shopify_access_token ? '••••••••••••••••' : '';
+  
+  document.getElementById('int-meta-accounts').value = int.meta_ad_account_ids || '';
+  document.getElementById('int-meta-token').value = int.meta_access_token ? '••••••••••••••••' : '';
+  
+  document.getElementById('int-google-enabled').checked = !!int.google_ads_enabled;
+  document.getElementById('int-google-customer-id').value = int.google_ads_customer_id || '';
+  document.getElementById('int-google-mcc-id').value = int.google_ads_mcc_id || '';
+  
+  document.getElementById('int-ga4-property-id').value = int.ga4_property_id || '';
+  document.getElementById('int-gsc-site-url').value = int.gsc_site_url || '';
+  
+  document.getElementById('int-test-status').textContent = 'Not checked';
+  document.getElementById('int-test-status').className = '';
+  document.getElementById('int-test-status').style.color = 'var(--mid)';
+  
+  setIntegrationTab('shopify');
+  openMo('mo-edit-brand');
+}
+
+function setIntegrationTab(tab) {
+  const tabs = ['shopify', 'meta', 'google', 'ga4', 'gsc'];
+  tabs.forEach(t => {
+    const elTab = document.getElementById('tab-int-' + t);
+    const elPan = document.getElementById('panel-int-' + t);
+    if (elTab) elTab.classList.toggle('active', t === tab);
+    if (elPan) elPan.style.display = t === tab ? 'block' : 'none';
+  });
+}
+
+async function submitEditBrand() {
+  if (!_editBrandSlug) return;
+  
+  const payload = {
+    integrations_json: {
+      shopify_enabled: document.getElementById('int-shopify-enabled').checked,
+      shopify_subdomain: document.getElementById('int-shopify-subdomain').value.trim(),
+      shopify_access_token: document.getElementById('int-shopify-token').value.trim(),
+      
+      meta_ad_account_ids: document.getElementById('int-meta-accounts').value.trim(),
+      meta_access_token: document.getElementById('int-meta-token').value.trim(),
+      
+      google_ads_enabled: document.getElementById('int-google-enabled').checked,
+      google_ads_customer_id: document.getElementById('int-google-customer-id').value.trim(),
+      google_ads_mcc_id: document.getElementById('int-google-mcc-id').value.trim(),
+      
+      ga4_property_id: document.getElementById('int-ga4-property-id').value.trim(),
+      gsc_site_url: document.getElementById('int-gsc-site-url').value.trim()
+    }
+  };
+  
+  const r = await api('/api/brands/' + _editBrandSlug, 'PUT', payload);
+  if (r && r.ok) {
+    showToast('Brand integrations saved!', 'success');
+    closeMo('mo-edit-brand');
+    renderAdminBrands();
+  } else {
+    alert(r?.error || 'Failed to save brand integrations.');
+  }
+}
+
+async function testActiveBrandConnections() {
+  if (!_editBrandSlug) return;
+  const statusEl = document.getElementById('int-test-status');
+  statusEl.textContent = 'Testing connection...';
+  statusEl.style.color = '#d97706';
+  
+  const payload = {
+    shopify_enabled: document.getElementById('int-shopify-enabled').checked,
+    shopify_subdomain: document.getElementById('int-shopify-subdomain').value.trim(),
+    shopify_access_token: document.getElementById('int-shopify-token').value.trim(),
+    
+    meta_ad_account_ids: document.getElementById('int-meta-accounts').value.trim(),
+    meta_access_token: document.getElementById('int-meta-token').value.trim(),
+    
+    google_ads_enabled: document.getElementById('int-google-enabled').checked,
+    google_ads_customer_id: document.getElementById('int-google-customer-id').value.trim(),
+    google_ads_mcc_id: document.getElementById('int-google-mcc-id').value.trim(),
+    
+    ga4_property_id: document.getElementById('int-ga4-property-id').value.trim(),
+    gsc_site_url: document.getElementById('int-gsc-site-url').value.trim()
+  };
+  
+  const r = await api(`/api/sync?brand_id=${_editBrandSlug}&action=test_connections`, 'POST', payload);
+  if (r && r.ok) {
+    statusEl.textContent = `Shopify: ${r.shopify}, Meta: ${r.meta}, Google: ${r.google_ads}, GA4: ${r.ga4}, GSC: ${r.gsc}`;
+    statusEl.style.color = '#10B981';
+  } else {
+    statusEl.textContent = 'Connection test failed: ' + (r?.error || 'unreachable');
+    statusEl.style.color = '#ef4444';
+  }
+}
+
+// ── MONTHLY REPORT GENERATOR PAGE ───────────────────────────────────────────
+let allMonthlyReportsCache = [];
+let syncedMonthlyData = null;
+
+async function initMonthlyReportsPage() {
+  const list = document.getElementById('monthly-tbody');
+  
+  // Reset subviews
+  document.getElementById('monthly-list-view').style.display = 'block';
+  document.getElementById('monthly-create-view').style.display = 'none';
+  
+  // Initialize brand filter select
+  const brandFilter = document.getElementById('monthly-filter-brand');
+  if (brandFilter) {
+    brandFilter.innerHTML = '<option value="">All Brands</option>' + 
+      allBrands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    if (!brandFilter.dataset.initialized) {
+      brandFilter.value = activeBrand ? activeBrand.id : '';
+      brandFilter.dataset.initialized = 'true';
+    }
+  }
+
+  list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--mid);padding:24px 0">Loading monthly reports…</td></tr>`;
+  try {
+    const r = await api('/api/reports?action=list');
+    allMonthlyReportsCache = r || [];
+    renderMonthlyReportsTable();
+  } catch (e) {
+    list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px 0">Failed to load reports: ${e.message}</td></tr>`;
+  }
+}
+
+function handleMonthlyBrandFilterChange(val) {
+  activeBrand = allBrands.find(b => b.id === val) || null;
+  updateBrandUI();
+  renderMonthlyReportsTable();
+}
+
+function renderMonthlyReportsTable() {
+  const list = document.getElementById('monthly-tbody');
+  if (!list) return;
+
+  const brandFilterVal = document.getElementById('monthly-filter-brand')?.value || '';
+
+  const filtered = allMonthlyReportsCache.filter(h => {
+    const matchesBrand = !brandFilterVal || h.brand_id === brandFilterVal;
+    const matchesType = h.report_type === 'monthly';
+    return matchesBrand && matchesType;
+  });
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--mid);padding:24px 0">No monthly reports found matching the filters.</td></tr>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(h => {
+    const startStr = h.period_start ? new Date(h.period_start).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '—';
+    const spend = typeof h.total_spend === 'number' ? '₹' + Math.round(h.total_spend).toLocaleString() : '—';
+    const rev = typeof h.total_revenue === 'number' ? '₹' + Math.round(h.total_revenue).toLocaleString() : '—';
+    const roas = typeof h.overall_roas === 'number' ? Number(h.overall_roas).toFixed(2) + 'x' : '—';
+    const created = h.created_at ? new Date(h.created_at).toLocaleDateString() : '—';
+    
+    const viewUrl = `/monthly-report.html?token=${h.shared_link || h.id}`;
+
+    return `<tr>
+      <td style="font-weight:700;color:var(--dark)">${h.brand_name || '—'}</td>
+      <td style="font-weight:600">${startStr}</td>
+      <td style="font-family:var(--fm)">${spend}</td>
+      <td style="font-family:var(--fm)">${rev}</td>
+      <td style="font-family:var(--fm);font-weight:700;color:#10B981">${roas}</td>
+      <td style="font-size:11px;color:var(--mid)">${created}</td>
+      <td><a href="${viewUrl}" target="_blank" style="font-size:11px;color:var(--blue);font-weight:700">Open Deck View ↗</a></td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn sm" onclick="window.open('${viewUrl}','_blank')">👁 View</button>
+          <button class="btn sm danger" onclick="deleteMonthlyReport('${h.id}')">🗑 Delete</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openCreateMonthlyReport() {
+  if (!activeBrand) {
+    alert('Please select a brand from the top navigation first.');
+    return;
+  }
+  
+  document.getElementById('monthly-list-view').style.display = 'none';
+  document.getElementById('monthly-create-view').style.display = 'block';
+  document.getElementById('monthly-create-brand-meta').textContent = activeBrand.name;
+  
+  document.getElementById('monthly-rep-month').value = '';
+  document.getElementById('monthly-rep-start-date').value = '';
+  document.getElementById('monthly-rep-end-date').value = '';
+  
+  document.getElementById('manual-email-spend').value = 0;
+  document.getElementById('manual-email-revenue').value = 0;
+  document.getElementById('manual-email-orders').value = 0;
+  document.getElementById('manual-email-sent').value = 0;
+  document.getElementById('manual-email-open').value = 0;
+  document.getElementById('manual-email-click').value = 0;
+  
+  document.getElementById('manual-wa-spend').value = 0;
+  document.getElementById('manual-wa-revenue').value = 0;
+  document.getElementById('manual-wa-orders').value = 0;
+  document.getElementById('manual-wa-sent').value = 0;
+  
+  document.getElementById('manual-mp-spend').value = 0;
+  document.getElementById('manual-mp-revenue').value = 0;
+  document.getElementById('manual-mp-orders').value = 0;
+  
+  document.getElementById('monthly-sync-status').textContent = 'Crawl Shopify storefront, Meta/Google ads, GA4 funnel and GSC search impressions.';
+  document.getElementById('monthly-sync-status').style.color = '';
+  
+  syncedMonthlyData = null;
+}
+
+function backToMonthlyList() {
+  document.getElementById('monthly-list-view').style.display = 'block';
+  document.getElementById('monthly-create-view').style.display = 'none';
+}
+
+function handleMonthlyMonthSelect() {
+  const mVal = document.getElementById('monthly-rep-month').value;
+  if (!mVal) return;
+  
+  const [yr, mn] = mVal.split('-');
+  const firstDay = `${yr}-${mn}-01`;
+  
+  const d = new Date(yr, mn, 0);
+  const lastDay = `${yr}-${mn}-${String(d.getDate()).padStart(2, '0')}`;
+  
+  document.getElementById('monthly-rep-start-date').value = firstDay;
+  document.getElementById('monthly-rep-end-date').value = lastDay;
+}
+
+async function triggerMonthlySync() {
+  if (!activeBrand) return;
+  const start = document.getElementById('monthly-rep-start-date').value;
+  const end = document.getElementById('monthly-rep-end-date').value;
+  
+  if (!start || !end) {
+    alert('Please select a target month first.');
+    return;
+  }
+  
+  const btn = document.getElementById('btn-sync-monthly');
+  const statusEl = document.getElementById('monthly-sync-status');
+  
+  btn.disabled = true;
+  btn.textContent = 'Syncing...';
+  statusEl.textContent = 'Contacting integrations, downloading storefront & ad campaign metrics...';
+  statusEl.style.color = '#d97706';
+  
+  try {
+    const r = await api(`/api/sync.php?brand_id=${activeBrand.id}&start_date=${start}&end_date=${end}`);
+    if (r && r.ok) {
+      syncedMonthlyData = r;
+      statusEl.textContent = `Sync completed successfully! Shopify items: ${r.sync_shopify}, Meta: ${r.sync_meta}, Google Ads: ${r.sync_google_ads}, GA4: ${r.sync_ga4}, GSC: ${r.sync_gsc}.`;
+      statusEl.style.color = '#10B981';
+    } else {
+      statusEl.textContent = 'Sync encountered errors: ' + (r?.error || 'unreachable');
+      statusEl.style.color = '#ef4444';
+    }
+  } catch(e) {
+    statusEl.textContent = 'Sync failed: ' + e.message;
+    statusEl.style.color = '#ef4444';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚡ Sync API Data';
+  }
+}
+
+async function submitGenerateMonthlyReport() {
+  if (!activeBrand) return;
+  const start = document.getElementById('monthly-rep-start-date').value;
+  const end = document.getElementById('monthly-rep-end-date').value;
+  
+  if (!start || !end) {
+    alert('Please select a target month first.');
+    return;
+  }
+  
+  const btn = document.getElementById('btn-generate-monthly-report');
+  btn.disabled = true;
+  btn.textContent = 'Compiling Deck...';
+  
+  const ownedMedia = {
+    email: {
+      spend: parseFloat(document.getElementById('manual-email-spend').value) || 0,
+      revenue: parseFloat(document.getElementById('manual-email-revenue').value) || 0,
+      orders: parseInt(document.getElementById('manual-email-orders').value) || 0,
+      sent: parseInt(document.getElementById('manual-email-sent').value) || 0,
+      open_rate: parseFloat(document.getElementById('manual-email-open').value) || 0,
+      click_rate: parseFloat(document.getElementById('manual-email-click').value) || 0
+    },
+    whatsapp: {
+      spend: parseFloat(document.getElementById('manual-wa-spend').value) || 0,
+      revenue: parseFloat(document.getElementById('manual-wa-revenue').value) || 0,
+      orders: parseInt(document.getElementById('manual-wa-orders').value) || 0,
+      sent: parseInt(document.getElementById('manual-wa-sent').value) || 0
+    },
+    marketplace: {
+      spend: parseFloat(document.getElementById('manual-mp-spend').value) || 0,
+      revenue: parseFloat(document.getElementById('manual-mp-revenue').value) || 0,
+      orders: parseInt(document.getElementById('manual-mp-orders').value) || 0
+    }
+  };
+  
+  const payload = {
+    brand_id: activeBrand.id,
+    report_type: 'monthly',
+    start_date: start,
+    end_date: end,
+    owned_media: ownedMedia,
+    api_sync_data: syncedMonthlyData || {}
+  };
+  
+  try {
+    const r = await api('/api/reports?action=create', 'POST', payload);
+    if (r && r.ok) {
+      showToast('Monthly performance deck created successfully!', 'success');
+      const viewUrl = `/monthly-report.html?token=${r.shared_link || r.id}`;
+      window.open(viewUrl, '_blank');
+      initMonthlyReportsPage();
+    } else {
+      alert(r?.error || 'Failed to generate monthly report.');
+    }
+  } catch(e) {
+    alert('Request failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate Monthly Deck';
+  }
+}
+
+async function deleteMonthlyReport(id) {
+  if (!confirm('Are you sure you want to delete this monthly deck report? This cannot be undone.')) return;
+  try {
+    const r = await api(`/api/reports?id=${id}`, 'DELETE');
+    if (r && r.ok) {
+      showToast('Report deleted successfully.', 'success');
+      initMonthlyReportsPage();
+    } else {
+      alert(r?.error || 'Delete failed.');
+    }
+  } catch(e) {
+    alert('Delete request failed: ' + e.message);
+  }
+}
+
+async function triggerShopifyCatalogSync() {
+  if (!activeBrand) return;
+  const btn = document.getElementById('btn-sync-shopify-catalog');
+  btn.disabled = true;
+  btn.textContent = 'Syncing...';
+  
+  try {
+    const r = await api(`/api/pricing?brand=${activeBrand.slug}&action=sync_shopify`, 'POST');
+    if (r && r.ok) {
+      showToast(`Successfully synced ${r.count} products from Shopify!`, 'success');
+      if (typeof loadProducts === 'function') loadProducts();
+    } else {
+      alert(r?.error || 'Failed to sync Shopify catalog.');
+    }
+  } catch(e) {
+    alert('Catalog sync failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚡ Sync Shopify Catalog';
+  }
 }
 

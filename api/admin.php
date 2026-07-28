@@ -121,18 +121,31 @@ if ($method === 'DELETE' && $action === 'months' && $id) {
 
 // GET /api/admin.php?action=settings
 if ($method === 'GET' && $action === 'settings') {
-    $keys = ['ai_provider','anthropic_model','openai_model','anthropic_api_key','openai_api_key','jina_api_key','firecrawl_api_key','tavily_api_key','serpapi_api_key'];
+    $keys = ['ai_provider','anthropic_model','openai_model','anthropic_api_key','openai_api_key','jina_api_key','firecrawl_api_key','tavily_api_key','serpapi_api_key','google_client_id','google_client_secret','google_refresh_token','google_developer_token'];
     $out  = [];
-    foreach ($keys as $k) $out[$k] = getSetting($k);
+    foreach ($keys as $k) {
+        $val = getSetting($k);
+        if ($val && in_array($k, ['google_client_secret', 'google_developer_token'])) {
+            $out[$k] = '••••••••••••••••';
+        } else {
+            $out[$k] = $val;
+        }
+    }
     json_out($out);
 }
 
 // POST /api/admin.php?action=settings
 if ($method === 'POST' && $action === 'settings') {
     $b = body();
-    $allowed = ['ai_provider','anthropic_model','openai_model','anthropic_api_key','openai_api_key','jina_api_key','firecrawl_api_key','tavily_api_key','serpapi_api_key'];
+    $allowed = ['ai_provider','anthropic_model','openai_model','anthropic_api_key','openai_api_key','jina_api_key','firecrawl_api_key','tavily_api_key','serpapi_api_key','google_client_id','google_client_secret','google_developer_token'];
     foreach ($allowed as $k) {
-        if (isset($b[$k])) setSetting($k, $b[$k], $user['name']);
+        if (isset($b[$k])) {
+            $val = $b[$k];
+            if ($val === '••••••••••••••••' && in_array($k, ['google_client_secret', 'google_developer_token'])) {
+                continue;
+            }
+            setSetting($k, $val, $user['name']);
+        }
     }
     json_out(['ok' => true]);
 }

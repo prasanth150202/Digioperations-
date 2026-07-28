@@ -123,4 +123,88 @@ if ($method === 'PUT' && $action === 'products') {
     json_out(['ok' => true]);
 }
 
+// POST /api/pricing.php?brand=X&action=sync_shopify
+if ($method === 'POST' && $action === 'sync_shopify') {
+    if (!canManage($user)) json_err('Insufficient permissions', 403);
+    
+    $int = json_decode($brand['integrations_json'] ?? '{}', true);
+    $sub = $int['shopify_subdomain'] ?? '';
+    $tok = $int['shopify_access_token'] ?? '';
+    if ($tok === str_repeat('·', 8)) {
+        $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
+        $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
+        $tok = $dbInt['shopify_access_token'] ?? '';
+    }
+    
+    if (empty($sub) || empty($tok)) {
+        json_err('Shopify credentials are not configured for this brand under Integrations settings.');
+    }
+    
+    $ch = curl_init("https://{$sub}.myshopify.com/admin/api/2025-01/products.json?limit=250");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-Shopify-Access-Token: {$tok}", "Content-Type: application/json"]);
+    $resp = curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($status !== 200) {
+        json_err('Shopify API returned error code ' . $status . ': ' . $resp);
+    }
+    
+    $data = json_decode($resp, true);
+    $products = $data['products'] ?? [];
+    
+    $currentCatalog = dbAll('SELECT * FROM pricing_products WHERE brand_id=?', [$brand['id']]);
+    $existingMap = [];
+    foreach ($currentCatalog as $item) {
+        $existingMap[trim(strtolower($item['name']))] = $item;
+    }
+    
+    $importedCount = 0;
+    foreach ($products as $p) {
+        $pName = trim($p['title']);
+        $pKey = strtolower($pName);
+        
+        $variants = [];
+        foreach ($p['variants'] ?? [] as $v) {
+            $variants[] = [
+                'id' => (string)($v['id']),
+                'name' => trim($v['title'] === 'Default Title' ? 'Default' : $v['title']),
+                'selling' => (float)($v['price'] ?? 0.0),
+                'compO' => !empty($v['compare_at_price']) ? (float)$v['compare_at_price'] : null,
+                'mfgO' => null
+            ];
+        }
+        
+        $variantType = count($variants) > 1 ? 'multi' : 'single';
+        
+        if (isset($existingMap[$pKey])) {
+            $oldItem = $existingMap[$pKey];
+            $oldVars = json_decode($oldItem['variants_json'] ?? '[]', true) ?: [];
+            
+            $mfgMap = [];
+            foreach ($oldVars as $oldV) {
+                if (!empty($oldV['id'])) {
+                    $mfgMap[(string)$oldV['id']] = $oldV['mfgO'] ?? null;
+                }
+            }
+            
+            foreach ($variants as &$v) {
+                if (isset($mfgMap[$v['id']])) {
+                    $v['mfgO'] = $mfgMap[$v['id']];
+                }
+            }
+            
+            dbRun('UPDATE pricing_products SET variants_json=?, variant_type=? WHERE id=?', 
+                [json_encode($variants), $variantType, $oldItem['id']]);
+        } else {
+            dbRun('INSERT INTO pricing_products (id, brand_id, name, mfg_per_pc, variant_type, extras_json, variants_json, globals_json) VALUES (?,?,?,?,?,?,?,?)',
+                [uuid4(), $brand['id'], $pName, 0.0, $variantType, '[]', json_encode($variants), '{}']);
+        }
+        $importedCount++;
+    }
+    
+    json_out(['ok' => true, 'count' => $importedCount]);
+}
+
 json_err('Not found', 404);

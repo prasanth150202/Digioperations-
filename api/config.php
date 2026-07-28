@@ -104,6 +104,13 @@ function db(): PDO {
         } catch (Throwable $migrationErr) {}
 
         try {
+            $cols = $pdo->query("SHOW COLUMNS FROM `brands` LIKE 'integrations_json'")->fetchAll();
+            if (empty($cols)) {
+                $pdo->exec("ALTER TABLE `brands` ADD COLUMN `integrations_json` TEXT DEFAULT NULL");
+            }
+        } catch (Throwable $migrationErr) {}
+
+        try {
             $cols = $pdo->query("SHOW COLUMNS FROM `budget_days` LIKE 'channels_json'")->fetchAll();
             if (empty($cols)) {
                 $pdo->exec("ALTER TABLE `budget_days` ADD COLUMN `channels_json` TEXT DEFAULT NULL AFTER `posts_real`");
@@ -246,6 +253,13 @@ function db(): PDO {
         // Seed intelligence API key settings rows if not present
         try {
             foreach (['firecrawl_api_key','tavily_api_key','serpapi_api_key','jina_api_key'] as $k) {
+                $pdo->exec("INSERT IGNORE INTO `settings` (`key`, `value`, `updated_by`) VALUES ('{$k}', '', 'system')");
+            }
+        } catch (Throwable $migrationErr) {}
+
+        // Seed Google API settings if not present
+        try {
+            foreach (['google_client_id','google_client_secret','google_refresh_token','google_developer_token'] as $k) {
                 $pdo->exec("INSERT IGNORE INTO `settings` (`key`, `value`, `updated_by`) VALUES ('{$k}', '', 'system')");
             }
         } catch (Throwable $migrationErr) {}

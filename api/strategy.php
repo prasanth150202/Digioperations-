@@ -17,8 +17,9 @@ if (!$brand) json_err('Brand not found', 404);
 const SYS = 'You are a senior D2C growth strategist for Indian brands. Return ONLY valid JSON, no markdown, no preamble.';
 
 function buildCtx(array $f): string {
+    global $brand;
     $g = fn($k) => !empty($f[$k]) ? $f[$k] : '—';
-    return "BRAND: {$g('brandName')} | INDUSTRY: {$g('industry')} | PLATFORM: {$g('platform')}
+    $ctxText = "BRAND: {$g('brandName')} | INDUSTRY: {$g('industry')} | PLATFORM: {$g('platform')}
 TARGET AUDIENCE: {$g('targetAudience')} | PRICE RANGE: {$g('priceRange')}
 AD BUDGET: {$g('adBudget')} | STRATEGY MONTH: {$g('strategyMonth')}
 LAST MONTH REVENUE: {$g('lastRevenue')} | THIS MONTH TARGET: {$g('thisTarget')}
@@ -27,6 +28,27 @@ CURRENT CAC: {$g('currentCAC')} | CURRENT CVR: {$g('currentCVR')}
 PROBLEM: {$g('primaryProblem')} | WHAT FAILED: {$g('whatFailed')}
 AI INSTRUCTIONS: {$g('aiInstructions')}
 BRAND VOICE: {$g('brandVoice')} | TONE: {$g('communicationTone')}";
+
+    // Append GSC and GA4 connection statistics context if available
+    try {
+        $latestReport = dbGet('SELECT * FROM reports WHERE brand_id=? ORDER BY period_end DESC LIMIT 1', [$brand['id']]);
+        if ($latestReport) {
+            $repData = json_decode($latestReport['report_data'] ?? '{}', true);
+            if (!empty($repData['gsc_queries'])) {
+                $queries = array_slice($repData['gsc_queries'], 0, 5);
+                $queryStrings = array_map(fn($q) => "- {$q['query']} (Clicks: {$q['clicks']}, Position: {$q['position']})", $queries);
+                $ctxText .= "\n\nLATEST HIGH-INTENT ORGANIC SEARCH KEYWORDS:\n" . implode("\n", $queryStrings);
+            }
+            if (!empty($repData['ga4_channels'])) {
+                $ctxText .= "\n\nLATEST GA4 TRAFFIC SOURCES:\n";
+                foreach ($repData['ga4_channels'] as $ch => $m) {
+                    $ctxText .= "- {$ch}: Sessions {$m['sessions']}, CVR {$m['convRate']}%, Revenue: ₹{$m['revenue']}\n";
+                }
+            }
+        }
+    } catch (Throwable $e) {}
+
+    return $ctxText;
 }
 
 // GET memory

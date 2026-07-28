@@ -3,7 +3,9 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/ai.php';
 
 $user = requireAuth();
-requirePage($user, 'reports');
+if ($user['role'] !== 'superadmin' && !in_array('reports', $user['pages']) && !in_array('monthly_reports', $user['pages'])) {
+    json_err('Access denied', 403);
+}
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
@@ -290,6 +292,75 @@ if ($method === 'POST' && $action === 'create') {
     $prevStartDateStr = $prevStartDt->format('Y-m-d');
     $prevEndDateStr = $prevEndDt->format('Y-m-d');
     $prevStats = aggregateStats($brandId, $prevStartDateStr, $prevEndDateStr);
+
+    // If monthly report, parse manual Owned Media inputs
+    if ($reportType === 'monthly') {
+        $ownedMedia = bodyGet('owned_media', []);
+        
+        // Sum up manual spends, revenues, conversions
+        $manualSpend = 0;
+        $manualRevenue = 0;
+        $manualConversions = 0;
+        
+        // Process Email Marketing
+        if (!empty($ownedMedia['email'])) {
+            $e = $ownedMedia['email'];
+            $manualSpend += (float)($e['spend'] ?? 0);
+            $manualRevenue += (float)($e['revenue'] ?? 0);
+            $manualConversions += (int)($e['orders'] ?? 0);
+            $currentStats['channels']['email_marketing'] = [
+                'spend' => (float)($e['spend'] ?? 0),
+                'revenue' => (float)($e['revenue'] ?? 0),
+                'conversions' => (int)($e['orders'] ?? 0),
+                'sessions' => (int)($e['sent'] ?? 0),
+                'open_rate' => (float)($e['open_rate'] ?? 0),
+                'click_rate' => (float)($e['click_rate'] ?? 0),
+                'roas' => (float)($e['spend'] > 0 ? $e['revenue'] / $e['spend'] : 0.0),
+                'cpa' => (float)($e['orders'] > 0 ? $e['spend'] / $e['orders'] : 0.0)
+            ];
+        }
+        
+        // Process WhatsApp
+        if (!empty($ownedMedia['whatsapp'])) {
+            $w = $ownedMedia['whatsapp'];
+            $manualSpend += (float)($w['spend'] ?? 0);
+            $manualRevenue += (float)($w['revenue'] ?? 0);
+            $manualConversions += (int)($w['orders'] ?? 0);
+            $currentStats['channels']['whatsapp'] = [
+                'spend' => (float)($w['spend'] ?? 0),
+                'revenue' => (float)($w['revenue'] ?? 0),
+                'conversions' => (int)($w['orders'] ?? 0),
+                'sessions' => (int)($w['sent'] ?? 0),
+                'roas' => (float)($w['spend'] > 0 ? $w['revenue'] / $w['spend'] : 0.0),
+                'cpa' => (float)($w['orders'] > 0 ? $w['spend'] / $w['orders'] : 0.0)
+            ];
+        }
+        
+        // Process Marketplace
+        if (!empty($ownedMedia['marketplace'])) {
+            $m = $ownedMedia['marketplace'];
+            $manualSpend += (float)($m['spend'] ?? 0);
+            $manualRevenue += (float)($m['revenue'] ?? 0);
+            $manualConversions += (int)($m['orders'] ?? 0);
+            $currentStats['channels']['marketplace'] = [
+                'spend' => (float)($m['spend'] ?? 0),
+                'revenue' => (float)($m['revenue'] ?? 0),
+                'conversions' => (int)($m['orders'] ?? 0),
+                'roas' => (float)($m['spend'] > 0 ? $m['revenue'] / $m['spend'] : 0.0),
+                'cpa' => (float)($m['orders'] > 0 ? $m['spend'] / $m['orders'] : 0.0)
+            ];
+        }
+        
+        // Blend totals
+        $currentStats['totals']['spend'] += $manualSpend;
+        $currentStats['totals']['revenue'] += $manualRevenue;
+        $currentStats['totals']['conversions'] += $manualConversions;
+        
+        // Recompute derived totals
+        $currentStats['totals']['roas'] = $currentStats['totals']['spend'] > 0 ? round($currentStats['totals']['revenue'] / $currentStats['totals']['spend'], 2) : 0.0;
+        $currentStats['totals']['cpa'] = $currentStats['totals']['conversions'] > 0 ? round($currentStats['totals']['spend'] / $currentStats['totals']['conversions'], 2) : 0.0;
+        $currentStats['totals']['aov'] = $currentStats['totals']['conversions'] > 0 ? round($currentStats['totals']['revenue'] / $currentStats['totals']['conversions'], 2) : 0.0;
+    }
     
     // Calculate WoW Percentage Changes — null when no prior data exists
     $pctChange = function($curr, $prev) {
@@ -366,6 +437,22 @@ if ($method === 'POST' && $action === 'create') {
             'totals' => $prevStats['totals']
         ]
     ];
+    
+    if ($reportType === 'monthly') {
+        $reportData['owned_media'] = bodyGet('owned_media', []);
+        $apiSyncData = bodyGet('api_sync_data', []);
+        
+        $reportData['meta_campaigns'] = $apiSyncData['meta_campaigns'] ?? [];
+        $reportData['meta_creatives'] = $apiSyncData['meta_creatives'] ?? [];
+        $reportData['google_campaigns'] = $apiSyncData['google_campaigns'] ?? [];
+        $reportData['ga4_channels'] = $apiSyncData['ga4_channels'] ?? [];
+        $reportData['gsc_pages'] = $apiSyncData['gsc_pages'] ?? [];
+        $reportData['gsc_queries'] = $apiSyncData['gsc_queries'] ?? [];
+        
+        $reportData['shopify_products'] = $apiSyncData['shopify_products'] ?? [];
+        $reportData['shopify_locations'] = $apiSyncData['shopify_locations'] ?? [];
+        $reportData['shopify_campaigns'] = $apiSyncData['shopify_campaigns'] ?? [];
+    }
     
     // UPSERT LOGIC
     // Check if report already exists for this exact period and type
