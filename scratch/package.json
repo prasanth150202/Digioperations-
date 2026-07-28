@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "adm-zip": "^0.6.0",
-    "pptxgenjs": "^4.0.1",
-    "puppeteer-core": "^25.3.0"
-  }
-}
