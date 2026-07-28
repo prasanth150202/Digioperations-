@@ -54,8 +54,7 @@ if ($method === 'POST') {
     $industry = trim(bodyGet('industry', ''));
     $platform = trim(bodyGet('platform', ''));
     if (!$name) json_err('Brand name required');
-    $slug = strtolower(preg_replace('/[^a-z0-9]+/', '-', $name));
-    $slug = trim($slug, '-');
+    $slug = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($name)), '-');
     if (dbGet('SELECT id FROM brands WHERE slug=?', [$slug])) json_err('Brand already exists', 409);
     $bid = uuid4();
     
