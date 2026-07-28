@@ -439,7 +439,7 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
                 $metaCreatives[] = [
                     'name' => $ad['ad_name'] ?? 'Ad Creative',
                     'ctr' => number_format((float)($ad['ctr'] ?? 0.0), 1) . '%',
-                    'cpa' => $adOrders > 0 ? '₹' . Math.round($adSpend / $adOrders) : '—',
+                    'cpa' => $adOrders > 0 ? '₹' . round($adSpend / $adOrders) : '—',
                     'orders' => $adOrders,
                     'revenue' => round($adRevenue)
                 ];

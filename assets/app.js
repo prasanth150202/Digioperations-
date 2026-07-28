@@ -6899,7 +6899,7 @@ async function testActiveBrandConnections() {
     gsc_site_url: document.getElementById('int-gsc-site-url').value.trim()
   };
   
-  const r = await api(`/api/sync?brand_id=${_editBrandSlug}&action=test_connections`, 'POST', payload);
+  const r = await api(`/api/sync.php?brand_id=${_editBrandSlug}&action=test_connections`, 'POST', payload);
   if (r && r.ok) {
     statusEl.textContent = `Shopify: ${r.shopify}, Meta: ${r.meta}, Google: ${r.google_ads}, GA4: ${r.ga4}, GSC: ${r.gsc}`;
     statusEl.style.color = '#10B981';
@@ -6980,7 +6980,10 @@ function renderMonthlyReportsTable() {
     const roas = typeof h.overall_roas === 'number' ? Number(h.overall_roas).toFixed(2) + 'x' : '—';
     const created = h.created_at ? new Date(h.created_at).toLocaleDateString() : '—';
     
-    const viewUrl = `/monthly-report.html?token=${h.shared_link || h.id}`;
+    // Use unique_token (from report_links join) as the deck URL parameter
+    const token = h.unique_token || h.shared_link || h.id;
+    const viewUrl = `/monthly-report.html?token=${token}`;
+    const fullShareUrl = window.location.origin + viewUrl;
 
     return `<tr>
       <td style="font-weight:700;color:var(--dark)">${h.brand_name || '—'}</td>
@@ -6989,10 +6992,13 @@ function renderMonthlyReportsTable() {
       <td style="font-family:var(--fm)">${rev}</td>
       <td style="font-family:var(--fm);font-weight:700;color:#10B981">${roas}</td>
       <td style="font-size:11px;color:var(--mid)">${created}</td>
-      <td><a href="${viewUrl}" target="_blank" style="font-size:11px;color:var(--blue);font-weight:700">Open Deck View ↗</a></td>
       <td>
-        <div style="display:flex;gap:4px">
-          <button class="btn sm" onclick="window.open('${viewUrl}','_blank')">👁 View</button>
+        <input type="text" readonly value="${fullShareUrl}" onclick="this.select()" style="width:100%;max-width:200px;font-size:10px;padding:4px 6px;border:1px solid var(--border);border-radius:5px;background:var(--off);color:var(--fg);cursor:pointer" title="Click to select share link">
+      </td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn sm" onclick="window.open('${viewUrl}','_blank')">👁 View Deck</button>
+          <button class="btn sm" onclick="navigator.clipboard.writeText('${fullShareUrl}').then(()=>showToast('Share link copied!','success'))" style="background:rgba(67,97,238,0.1);color:var(--blue);border:1px solid rgba(67,97,238,0.2)">🔗 Copy</button>
           <button class="btn sm danger" onclick="deleteMonthlyReport('${h.id}')">🗑 Delete</button>
         </div>
       </td>
@@ -7140,10 +7146,13 @@ async function submitGenerateMonthlyReport() {
   try {
     const r = await api('/api/reports?action=create', 'POST', payload);
     if (r && r.ok) {
-      showToast('Monthly performance deck created successfully!', 'success');
-      const viewUrl = `/monthly-report.html?token=${r.shared_link || r.id}`;
+      showToast('Monthly performance deck created successfully! Opening deck...', 'success');
+      // Reload list to get unique_token, then open
+      await initMonthlyReportsPage();
+      backToMonthlyList();
+      // Open the newly created report using its ID
+      const viewUrl = `/monthly-report.html?id=${r.report_id}`;
       window.open(viewUrl, '_blank');
-      initMonthlyReportsPage();
     } else {
       alert(r?.error || 'Failed to generate monthly report.');
     }
@@ -7158,7 +7167,7 @@ async function submitGenerateMonthlyReport() {
 async function deleteMonthlyReport(id) {
   if (!confirm('Are you sure you want to delete this monthly deck report? This cannot be undone.')) return;
   try {
-    const r = await api(`/api/reports?id=${id}`, 'DELETE');
+    const r = await api(`/api/reports?action=delete&id=${id}`, 'DELETE');
     if (r && r.ok) {
       showToast('Report deleted successfully.', 'success');
       initMonthlyReportsPage();

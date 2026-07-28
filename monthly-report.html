@@ -1038,18 +1038,28 @@
         // ── DYNAMIC METRICS BINDING ──
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token') || '';
+        const directId = urlParams.get('id') || '';
 
-        if (token) {
-            fetch(`/api/report-view.php?token=${token}`)
+        if (token || directId) {
+            const apiUrl = directId
+                ? `/api/report-view.php?id=${directId}`
+                : `/api/report-view.php?token=${token}`;
+            
+            fetch(apiUrl)
                 .then(res => res.json())
                 .then(res => {
                     if (res && res.ok) {
                         bindReportData(res.report);
                     } else {
-                        alert('Failed to load monthly report parameters: ' + (res.error || 'unreachable'));
+                        alert('Failed to load monthly report: ' + (res.error || 'unreachable'));
                     }
                 })
-                .catch(err => console.error(err));
+                .catch(err => {
+                    console.error('Failed to fetch report:', err);
+                    alert('Network error loading report. Please try again.');
+                });
+        } else {
+            alert('No report token or ID provided in URL.');
         }
 
         function bindReportData(report) {

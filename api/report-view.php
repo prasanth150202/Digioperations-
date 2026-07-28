@@ -3,26 +3,42 @@
 require_once __DIR__ . '/config.php';
 
 $token = $_GET['token'] ?? '';
-if (!$token) {
-    json_err('Token required', 400);
+$directId = $_GET['id'] ?? '';
+
+if (!$token && !$directId) {
+    json_err('Token or ID required', 400);
 }
 
-// 1. Resolve token via report_links
-$link = dbGet('SELECT * FROM report_links WHERE unique_token=?', [$token]);
-$reportId = $link ? $link['report_id'] : $token;
+$link = null;
+$report = null;
 
-// 2. Fetch report
-$report = dbGet('SELECT r.*, b.name as brand_name 
-                 FROM reports r 
-                 JOIN brands b ON b.id = r.brand_id 
-                 WHERE r.id=?', [$reportId]);
-
-if (!$report) {
-    // Check if token matches shared_link directly
+if ($directId) {
+    // Direct lookup by report ID (used after generation)
     $report = dbGet('SELECT r.*, b.name as brand_name 
                      FROM reports r 
                      JOIN brands b ON b.id = r.brand_id 
-                     WHERE r.shared_link=?', [$token]);
+                     WHERE r.id=?', [$directId]);
+    if ($report) {
+        $link = dbGet('SELECT * FROM report_links WHERE report_id=?', [$report['id']]);
+    }
+} else {
+    // 1. Resolve token via report_links
+    $link = dbGet('SELECT * FROM report_links WHERE unique_token=?', [$token]);
+    $reportId = $link ? $link['report_id'] : $token;
+    
+    // 2. Fetch report
+    $report = dbGet('SELECT r.*, b.name as brand_name 
+                     FROM reports r 
+                     JOIN brands b ON b.id = r.brand_id 
+                     WHERE r.id=?', [$reportId]);
+    
+    if (!$report) {
+        // Check if token matches shared_link directly
+        $report = dbGet('SELECT r.*, b.name as brand_name 
+                         FROM reports r 
+                         JOIN brands b ON b.id = r.brand_id 
+                         WHERE r.shared_link=?', [$token]);
+    }
 }
 
 if (!$report) {
