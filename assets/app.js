@@ -2584,7 +2584,7 @@ function setVariantExtraOverride(pid, vid, label, val) {
 async function deleteBrand(slug, name) {
   if (!confirm(`Delete brand "${name}"?\n\nThis will permanently remove all budget months, daily data, and pricing data for this brand. Reports are kept.\n\nThis cannot be undone.`)) return;
   const r = await api(`/api/brands/${slug}`, 'DELETE');
-  if (!r || !r.ok) return showToast('Failed to delete brand', 'error');
+  if (!r || !r.ok) return showToast(r?.error || 'Failed to delete brand (you may need superadmin access)', 'error');
   allBrands = allBrands.filter(b => b.slug !== slug);
   showToast(`Brand "${name}" deleted`, 'success');
   renderAdminBrands();
@@ -6849,25 +6849,36 @@ function setIntegrationTab(tab) {
 async function submitEditBrand() {
   if (!_editBrandSlug) return;
   
-  const payload = {
-    integrations_json: {
-      shopify_enabled: document.getElementById('int-shopify-enabled').checked,
-      shopify_subdomain: document.getElementById('int-shopify-subdomain').value.trim(),
-      shopify_access_token: document.getElementById('int-shopify-token').value.trim(),
-      
-      meta_ad_account_ids: document.getElementById('int-meta-accounts').value.trim(),
-      meta_access_token: document.getElementById('int-meta-token').value.trim(),
-      
-      google_ads_enabled: document.getElementById('int-google-enabled').checked,
-      google_ads_customer_id: document.getElementById('int-google-customer-id').value.trim(),
-      google_ads_mcc_id: document.getElementById('int-google-mcc-id').value.trim(),
-      
-      ga4_property_id: document.getElementById('int-ga4-property-id').value.trim(),
-      gsc_site_url: document.getElementById('int-gsc-site-url').value.trim()
-    }
+  // Helper: if field shows the masked placeholder (starts with •), don't send it
+  // so the backend merge logic keeps the existing stored token unchanged.
+  const MASK_CHAR = '\u2022'; // bullet •
+  const readToken = (id) => {
+    const val = document.getElementById(id).value.trim();
+    return val.startsWith(MASK_CHAR) ? null : val; // null = keep existing
   };
   
-  const r = await api('/api/brands/' + _editBrandSlug, 'PUT', payload);
+  const shopifyToken = readToken('int-shopify-token');
+  const metaToken = readToken('int-meta-token');
+  
+  const intPayload = {
+    shopify_enabled: document.getElementById('int-shopify-enabled').checked,
+    shopify_subdomain: document.getElementById('int-shopify-subdomain').value.trim(),
+    
+    meta_ad_account_ids: document.getElementById('int-meta-accounts').value.trim(),
+    
+    google_ads_enabled: document.getElementById('int-google-enabled').checked,
+    google_ads_customer_id: document.getElementById('int-google-customer-id').value.trim(),
+    google_ads_mcc_id: document.getElementById('int-google-mcc-id').value.trim(),
+    
+    ga4_property_id: document.getElementById('int-ga4-property-id').value.trim(),
+    gsc_site_url: document.getElementById('int-gsc-site-url').value.trim()
+  };
+  
+  // Only include tokens if they were actually changed (not masked placeholder)
+  if (shopifyToken !== null) intPayload.shopify_access_token = shopifyToken;
+  if (metaToken !== null) intPayload.meta_access_token = metaToken;
+  
+  const r = await api('/api/brands/' + _editBrandSlug, 'PUT', { integrations_json: intPayload });
   if (r && r.ok) {
     showToast('Brand integrations saved!', 'success');
     closeMo('mo-edit-brand');
@@ -6880,16 +6891,19 @@ async function submitEditBrand() {
 async function testActiveBrandConnections() {
   if (!_editBrandSlug) return;
   const statusEl = document.getElementById('int-test-status');
-  statusEl.textContent = 'Testing connection...';
+  statusEl.innerHTML = 'Testing connections... <em style="font-weight:400">(this may take up to 15 seconds)</em>';
   statusEl.style.color = '#d97706';
   
+  // Send only the non-sensitive, non-token fields plus the brand slug.
+  // PHP will read tokens directly from the DB — this avoids the masking mismatch.
   const payload = {
     shopify_enabled: document.getElementById('int-shopify-enabled').checked,
     shopify_subdomain: document.getElementById('int-shopify-subdomain').value.trim(),
-    shopify_access_token: document.getElementById('int-shopify-token').value.trim(),
+    // Tokens: if masked (starts with •), send empty string so PHP falls back to DB
+    shopify_access_token: (() => { const v = document.getElementById('int-shopify-token').value.trim(); return v.startsWith('\u2022') ? '' : v; })(),
     
     meta_ad_account_ids: document.getElementById('int-meta-accounts').value.trim(),
-    meta_access_token: document.getElementById('int-meta-token').value.trim(),
+    meta_access_token: (() => { const v = document.getElementById('int-meta-token').value.trim(); return v.startsWith('\u2022') ? '' : v; })(),
     
     google_ads_enabled: document.getElementById('int-google-enabled').checked,
     google_ads_customer_id: document.getElementById('int-google-customer-id').value.trim(),
@@ -6899,12 +6913,28 @@ async function testActiveBrandConnections() {
     gsc_site_url: document.getElementById('int-gsc-site-url').value.trim()
   };
   
-  const r = await api(`/api/sync.php?brand_id=${_editBrandSlug}&action=test_connections`, 'POST', payload);
-  if (r && r.ok) {
-    statusEl.textContent = `Shopify: ${r.shopify}, Meta: ${r.meta}, Google: ${r.google_ads}, GA4: ${r.ga4}, GSC: ${r.gsc}`;
-    statusEl.style.color = '#10B981';
-  } else {
-    statusEl.textContent = 'Connection test failed: ' + (r?.error || 'unreachable');
+  try {
+    const r = await api(`/api/sync.php?brand_id=${_editBrandSlug}&action=test_connections`, 'POST', payload);
+    if (r && r.ok) {
+      const statusMap = {
+        'Connected': '<span style="color:#10B981;font-weight:800">✓ Connected</span>',
+        'disabled': '<span style="color:#94a3b8">— Not configured</span>',
+      };
+      const fmt = (v) => statusMap[v] || `<span style="color:#ef4444;font-weight:700">✗ ${v}</span>`;
+      statusEl.innerHTML = [
+        `<strong>Shopify:</strong> ${fmt(r.shopify)}`,
+        `<strong>Meta:</strong> ${fmt(r.meta)}`,
+        `<strong>Google Ads:</strong> ${fmt(r.google_ads)}`,
+        `<strong>GA4:</strong> ${fmt(r.ga4)}`,
+        `<strong>GSC:</strong> ${fmt(r.gsc)}`
+      ].join(' &nbsp;|&nbsp; ');
+      statusEl.style.color = '';
+    } else {
+      statusEl.textContent = 'Connection test failed: ' + (r?.error || 'Server unreachable');
+      statusEl.style.color = '#ef4444';
+    }
+  } catch(e) {
+    statusEl.textContent = 'Test failed: ' + e.message;
     statusEl.style.color = '#ef4444';
   }
 }

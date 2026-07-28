@@ -78,42 +78,55 @@ if ($action === 'test_connections') {
     $res = ['shopify' => 'disabled', 'meta' => 'disabled', 'google_ads' => 'disabled', 'ga4' => 'disabled', 'gsc' => 'disabled'];
     
     // 1. Shopify
-    if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !empty($int['shopify_access_token'])) {
+    if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && (!empty($int['shopify_access_token']) || true)) {
         $sub = $int['shopify_subdomain'];
-        $tok = $int['shopify_access_token'];
-        if ($tok === str_repeat('·', 8)) {
-            // Retrieve actual token from DB
+        $tok = $int['shopify_access_token'] ?? '';
+        // If token is empty or looks like a masked value, fetch real token from DB
+        if (empty($tok) || $tok === str_repeat('·', 8) || $tok === str_repeat('•', 16)) {
             $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
             $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
             $tok = $dbInt['shopify_access_token'] ?? '';
         }
         
-        $ch = curl_init("https://{$sub}.myshopify.com/admin/api/2025-01/shop.json");
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-Shopify-Access-Token: {$tok}"]);
-        curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        $res['shopify'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
+        if (!empty($sub) && !empty($tok)) {
+            $ch = curl_init("https://{$sub}.myshopify.com/admin/api/2025-01/shop.json");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-Shopify-Access-Token: {$tok}"]);
+            curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            $res['shopify'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
+        } else {
+            $res['shopify'] = 'disabled';
+        }
     }
     
     // 2. Meta
-    if (!empty($int['meta_access_token']) && !empty($int['meta_ad_account_ids'])) {
-        $tok = $int['meta_access_token'];
-        if ($tok === str_repeat('·', 8)) {
+    if (!empty($int['meta_ad_account_ids'])) {
+        $tok = $int['meta_access_token'] ?? '';
+        // If token is empty or masked, fetch from DB
+        if (empty($tok) || $tok === str_repeat('·', 8) || $tok === str_repeat('•', 16)) {
             $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
             $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
             $tok = $dbInt['meta_access_token'] ?? '';
         }
         $accts = array_filter(array_map('trim', explode(',', $int['meta_ad_account_ids'])));
-        if (!empty($accts)) {
+        if (!empty($accts) && !empty($tok)) {
             $testAcct = $accts[0];
-            $ch = curl_init("https://graph.facebook.com/v21.0/{$testAcct}/insights?limit=1&access_token={$tok}");
+            // Auto-add act_ prefix if not present (Meta Graph API requires it)
+            if (!str_starts_with($testAcct, 'act_')) $testAcct = 'act_' . $testAcct;
+            $ch = curl_init("https://graph.facebook.com/v21.0/{$testAcct}?fields=id,name&access_token={$tok}");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
             curl_exec($ch);
             $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
             $res['meta'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
+        } else {
+            $res['meta'] = 'disabled';
         }
     }
     
@@ -129,6 +142,8 @@ if ($action === 'test_connections') {
             $q = "SELECT campaign.id FROM campaign LIMIT 1";
             $ch = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 "Authorization: Bearer {$gAccessToken}",
@@ -148,12 +163,13 @@ if ($action === 'test_connections') {
             $gaPid = $int['ga4_property_id'];
             $ch = curl_init("https://analyticsdata.googleapis.com/v1beta/properties/{$gaPid}:runReport");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 "Authorization: Bearer {$gAccessToken}",
                 "Content-Type: application/json"
             ]);
-            // Empty payload request
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
                 'dateRanges' => [['startDate' => date('Y-m-d'), 'endDate' => date('Y-m-d')]],
                 'metrics' => [['name' => 'sessions']]
@@ -169,6 +185,8 @@ if ($action === 'test_connections') {
             $gscUrl = urlencode($int['gsc_site_url']);
             $ch = curl_init("https://www.googleapis.com/webmasters/v3/sites/{$gscUrl}/searchAnalytics/query");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 "Authorization: Bearer {$gAccessToken}",
@@ -384,6 +402,9 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
     $metaDaily = [];
     
     foreach ($accts as $acct) {
+        // Auto-add act_ prefix if not present (Meta Graph API requires it)
+        if (!str_starts_with($acct, 'act_')) $acct = 'act_' . $acct;
+        
         // 1. Campaign Breakdown
         $cf = urlencode("campaign_name,spend,impressions,clicks,actions,action_values");
         $curlUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$cf}&level=campaign&time_range=" . urlencode($timeRange) . "&limit=100&access_token={$metaToken}";

@@ -1817,24 +1817,25 @@
           <label for="int-shopify-enabled" style="font-weight:700;cursor:pointer;margin:0;font-size:12.5px;color:var(--dark)">Enable Shopify Sync</label>
         </div>
         <div class="field" style="margin-bottom:10px">
-          <label>Store Subdomain (e.g. "blackape" for blackape.myshopify.com)</label>
-          <input id="int-shopify-subdomain" placeholder="blackape">
+          <label>Store Subdomain &mdash; enter just the subdomain (e.g. <code>blackape</code> for blackape.myshopify.com)</label>
+          <input id="int-shopify-subdomain" placeholder="your-store-name">
         </div>
         <div class="field">
-          <label>Admin API Access Token (starts with shpat_)</label>
-          <input type="password" id="int-shopify-token" placeholder="shpat_••••••••••••••••">
+          <label>Admin API Access Token &mdash; starts with <code>shpat_</code></label>
+          <input type="password" id="int-shopify-token" placeholder="Paste token here (shpat_...)">
         </div>
       </div>
 
       <!-- Meta Ads Tab content -->
       <div id="panel-int-meta" class="integration-panel-tab" style="display:none">
         <div class="field" style="margin-bottom:10px">
-          <label>Ad Account IDs (comma-separated, e.g. act_12345, act_67890)</label>
-          <input id="int-meta-accounts" placeholder="act_••••••••">
+          <label>Ad Account ID(s) &mdash; enter numeric IDs only, comma-separated. The <code>act_</code> prefix is added automatically.<br>
+          <span style="font-size:10.5px;color:var(--mid)">Example: <code>123456789</code> or <code>123456789, 987654321</code></span></label>
+          <input id="int-meta-accounts" placeholder="123456789" style="font-family:var(--fm)">
         </div>
         <div class="field">
-          <label>System User Access Token</label>
-          <input type="password" id="int-meta-token" placeholder="EAABw••••••••">
+          <label>System User Access Token &mdash; long-lived token from Meta Business Manager</label>
+          <input type="password" id="int-meta-token" placeholder="Paste token here (EAABw...)">
         </div>
       </div>
 
@@ -1845,39 +1846,40 @@
           <label for="int-google-enabled" style="font-weight:700;cursor:pointer;margin:0;font-size:12.5px;color:var(--dark)">Enable Google Ads Sync</label>
         </div>
         <div class="field" style="margin-bottom:10px">
-          <label>Google Ads Customer ID (Ad Account ID)</label>
-          <input id="int-google-customer-id" placeholder="123-456-7890">
+          <label>Google Ads Customer ID &mdash; format: <code>123-456-7890</code> (found in Google Ads top bar)</label>
+          <input id="int-google-customer-id" placeholder="123-456-7890" style="font-family:var(--fm)">
         </div>
         <div class="field">
-          <label>Manager Customer ID (MCC) (optional, fallback to Customer ID)</label>
-          <input id="int-google-mcc-id" placeholder="987-654-3210">
+          <label>Manager Customer ID (MCC) &mdash; optional, only if ads are managed via an MCC account</label>
+          <input id="int-google-mcc-id" placeholder="987-654-3210 (optional)" style="font-family:var(--fm)">
         </div>
       </div>
 
       <!-- GA4 Tab content -->
       <div id="panel-int-ga4" class="integration-panel-tab" style="display:none">
         <div class="field">
-          <label>GA4 Property ID (e.g. 123456789)</label>
-          <input id="int-ga4-property-id" placeholder="123456789">
+          <label>GA4 Property ID &mdash; numeric only (e.g. <code>123456789</code>), found in GA4 Admin &rarr; Property Settings</label>
+          <input id="int-ga4-property-id" placeholder="123456789" style="font-family:var(--fm)">
         </div>
       </div>
 
       <!-- GSC Tab content -->
       <div id="panel-int-gsc" class="integration-panel-tab" style="display:none">
         <div class="field">
-          <label>Search Console Site URL (exact verified property, e.g. sc-domain:blackape.in or https://blackape.in/)</label>
-          <input id="int-gsc-site-url" placeholder="sc-domain:blackape.in">
+          <label>Search Console Site URL &mdash; must be the exact verified property URL<br>
+          <span style="font-size:10.5px;color:var(--mid)">Domain property: <code>sc-domain:yourdomain.com</code> &nbsp;|&nbsp; URL prefix: <code>https://yourdomain.com/</code></span></label>
+          <input id="int-gsc-site-url" placeholder="sc-domain:yourdomain.com">
         </div>
       </div>
     </div>
 
     <!-- Connection Test Panel -->
-    <div style="margin-top:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:#f8fafc;display:flex;align-items:center;justify-content:space-between">
-      <div style="font-size:11.5px;font-weight:600;color:var(--dark)">
-        <span>Connection Test: </span>
-        <span id="int-test-status" style="color:var(--mid)">Not checked</span>
+    <div style="margin-top:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:#f8fafc">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:11.5px;font-weight:700;color:var(--dark)">Connection Test</div>
+        <button class="btn sm" onclick="testActiveBrandConnections()" style="padding:4px 10px;font-size:10.5px">&#9889; Test All Connections</button>
       </div>
-      <button class="btn sm" onclick="testActiveBrandConnections()" style="padding:4px 10px;font-size:10.5px">Test Connection</button>
+      <div id="int-test-status" style="color:var(--mid);font-size:11.5px;line-height:1.8">Not tested yet. Click "Test All Connections" to verify your API credentials.</div>
     </div>
 
     <div style="margin-top:20px;display:flex;justify-content:flex-end;gap:8px">
