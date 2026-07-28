@@ -6914,30 +6914,39 @@ let allMonthlyReportsCache = [];
 let syncedMonthlyData = null;
 
 async function initMonthlyReportsPage() {
-  const list = document.getElementById('monthly-tbody');
-  
-  // Reset subviews
-  document.getElementById('monthly-list-view').style.display = 'block';
-  document.getElementById('monthly-create-view').style.display = 'none';
-  
-  // Initialize brand filter select
-  const brandFilter = document.getElementById('monthly-filter-brand');
-  if (brandFilter) {
-    brandFilter.innerHTML = '<option value="">All Brands</option>' + 
-      allBrands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
-    if (!brandFilter.dataset.initialized) {
-      brandFilter.value = activeBrand ? activeBrand.id : '';
-      brandFilter.dataset.initialized = 'true';
-    }
-  }
-
-  list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--mid);padding:24px 0">Loading monthly reports…</td></tr>`;
   try {
-    const r = await api('/api/reports?action=list');
-    allMonthlyReportsCache = r || [];
-    renderMonthlyReportsTable();
-  } catch (e) {
-    list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px 0">Failed to load reports: ${e.message}</td></tr>`;
+    const list = document.getElementById('monthly-tbody');
+    if (!list) {
+      alert("Error: monthly-tbody element not found in DOM! Your browser might still be serving a cached version of app.html.");
+      return;
+    }
+    
+    const listView = document.getElementById('monthly-list-view');
+    const createView = document.getElementById('monthly-create-view');
+    if (listView) listView.style.display = 'block';
+    if (createView) createView.style.display = 'none';
+    
+    const brandFilter = document.getElementById('monthly-filter-brand');
+    if (brandFilter) {
+      brandFilter.innerHTML = '<option value="">All Brands</option>' + 
+        allBrands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+      if (!brandFilter.dataset.initialized) {
+        brandFilter.value = activeBrand ? activeBrand.id : '';
+        brandFilter.dataset.initialized = 'true';
+      }
+    }
+
+    list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--mid);padding:24px 0">Loading monthly reports…</td></tr>`;
+    try {
+      const r = await api('/api/reports?action=list');
+      allMonthlyReportsCache = r || [];
+      renderMonthlyReportsTable();
+    } catch (e) {
+      list.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px 0">Failed to load reports: ${e.message}</td></tr>`;
+    }
+  } catch (globalError) {
+    alert("Global initialization crash: " + globalError.message);
+    console.error(globalError);
   }
 }
 
