@@ -12,7 +12,7 @@ const NAV = [
     { id:'pricing',   label:'Pricing Calculator',icon:'💰', sub:'Margin & price analysis'  },
     { id:'catalog',   label:'Price Catalog',     icon:'📋', sub:'Searchable price lookup'  },
     { id:'budget',    label:'Budget Tracker',    icon:'📊', sub:'Monthly performance & ROAS'},
-    { id:'reports',   label:'Reports Generator', icon:'📄', sub:'Weekly & monthly summaries' },
+    { id:'reports',   label:'Weekly Report Generator', icon:'📄', sub:'Weekly summaries' },
   ]},
   { group:'Admin', adminOnly:true, items:[
     { id:'admin',     label:'User Management',   icon:'👥', sub:'Users & permissions'      },
@@ -168,7 +168,7 @@ function showPage(id) {
     pricing: 'Pricing Calculator', 
     catalog: 'Price Catalog', 
     budget: 'Budget Tracker', 
-    reports: 'Reports Generator',
+    reports: 'Weekly Report Generator',
     admin: 'User Management',
     activity: 'Activity Logs'
   };
