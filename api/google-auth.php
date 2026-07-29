@@ -9,15 +9,26 @@ if ($user['role'] !== 'superadmin') {
 
 $action = $_GET['action'] ?? '';
 
+// This app runs behind a reverse proxy that terminates TLS and forwards plain HTTP internally
+// (config.php's session-cookie security check already has to account for this same thing via
+// X-Forwarded-Proto) — checking $_SERVER['HTTPS'] alone would build an "http://" redirect_uri
+// here even though the public site is HTTPS, which Google would reject as a redirect_uri
+// mismatch against whatever "https://..." URI is registered in Cloud Console.
+function googleRedirectUri(): string {
+    $isSecure = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
+        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+    return ($isSecure ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . '/api/google-auth.php';
+}
+
 // Step 1: Redirect to Google
 if ($action === 'authorize') {
     $clientId = getSetting('google_client_id');
     if (empty($clientId)) {
         die("Error: Google Client ID is not configured. Please save it in System Settings first.");
     }
-    
-    $redirectUri = (empty($_SERVER['HTTPS']) ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'] . '/api/google-auth.php';
-    
+
+    $redirectUri = googleRedirectUri();
+
     // Scopes for GA4, Google Ads, Search Console
     $scopes = [
         'https://www.googleapis.com/auth/adwords',
@@ -44,8 +55,8 @@ $code = $_GET['code'] ?? '';
 if ($code) {
     $clientId = getSetting('google_client_id');
     $clientSecret = getSetting('google_client_secret');
-    $redirectUri = (empty($_SERVER['HTTPS']) ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'] . '/api/google-auth.php';
-    
+    $redirectUri = googleRedirectUri();
+
     $ch = curl_init("https://oauth2.googleapis.com/token");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
