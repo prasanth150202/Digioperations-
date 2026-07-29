@@ -104,6 +104,15 @@ if ($method === 'PUT' && $id) {
                 $merged[$k] = $existing[$k];
             }
         }
+        // Normalize the Shopify subdomain field on save — the label asks for just the bare
+        // subdomain, but pasting a full URL (e.g. "http://blackape.myshopify.com") silently
+        // breaks the sync/test URL later ("https://http://blackape.myshopify.com.myshopify.com").
+        if (!empty($merged['shopify_subdomain'])) {
+            $sd = trim($merged['shopify_subdomain']);
+            $sd = preg_replace('#^https?://#i', '', $sd);
+            $sd = preg_replace('#\.myshopify\.com.*$#i', '', $sd);
+            $merged['shopify_subdomain'] = trim($sd, "/ \t\n\r\0\x0B");
+        }
         $finalIntegrations = json_encode($merged);
     }
     

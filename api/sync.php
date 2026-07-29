@@ -44,6 +44,18 @@ if ($action === 'test_connections') {
     if (!empty($body)) $int = $body;
 }
 
+// Normalize the Shopify subdomain field — the UI asks for just the bare subdomain (e.g.
+// "blackape"), but if someone pastes a full URL (e.g. "http://blackape.myshopify.com") it gets
+// concatenated into "https://http://blackape.myshopify.com.myshopify.com", which fails to
+// resolve and shows up as a connection timeout rather than the actual input mistake.
+if (!empty($int['shopify_subdomain'])) {
+    $sd = trim($int['shopify_subdomain']);
+    $sd = preg_replace('#^https?://#i', '', $sd);
+    $sd = preg_replace('#\.myshopify\.com.*$#i', '', $sd);
+    $sd = trim($sd, "/ \t\n\r\0\x0B");
+    $int['shopify_subdomain'] = $sd;
+}
+
 // ── GOOGLE CLIENT REFRESH TOKEN HELPER ──
 function getGoogleAccessToken() {
     $clientId = getSetting('google_client_id');
@@ -185,7 +197,25 @@ if ($action === 'test_connections') {
 
     foreach ($handles as $key => $ch) {
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $res[$key] = ($code === 200) ? 'Connected' : 'Failed (' . ($code ?: 'timeout') . ')';
+        $errno = curl_errno($ch);
+        if ($code === 200) {
+            $res[$key] = 'Connected';
+        } elseif ($errno === CURLE_OPERATION_TIMEDOUT) {
+            $res[$key] = 'Failed (timeout — server could not reach the endpoint in time)';
+        } elseif ($errno !== 0) {
+            // Any other curl-level failure (DNS resolution, malformed URL, connection refused, SSL, etc.)
+            $res[$key] = 'Failed (' . curl_error($ch) . ')';
+        } else {
+            // Got a real HTTP response back — surface the API's own error message if present,
+            // instead of just the bare status code, so a wrong token/ID is diagnosable at a glance.
+            $body = curl_multi_getcontent($ch);
+            $decoded = json_decode($body, true);
+            $apiMsg = '';
+            if (is_array($decoded)) {
+                $apiMsg = $decoded['error']['message'] ?? $decoded['errors'][0]['message'] ?? $decoded['error_description'] ?? '';
+            }
+            $res[$key] = 'Failed (' . $code . ($apiMsg ? ': ' . mb_strimwidth($apiMsg, 0, 90, '…') : '') . ')';
+        }
         curl_multi_remove_handle($mh, $ch);
         curl_close($ch);
     }
