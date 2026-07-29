@@ -908,6 +908,15 @@
                   <div class="field" style="margin-bottom:0"><label style="font-size:10.5px">Orders</label><input type="number" id="manual-mp-orders" value="0" style="height:32px"></div>
                 </div>
               </div>
+              <div style="border:1px solid var(--border);padding:14px;border-radius:10px;background:#f8fafc">
+                <div style="font-weight:700;font-size:12.5px;color:var(--dark);margin-bottom:12px;display:flex;align-items:center;gap:6px">🔔 Push Notifications</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                  <div class="field" style="margin-bottom:0"><label style="font-size:10.5px">Sent</label><input type="number" id="manual-push-sent" value="0" style="height:32px"></div>
+                  <div class="field" style="margin-bottom:0"><label style="font-size:10.5px">Revenue (₹)</label><input type="number" id="manual-push-revenue" value="0" style="height:32px"></div>
+                  <div class="field" style="margin-bottom:0"><label style="font-size:10.5px">Open Rate %</label><input type="number" step="0.01" id="manual-push-open" value="0" style="height:32px"></div>
+                  <div class="field" style="margin-bottom:0"><label style="font-size:10.5px">Click Rate %</label><input type="number" step="0.01" id="manual-push-click" value="0" style="height:32px"></div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1821,8 +1830,8 @@
           <input id="int-shopify-subdomain" placeholder="your-store-name">
         </div>
         <div class="field">
-          <label>Admin API Access Token &mdash; starts with <code>shpat_</code></label>
-          <input type="password" id="int-shopify-token" placeholder="Paste token here (shpat_...)">
+          <label>Admin API Access Token &mdash; starts with <code>shpat_</code> or <code>shpca_</code></label>
+          <input type="password" id="int-shopify-token" placeholder="Paste token here (shpat_... or shpca_...)">
         </div>
       </div>
 

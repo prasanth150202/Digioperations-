@@ -250,6 +250,25 @@ function db(): PDO {
             }
         } catch (Throwable $migrationErr) {}
 
+        // Self-healing migration for shopify_customer_orders table (feeds the monthly deck's
+        // repeat-purchase cohort matrix — accumulates across syncs since cohort behavior can only
+        // be measured by comparing a customer's orders across multiple calendar months over time).
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `shopify_customer_orders` (
+              `id`                 VARCHAR(36)  NOT NULL PRIMARY KEY,
+              `brand_id`           VARCHAR(36)  NOT NULL,
+              `shopify_order_id`   VARCHAR(64)  NOT NULL,
+              `shopify_customer_id` VARCHAR(64) NOT NULL,
+              `order_date`         DATE         NOT NULL,
+              `order_value`        DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+              `created_at`         DATETIME     NOT NULL DEFAULT NOW(),
+              UNIQUE KEY `uniq_sco_order` (`brand_id`, `shopify_order_id`),
+              KEY `idx_sco_customer` (`brand_id`, `shopify_customer_id`),
+              KEY `idx_sco_date` (`brand_id`, `order_date`),
+              CONSTRAINT `fk_sco_brand` FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        } catch (Throwable $migrationErr) {}
+
         // Seed intelligence API key settings rows if not present
         try {
             foreach (['firecrawl_api_key','tavily_api_key','serpapi_api_key','jina_api_key'] as $k) {

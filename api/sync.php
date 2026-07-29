@@ -251,13 +251,18 @@ $syncGSCCount = 0;
 
 $metaCampaigns = [];
 $metaCreatives = [];
+$metaAdAudit = new stdClass();
 $googleCampaigns = [];
+$googleAdAudit = new stdClass();
+$googleSearchAds = [];
 $ga4Channels = [];
+$ga4Funnel = [];
 $gscPages = [];
 $gscQueries = [];
 $shopifyProducts = [];
 $shopifyLocations = [];
 $shopifyCampaigns = [];
+$cohortMatrix = [];
 
 // ── CRAWL THIRD-PARTY APIS FOR RANGE ──
 
@@ -336,17 +341,8 @@ if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !emp
             }
         }
         
-        // Aggregates for reports (products, cities)
-        foreach ($order['line_items'] ?? [] as $item) {
-            $name = trim($item['title'] ?? '');
-            if (empty($name)) continue;
-            $qty = (int)($item['quantity'] ?? 0);
-            $price = (float)($item['price'] ?? 0.0);
-            if (!isset($prodAgg[$name])) $prodAgg[$name] = ['name' => $name, 'orders' => 0, 'revenue' => 0];
-            $prodAgg[$name]['orders'] += $qty;
-            $prodAgg[$name]['revenue'] += ($qty * $price);
-        }
-        
+        // Shipping region — computed before line items so each product can be cross-referenced
+        // against the region of the order it shipped in (see Product×Region aggregation below).
         $addr = $order['shipping_address'] ?? $order['billing_address'] ?? [];
         $city = trim($addr['city'] ?? 'Unknown');
         $prov = trim($addr['province'] ?? '');
@@ -354,7 +350,31 @@ if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !emp
         if (!isset($cityAgg[$loc])) $cityAgg[$loc] = ['location' => $loc, 'orders' => 0, 'revenue' => 0];
         $cityAgg[$loc]['orders'] += 1;
         $cityAgg[$loc]['revenue'] += $subtotal;
-        
+
+        // Aggregates for reports (products cross-referenced with the region of the order)
+        foreach ($order['line_items'] ?? [] as $item) {
+            $name = trim($item['title'] ?? '');
+            if (empty($name)) continue;
+            $qty = (int)($item['quantity'] ?? 0);
+            $price = (float)($item['price'] ?? 0.0);
+            $lineRevenue = $qty * $price;
+            if (!isset($prodAgg[$name])) $prodAgg[$name] = ['name' => $name, 'orders' => 0, 'revenue' => 0, 'regions' => []];
+            $prodAgg[$name]['orders'] += $qty;
+            $prodAgg[$name]['revenue'] += $lineRevenue;
+            if (!isset($prodAgg[$name]['regions'][$loc])) $prodAgg[$name]['regions'][$loc] = 0;
+            $prodAgg[$name]['regions'][$loc] += $lineRevenue;
+        }
+
+        // Feed the persistent cohort ledger so repeat-purchase behavior can be tracked across
+        // months over time (a single sync only ever sees orders within its own date range).
+        if (!empty($order['id']) && !empty($order['customer']['id'])) {
+            try {
+                dbRun('INSERT INTO shopify_customer_orders (id, brand_id, shopify_order_id, shopify_customer_id, order_date, order_value) VALUES (?,?,?,?,?,?)
+                       ON DUPLICATE KEY UPDATE order_value = VALUES(order_value)',
+                    [uuid4(), $brand['id'], (string)$order['id'], (string)$order['customer']['id'], $date, $subtotal]);
+            } catch (Throwable $e) {}
+        }
+
         // UTM campaign mapping (referral, search)
         $landing = $order['landing_site'] ?? '';
         $referring = $order['referring_site'] ?? '';
@@ -381,16 +401,71 @@ if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !emp
         $utmAgg[$key]['revenue'] += $subtotal;
     }
     
-    // Sort and slice top products/cities
+    // Sort and slice top products, then attach each product's primary shipping region
+    // (Product×Region cross-reference) and its share of total product revenue.
     usort($prodAgg, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
-    $shopifyProducts = array_slice($prodAgg, 0, 8);
-    
+    $shopifyProducts = array_slice($prodAgg, 0, 6);
+    $totalProductRevenue = array_sum(array_column($prodAgg, 'revenue'));
+    foreach ($shopifyProducts as &$p) {
+        $topRegion = 'Unknown';
+        $topRegionRev = -1;
+        foreach ($p['regions'] as $region => $rev) {
+            if ($rev > $topRegionRev) { $topRegionRev = $rev; $topRegion = $region; }
+        }
+        $p['primary_region'] = $topRegion;
+        $p['revenue_share'] = $totalProductRevenue > 0 ? round($p['revenue'] / $totalProductRevenue * 100, 1) : 0;
+        unset($p['regions']);
+    }
+    unset($p);
+
     usort($cityAgg, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
     $shopifyLocations = array_slice($cityAgg, 0, 8);
-    
+
     usort($utmAgg, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
     $shopifyCampaigns = array_slice($utmAgg, 0, 10);
-    
+
+    // ── REPEAT-PURCHASE COHORT MATRIX (from the persistent ledger, not just this period) ──
+    try {
+        $firstOrders = dbAll('SELECT shopify_customer_id, MIN(order_date) AS first_date FROM shopify_customer_orders WHERE brand_id=? GROUP BY shopify_customer_id', [$brand['id']]);
+        $firstMonthByCustomer = [];
+        foreach ($firstOrders as $fo) {
+            $firstMonthByCustomer[$fo['shopify_customer_id']] = substr($fo['first_date'], 0, 7);
+        }
+
+        $allLedgerOrders = dbAll('SELECT shopify_customer_id, order_date FROM shopify_customer_orders WHERE brand_id=?', [$brand['id']]);
+        $ordersByCustomerMonth = [];
+        foreach ($allLedgerOrders as $o) {
+            $ordersByCustomerMonth[$o['shopify_customer_id']][substr($o['order_date'], 0, 7)] = true;
+        }
+
+        $cohorts = [];
+        foreach ($firstMonthByCustomer as $cust => $month) {
+            $cohorts[$month][] = $cust;
+        }
+        ksort($cohorts);
+        $reportMonth = substr($endDate, 0, 7);
+        $recentCohortMonths = array_slice(array_keys($cohorts), -4);
+
+        foreach ($recentCohortMonths as $cohortMonth) {
+            $custIds = $cohorts[$cohortMonth];
+            $cohortSize = count($custIds);
+            $row = ['cohort_month' => $cohortMonth, 'cohort_size' => $cohortSize, 'months' => []];
+            for ($offset = 0; $offset <= 3; $offset++) {
+                $targetMonth = date('Y-m', strtotime($cohortMonth . '-01 +' . $offset . ' months'));
+                if ($targetMonth > $reportMonth) {
+                    $row['months'][$offset] = null; // hasn't happened yet, don't fabricate a value
+                    continue;
+                }
+                $activeCount = 0;
+                foreach ($custIds as $cid) {
+                    if (!empty($ordersByCustomerMonth[$cid][$targetMonth])) $activeCount++;
+                }
+                $row['months'][$offset] = $cohortSize > 0 ? round($activeCount / $cohortSize * 100, 1) : 0.0;
+            }
+            $cohortMatrix[] = $row;
+        }
+    } catch (Throwable $e) {}
+
     $syncShopifyCount = count($orders);
 }
 
@@ -398,9 +473,11 @@ if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !emp
 if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
     $accts = array_filter(array_map('trim', explode(',', $int['meta_ad_account_ids'])));
     $timeRange = json_encode(['since' => $startDate, 'until' => $endDate]);
-    
+
     $metaDaily = [];
-    
+    $metaAnglesTested = 0;
+    $metaPlacementAgg = [];
+
     foreach ($accts as $acct) {
         // Auto-add act_ prefix if not present (Meta Graph API requires it)
         if (!str_starts_with($acct, 'act_')) $acct = 'act_' . $acct;
@@ -437,15 +514,18 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
         }
         
         // 2. Creative Ad breakdown
-        $adf = urlencode("ad_name,spend,ctr,actions,action_values");
+        $adf = urlencode("ad_id,ad_name,spend,ctr,actions,action_values");
         $adUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$adf}&level=ad&limit=50&time_range=" . urlencode($timeRange) . "&access_token={$metaToken}";
-        
+
         $chAd = curl_init($adUrl);
         curl_setopt($chAd, CURLOPT_RETURNTRANSFER, true);
         $respAd = curl_exec($chAd);
         curl_close($chAd);
-        
+
         $adData = json_decode($respAd, true);
+        // "Angles tested" = distinct ads that actually spent budget this period.
+        $metaAnglesTested += count(array_filter($adData['data'] ?? [], fn($ad) => (float)($ad['spend'] ?? 0) > 0));
+
         foreach ($adData['data'] ?? [] as $ad) {
             $adOrders = 0;
             $adRevenue = 0.0;
@@ -458,16 +538,41 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
             }
             if ($adOrders > 0) {
                 $metaCreatives[] = [
+                    'ad_id' => $ad['ad_id'] ?? '',
                     'name' => $ad['ad_name'] ?? 'Ad Creative',
                     'ctr' => number_format((float)($ad['ctr'] ?? 0.0), 1) . '%',
                     'cpa' => $adOrders > 0 ? '₹' . round($adSpend / $adOrders) : '—',
                     'orders' => $adOrders,
-                    'revenue' => round($adRevenue)
+                    'revenue' => round($adRevenue),
+                    'roas' => $adSpend > 0 ? round($adRevenue / $adSpend, 2) : 0
                 ];
             }
         }
-        
-        // 3. Daily Breakdown logs
+
+        // 3. Placement breakdown — which surface (Reels/Stories/Feed) actually won
+        $pf = urlencode("spend,actions,action_values");
+        $placementUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$pf}&level=account&breakdowns=publisher_platform,platform_position&time_range=" . urlencode($timeRange) . "&limit=50&access_token={$metaToken}";
+        $chPl = curl_init($placementUrl);
+        curl_setopt($chPl, CURLOPT_RETURNTRANSFER, true);
+        $respPl = curl_exec($chPl);
+        curl_close($chPl);
+
+        $placementData = json_decode($respPl, true);
+        foreach ($placementData['data'] ?? [] as $row) {
+            $platform = ucwords(str_replace('_', ' ', $row['publisher_platform'] ?? 'unknown'));
+            $position = ucwords(str_replace('_', ' ', $row['platform_position'] ?? ''));
+            $label = $position ? "{$platform} {$position}" : $platform;
+            $pSpend = (float)($row['spend'] ?? 0.0);
+            $pRevenue = 0.0;
+            foreach ($row['action_values'] ?? [] as $av) {
+                if ($av['action_type'] === 'purchase') $pRevenue = (float)$av['value'];
+            }
+            if (!isset($metaPlacementAgg[$label])) $metaPlacementAgg[$label] = ['spend' => 0, 'revenue' => 0];
+            $metaPlacementAgg[$label]['spend'] += $pSpend;
+            $metaPlacementAgg[$label]['revenue'] += $pRevenue;
+        }
+
+        // 4. Daily Breakdown logs
         $df = urlencode("date_start,spend,impressions,clicks,actions,action_values");
         $dailyUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$df}&level=account&time_increment=1&time_range=" . urlencode($timeRange) . "&limit=100&access_token={$metaToken}";
         
@@ -501,6 +606,44 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
     
     usort($metaCreatives, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
     $metaCreatives = array_slice($metaCreatives, 0, 3);
+
+    // Fetch actual creative previews (image/thumbnail/copy/CTA) only for the top 3 winners,
+    // to avoid an expensive per-ad call across the whole account.
+    foreach ($metaCreatives as &$topAd) {
+        if (empty($topAd['ad_id'])) continue;
+        $cf2 = urlencode("creative{thumbnail_url,image_url,body,object_story_spec}");
+        $creativeUrl = "https://graph.facebook.com/v21.0/{$topAd['ad_id']}?fields={$cf2}&access_token={$metaToken}";
+        $chCr = curl_init($creativeUrl);
+        curl_setopt($chCr, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($chCr, CURLOPT_TIMEOUT, 10);
+        $respCr = curl_exec($chCr);
+        curl_close($chCr);
+        $crData = json_decode($respCr, true);
+        $creative = $crData['creative'] ?? [];
+        $storySpec = $creative['object_story_spec'] ?? [];
+        $linkData = $storySpec['link_data'] ?? $storySpec['video_data'] ?? [];
+        $topAd['image_url'] = $creative['thumbnail_url'] ?? $creative['image_url'] ?? '';
+        $topAd['body'] = $creative['body'] ?? ($linkData['message'] ?? '');
+        $topAd['cta'] = $linkData['call_to_action']['type'] ?? '';
+    }
+    unset($topAd);
+
+    // Winning placement = highest-ROAS surface that actually spent meaningfully this period.
+    $metaWinningPlacement = '—';
+    $bestPlacementRoas = -1;
+    foreach ($metaPlacementAgg as $label => $m) {
+        if ($m['spend'] <= 0) continue;
+        $roas = $m['revenue'] / $m['spend'];
+        if ($roas > $bestPlacementRoas) { $bestPlacementRoas = $roas; $metaWinningPlacement = $label; }
+    }
+
+    $metaAdAudit = [
+        'angles_tested' => $metaAnglesTested,
+        'winning_placement' => $metaWinningPlacement,
+        'winning_placement_roas' => $bestPlacementRoas > 0 ? round($bestPlacementRoas, 2) : 0,
+        'winning_angle' => $metaCreatives[0]['name'] ?? '—'
+    ];
+
     $syncMetaCount = count($metaCampaigns);
 }
 
@@ -510,9 +653,9 @@ if ($gAccessToken && !empty($int['google_ads_enabled']) && !empty($int['google_a
     $devTok = getSetting('google_developer_token');
     $mcc = !empty($int['google_ads_mcc_id']) ? str_replace('-', '', $int['google_ads_mcc_id']) : $cust;
     
-    // 1. Fetch campaigns details
-    $q = "SELECT campaign.name, metrics.cost_micros, metrics.conversions, metrics.conversions_value, metrics.impressions, metrics.clicks FROM campaign WHERE segments.date BETWEEN '{$startDate}' AND '{$endDate}' AND campaign.status = 'ENABLED' ORDER BY metrics.cost_micros DESC LIMIT 50";
-    
+    // 1. Fetch campaigns details (including network/channel type, for the ad-structure audit)
+    $q = "SELECT campaign.name, campaign.advertising_channel_type, metrics.cost_micros, metrics.conversions, metrics.conversions_value, metrics.impressions, metrics.clicks FROM campaign WHERE segments.date BETWEEN '{$startDate}' AND '{$endDate}' AND campaign.status = 'ENABLED' ORDER BY metrics.cost_micros DESC LIMIT 50";
+
     $ch = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -525,8 +668,9 @@ if ($gAccessToken && !empty($int['google_ads_enabled']) && !empty($int['google_a
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['query' => $q]));
     $resp = curl_exec($ch);
     curl_close($ch);
-    
+
     $json = json_decode($resp, true);
+    $googleNetworkAgg = [];
     foreach ($json['results'] ?? [] as $row) {
         $m = $row['metrics'] ?? [];
         $spend = (float)($m['cost_micros'] ?? 0.0) / 1e6;
@@ -540,8 +684,54 @@ if ($gAccessToken && !empty($int['google_ads_enabled']) && !empty($int['google_a
             'orders' => $orders,
             'roas' => $spend > 0 ? number_format($revenue / $spend, 1) . 'x' : '—'
         ];
+
+        $network = ucwords(strtolower(str_replace('_', ' ', $row['campaign']['advertisingChannelType'] ?? $row['campaign']['advertising_channel_type'] ?? 'Unknown')));
+        if (!isset($googleNetworkAgg[$network])) $googleNetworkAgg[$network] = ['spend' => 0, 'revenue' => 0];
+        $googleNetworkAgg[$network]['spend'] += $spend;
+        $googleNetworkAgg[$network]['revenue'] += $revenue;
     }
-    
+
+    // Winning network = highest-ROAS network that actually spent meaningfully this period.
+    $googleWinningNetwork = '—';
+    $bestNetworkRoas = -1;
+    foreach ($googleNetworkAgg as $label => $m) {
+        if ($m['spend'] <= 0) continue;
+        $roas = $m['revenue'] / $m['spend'];
+        if ($roas > $bestNetworkRoas) { $bestNetworkRoas = $roas; $googleWinningNetwork = $label; }
+    }
+
+    // 1b. Fetch top responsive search ad copy (for the creative preview slide)
+    $googleSearchAds = [];
+    $qAds = "SELECT ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions, metrics.clicks, metrics.conversions_value, metrics.cost_micros FROM ad_group_ad WHERE segments.date BETWEEN '{$startDate}' AND '{$endDate}' AND ad_group_ad.status = 'ENABLED' AND campaign.advertising_channel_type = 'SEARCH' ORDER BY metrics.conversions_value DESC LIMIT 3";
+    $chAds = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+    curl_setopt($chAds, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($chAds, CURLOPT_POST, true);
+    curl_setopt($chAds, CURLOPT_TIMEOUT, 15);
+    curl_setopt($chAds, CURLOPT_HTTPHEADER, [
+        "Authorization: Bearer {$gAccessToken}",
+        "developer-token: {$devTok}",
+        "login-customer-id: {$mcc}",
+        "Content-Type: application/json"
+    ]);
+    curl_setopt($chAds, CURLOPT_POSTFIELDS, json_encode(['query' => $qAds]));
+    $respAds = curl_exec($chAds);
+    curl_close($chAds);
+    $adsJson = json_decode($respAds, true);
+    foreach ($adsJson['results'] ?? [] as $row) {
+        $rsa = $row['adGroupAd']['ad']['responsiveSearchAd'] ?? [];
+        $headlines = array_map(fn($h) => $h['text'] ?? '', $rsa['headlines'] ?? []);
+        $descriptions = array_map(fn($d) => $d['text'] ?? '', $rsa['descriptions'] ?? []);
+        $m = $row['metrics'] ?? [];
+        $aSpend = (float)($m['costMicros'] ?? $m['cost_micros'] ?? 0) / 1e6;
+        $aRevenue = (float)($m['conversionsValue'] ?? $m['conversions_value'] ?? 0);
+        $googleSearchAds[] = [
+            'headline' => $headlines[0] ?? 'Search Ad',
+            'description' => $descriptions[0] ?? '',
+            'clicks' => (int)($m['clicks'] ?? 0),
+            'roas' => $aSpend > 0 ? round($aRevenue / $aSpend, 2) : 0
+        ];
+    }
+
     // 2. Fetch daily logs
     $qDaily = "SELECT segments.date, metrics.cost_micros, metrics.conversions, metrics.conversions_value, metrics.impressions, metrics.clicks FROM campaign WHERE segments.date BETWEEN '{$startDate}' AND '{$endDate}'";
     $chD = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
@@ -571,7 +761,13 @@ if ($gAccessToken && !empty($int['google_ads_enabled']) && !empty($int['google_a
         $googleDaily[$day]['clicks'] += (int)($m['clicks'] ?? 0);
         $googleDaily[$day]['impressions'] += (int)($m['impressions'] ?? 0);
     }
-    
+
+    $googleAdAudit = [
+        'networks_tested' => count($googleNetworkAgg),
+        'winning_network' => $googleWinningNetwork,
+        'winning_network_roas' => $bestNetworkRoas > 0 ? round($bestNetworkRoas, 2) : 0
+    ];
+
     $syncGoogleAdsCount = count($googleCampaigns);
 }
 
@@ -627,6 +823,38 @@ if ($gAccessToken && !empty($int['ga4_property_id'])) {
     }
     
     $syncGA4Count = count($ga4Data['rows'] ?? []);
+
+    // 2. Fetch real ecommerce funnel event counts (session_start / add_to_cart / begin_checkout / purchase)
+    // so the monthly deck's conversion funnel shows actual GA4 data instead of guessed ratios.
+    $ch3 = curl_init("https://analyticsdata.googleapis.com/v1beta/properties/{$gaPid}:runReport");
+    curl_setopt($ch3, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch3, CURLOPT_POST, true);
+    curl_setopt($ch3, CURLOPT_TIMEOUT, 20);
+    curl_setopt($ch3, CURLOPT_HTTPHEADER, [
+        "Authorization: Bearer {$gAccessToken}",
+        "Content-Type: application/json"
+    ]);
+    curl_setopt($ch3, CURLOPT_POSTFIELDS, json_encode([
+        'dateRanges' => [['startDate' => $startDate, 'endDate' => $endDate]],
+        'dimensions' => [['name' => 'eventName']],
+        'metrics' => [['name' => 'eventCount']],
+        'dimensionFilter' => [
+            'filter' => [
+                'fieldName' => 'eventName',
+                'inListFilter' => ['values' => ['session_start', 'add_to_cart', 'begin_checkout', 'purchase']]
+            ]
+        ]
+    ]));
+    $resp3 = curl_exec($ch3);
+    curl_close($ch3);
+
+    $ga4EventData = json_decode($resp3, true);
+    $ga4Funnel = ['session_start' => 0, 'add_to_cart' => 0, 'begin_checkout' => 0, 'purchase' => 0];
+    foreach ($ga4EventData['rows'] ?? [] as $row) {
+        $ev = $row['dimensionValues'][0]['value'] ?? '';
+        $cnt = (int)($row['metricValues'][0]['value'] ?? 0);
+        if (isset($ga4Funnel[$ev])) $ga4Funnel[$ev] = $cnt;
+    }
 }
 
 // E. GSC API
@@ -802,13 +1030,18 @@ $outData = [
     'sync_gsc' => $syncGSCCount,
     'meta_campaigns' => $metaCampaigns,
     'meta_creatives' => $metaCreatives,
+    'meta_ad_audit' => $metaAdAudit,
     'google_campaigns' => $googleCampaigns,
+    'google_ad_audit' => $googleAdAudit,
+    'google_search_ads' => $googleSearchAds,
     'ga4_channels' => $ga4Channels,
+    'ga4_funnel' => $ga4Funnel,
     'gsc_pages' => $gscPages,
     'gsc_queries' => $gscQueries,
     'shopify_products' => $shopifyProducts,
     'shopify_locations' => $shopifyLocations,
-    'shopify_campaigns' => $shopifyCampaigns
+    'shopify_campaigns' => $shopifyCampaigns,
+    'cohort_matrix' => $cohortMatrix
 ];
 
 if (php_sapi_name() === 'cli') {

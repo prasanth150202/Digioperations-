@@ -6774,28 +6774,34 @@ function exportPoaXLSXById(id) {
 
 // ── GOOGLE GLOBAL SETTINGS ───────────────────────────────────────────────────
 let _googleGlobalSaveTimer = null;
-function saveGoogleGlobalKeys() {
+async function flushGoogleGlobalKeysSave() {
   clearTimeout(_googleGlobalSaveTimer);
-  _googleGlobalSaveTimer = setTimeout(async () => {
-    const keys = {
-      google_client_id: document.getElementById('google-client-id').value.trim(),
-      google_client_secret: document.getElementById('google-client-secret').value.trim(),
-      google_developer_token: document.getElementById('google-developer-token').value.trim()
-    };
-    try {
-      await api('/api/admin?action=settings', 'POST', keys);
-    } catch(e) {
-      console.error(e);
-    }
-  }, 1200);
+  const keys = {
+    google_client_id: document.getElementById('google-client-id').value.trim(),
+    google_client_secret: document.getElementById('google-client-secret').value.trim(),
+    google_developer_token: document.getElementById('google-developer-token').value.trim()
+  };
+  try {
+    await api('/api/admin?action=settings', 'POST', keys);
+  } catch(e) {
+    console.error(e);
+  }
 }
 
-function startGoogleOAuth() {
+function saveGoogleGlobalKeys() {
+  clearTimeout(_googleGlobalSaveTimer);
+  _googleGlobalSaveTimer = setTimeout(flushGoogleGlobalKeysSave, 1200);
+}
+
+async function startGoogleOAuth() {
   const clientId = document.getElementById('google-client-id').value.trim();
   if (!clientId) {
     alert('Please enter a Google Client ID and save it first.');
     return;
   }
+  // Flush any pending debounced save immediately so we never redirect to the OAuth
+  // flow before the just-typed Client ID has actually landed in the database.
+  await flushGoogleGlobalKeysSave();
   window.location.href = '/api/google-auth.php?action=authorize';
 }
 
@@ -7065,7 +7071,12 @@ function openCreateMonthlyReport() {
   document.getElementById('manual-mp-spend').value = 0;
   document.getElementById('manual-mp-revenue').value = 0;
   document.getElementById('manual-mp-orders').value = 0;
-  
+
+  document.getElementById('manual-push-sent').value = 0;
+  document.getElementById('manual-push-revenue').value = 0;
+  document.getElementById('manual-push-open').value = 0;
+  document.getElementById('manual-push-click').value = 0;
+
   document.getElementById('monthly-sync-status').textContent = 'Crawl Shopify storefront, Meta/Google ads, GA4 funnel and GSC search impressions.';
   document.getElementById('monthly-sync-status').style.color = '';
   
@@ -7161,6 +7172,12 @@ async function submitGenerateMonthlyReport() {
       spend: parseFloat(document.getElementById('manual-mp-spend').value) || 0,
       revenue: parseFloat(document.getElementById('manual-mp-revenue').value) || 0,
       orders: parseInt(document.getElementById('manual-mp-orders').value) || 0
+    },
+    push: {
+      sent: parseInt(document.getElementById('manual-push-sent').value) || 0,
+      revenue: parseFloat(document.getElementById('manual-push-revenue').value) || 0,
+      open_rate: parseFloat(document.getElementById('manual-push-open').value) || 0,
+      click_rate: parseFloat(document.getElementById('manual-push-click').value) || 0
     }
   };
   

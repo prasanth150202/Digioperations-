@@ -314,9 +314,34 @@
             font-weight: 800;
             color: var(--green);
         }
+
+        /* Narrative / AI text boxes */
+        .narrative-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-size: 11.5px;
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+
+        .callout-box {
+            background: rgba(59, 130, 246, 0.06);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 11.5px;
+            color: #cbd5e1;
+            text-align: center;
+            font-weight: 600;
+        }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 </head>
 <body>
+
+    <button id="btn-download-pptx" onclick="downloadMonthlyPptx()" style="position:fixed;top:16px;right:16px;z-index:999;background:var(--blue);color:#fff;border:none;padding:10px 16px;border-radius:8px;font-family:var(--font);font-weight:700;font-size:12.5px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.25)">⬇ Download PPTX</button>
 
     <div id="deck-viewport">
 
@@ -329,9 +354,10 @@
                 <h1 id="cover-brand" style="font-family:var(--font-hd); font-size:54px; font-weight:900; letter-spacing:-1.5px; margin-bottom:10px; color:#fff">
                     Brand Name
                 </h1>
-                <p id="cover-date" style="font-size:18px; color:var(--gray); font-weight:600">
+                <p id="cover-date" style="font-size:18px; color:var(--gray); font-weight:600; margin-bottom:18px">
                     Month Year
                 </p>
+                <p style="font-size:11.5px; color:var(--gray)">Agency: Digifyce Team &nbsp;|&nbsp; Contact: agent@digifyce.in &nbsp;|&nbsp; Portal: platform.digifyce.in</p>
             </div>
             <div class="slide-footer">
                 <div>Digifyce Platform</div>
@@ -339,56 +365,24 @@
             </div>
         </div>
 
-        <!-- SLIDE 2: HIGH-LEVEL ROI -->
+        <!-- SLIDE 2: HIGH LEVEL OVERVIEW -->
         <div class="slide" id="slide-2">
             <div class="slide-header">
                 <div class="slide-title-group">
                     <div class="slide-subtitle">Executive Summary</div>
-                    <h2>High-Level Consolidated Performance</h2>
+                    <h2>High Level Overview</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="grid-3" style="margin-bottom:15px">
-                <div class="metric-card">
-                    <div class="metric-label">Total Spend</div>
-                    <div class="metric-value" id="h-spend">₹0</div>
-                    <div class="metric-trend" id="h-spend-trend">-</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Total Revenue</div>
-                    <div class="metric-value" id="h-revenue">₹0</div>
-                    <div class="metric-trend" id="h-revenue-trend">-</div>
-                </div>
-                <div class="metric-card" style="border-color:rgba(16,185,129,0.3)">
-                    <div class="metric-label">Blended ROAS</div>
-                    <div class="metric-value" id="h-roas" style="color:var(--green)">0.00x</div>
-                    <div class="metric-trend" id="h-roas-trend">-</div>
-                </div>
-            </div>
-            <div class="grid-3">
-                <div class="metric-card">
-                    <div class="metric-label">Total Orders</div>
-                    <div class="metric-value" id="h-orders">0</div>
-                    <div class="metric-trend" id="h-orders-trend">-</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Blended CPA</div>
-                    <div class="metric-value" id="h-cpa">₹0</div>
-                    <div class="metric-trend" id="h-cpa-trend">-</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Blended AOV</div>
-                    <div class="metric-value" id="h-aov">₹0</div>
-                    <div class="metric-trend" id="h-aov-trend">-</div>
-                </div>
-            </div>
+            <div class="narrative-box" id="hl-exec-summary" style="margin-bottom:14px">AI executive summary loads here.</div>
+            <div class="grid-3" id="hl-tiles" style="flex:1"></div>
             <div class="slide-footer">
                 <div id="slide2-period">Date Range</div>
                 <div>Slide 2 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 3: POP COMPARISON -->
+        <!-- SLIDE 3: MoM GROWTH COMPARISON -->
         <div class="slide" id="slide-3">
             <div class="slide-header">
                 <div class="slide-title-group">
@@ -397,19 +391,18 @@
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div style="flex:1; display:flex; align-items:center">
+            <div style="flex:1; display:flex; align-items:center; overflow:auto">
                 <table class="slide-table" id="table-comparison">
                     <thead>
                         <tr>
                             <th>Performance Metric</th>
                             <th>Previous Period</th>
                             <th>Current Period</th>
-                            <th>Change (%)</th>
+                            <th>Change</th>
+                            <th>Why It Changed</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- Populated by JavaScript -->
-                    </tbody>
+                    <tbody><!-- Populated by JavaScript --></tbody>
                 </table>
             </div>
             <div class="slide-footer">
@@ -453,240 +446,166 @@
                 <div style="background:rgba(255,255,255,0.02); padding:24px; border-radius:12px; display:flex; flex-direction:column; justify-content:center">
                     <h3 style="font-size:14px; margin-bottom:12px; color:var(--blue)">Conversion Rates Summary</h3>
                     <p style="font-size:12px; color:#cbd5e1; line-height:1.6; margin-bottom:8px" id="funnel-inferences-text">
-                        The overall website conversion rate is tracked at 0.00%. Shopify checkout funnel configurations can be verified to optimize dropoffs between Add to Cart and Purchase.
+                        The overall website conversion rate is tracked at 0.00%.
                     </p>
                 </div>
             </div>
             <div class="slide-footer">
-                <div>Shopify storefront tracking</div>
+                <div>Shopify Storefront</div>
                 <div>Slide 4 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 5: BLENDED ATTRIBUTION MATRIX -->
+        <!-- SLIDE 5: PRODUCT PERFORMANCE BY REGION -->
         <div class="slide" id="slide-5">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Attribution Overview</div>
-                    <h2>Blended Attribution Matrix</h2>
+                    <div class="slide-subtitle">Sales & Shipping Cross-Reference</div>
+                    <h2>Product Performance by Region</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div style="flex:1; display:flex; align-items:center">
-                <table class="slide-table" id="table-attribution">
+            <div style="flex:1; overflow:auto">
+                <table class="slide-table" id="table-product-region">
                     <thead>
-                        <tr>
-                            <th>Channel</th>
-                            <th>Spend</th>
-                            <th>Orders</th>
-                            <th>Revenue</th>
-                            <th>CPA</th>
-                            <th>ROAS</th>
-                        </tr>
+                        <tr><th>Rank</th><th>Product</th><th>Primary Region</th><th>Revenue Share</th><th>Performance Driver</th></tr>
                     </thead>
-                    <tbody>
-                        <!-- Populated by JS -->
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
+            <div class="callout-box" id="product-region-callout" style="margin-top:12px"></div>
             <div class="slide-footer">
-                <div>Blended third-party dashboard data</div>
+                <div>Product Catalog</div>
                 <div>Slide 5 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 6: META ADS PERFORMANCE -->
+        <!-- SLIDE 6: ATTRIBUTION MAP -->
         <div class="slide" id="slide-6">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Meta Platform</div>
-                    <h2>Meta Ads Performance Overview</h2>
+                    <div class="slide-subtitle">Revenue Origins & Channels</div>
+                    <h2>Attribution Map</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="grid-3" style="margin-bottom:15px">
-                <div class="metric-card">
-                    <div class="metric-label">Meta Spend</div>
-                    <div class="metric-value" id="m-spend">₹0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Meta Revenue</div>
-                    <div class="metric-value" id="m-revenue">₹0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Meta ROAS</div>
-                    <div class="metric-value" id="m-roas" style="color:var(--blue)">0.00x</div>
-                </div>
+            <div style="flex:1; overflow:auto">
+                <table class="slide-table" id="table-attribution">
+                    <thead>
+                        <tr><th>Channel</th><th>Sessions</th><th>Orders</th><th>Revenue</th><th>Revenue Share</th><th>ROAS</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
             </div>
-            <div class="grid-3">
-                <div class="metric-card">
-                    <div class="metric-label">Meta Orders</div>
-                    <div class="metric-value" id="m-orders">0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Meta CPA</div>
-                    <div class="metric-value" id="m-cpa">₹0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Meta CTR</div>
-                    <div class="metric-value" id="m-ctr">0.0%</div>
-                </div>
-            </div>
+            <div class="callout-box" id="attribution-split-callout" style="margin-top:12px"></div>
             <div class="slide-footer">
-                <div>Meta Graph Insights</div>
+                <div>Shopify Campaign Attribution</div>
                 <div>Slide 6 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 7: META CAMPAIGN BREAKDOWNS -->
+        <!-- SLIDE 7: META CAMPAIGNS DEEP-DIVE -->
         <div class="slide" id="slide-7">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Meta Platform</div>
-                    <h2>Meta Ads Campaign Breakdown</h2>
+                    <div class="slide-subtitle">Meta Ads Manager Structure</div>
+                    <h2>Paid Ads: Meta Campaigns Deep-Dive</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div style="flex:1; display:flex; align-items:center; overflow-y:auto">
-                <table class="slide-table" id="table-meta-campaigns">
-                    <thead>
-                        <tr>
-                            <th>Campaign Name</th>
-                            <th>Spend</th>
-                            <th>Orders</th>
-                            <th>Revenue</th>
-                            <th>ROAS</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Populated by JS -->
-                    </tbody>
-                </table>
+            <div class="grid-2">
+                <div class="narrative-box" style="display:flex;flex-direction:column;gap:12px;justify-content:center">
+                    <div style="font-size:11px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.05em">Ad Structure Audit</div>
+                    <div><span style="color:var(--gray);font-size:11px">Creatives Tested:</span> <strong id="meta-audit-angles">—</strong></div>
+                    <div><span style="color:var(--gray);font-size:11px">Winning Placement:</span> <strong id="meta-audit-placement">—</strong></div>
+                    <div><span style="color:var(--gray);font-size:11px">Winning Creative:</span> <strong id="meta-audit-angle">—</strong></div>
+                </div>
+                <div style="overflow:auto">
+                    <table class="slide-table" id="table-meta-campaigns">
+                        <thead><tr><th>Campaign</th><th>Spend</th><th>Orders</th><th>Sales</th><th>ROAS</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
             <div class="slide-footer">
-                <div>Meta Campaign stats (Top 5)</div>
+                <div>Meta Ads Manager</div>
                 <div>Slide 7 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 8: META CREATIVE WINNERS -->
+        <!-- SLIDE 8: BEST PERFORMING CREATIVES (META) -->
         <div class="slide" id="slide-8">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Meta Ad Creatives</div>
-                    <h2>Meta Ads Creative Winner Audits</h2>
+                    <div class="slide-subtitle">Creative Performance Audit</div>
+                    <h2>Best Performing Creatives (Meta Ads)</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="grid-3" id="meta-creatives-grid" style="align-items:stretch">
-                <!-- Populated by JS -->
-            </div>
+            <div class="grid-3" id="meta-creatives-grid" style="flex:1"></div>
             <div class="slide-footer">
-                <div>Top creatives sorted by sales volume</div>
+                <div>Meta Creative Library</div>
                 <div>Slide 8 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 9: GOOGLE ADS PERFORMANCE -->
+        <!-- SLIDE 9: GOOGLE CAMPAIGNS DEEP-DIVE -->
         <div class="slide" id="slide-9">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Google Platform</div>
-                    <h2>Google Ads Performance Overview</h2>
+                    <div class="slide-subtitle">Google Ads Manager Structure</div>
+                    <h2>Paid Ads: Google Campaigns Deep-Dive</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="grid-3" style="margin-bottom:15px">
-                <div class="metric-card">
-                    <div class="metric-label">Google Spend</div>
-                    <div class="metric-value" id="g-spend">₹0</div>
+            <div class="grid-2">
+                <div class="narrative-box" style="display:flex;flex-direction:column;gap:12px;justify-content:center">
+                    <div style="font-size:11px;font-weight:800;color:var(--purple);text-transform:uppercase;letter-spacing:.05em">Ad Structure Audit</div>
+                    <div><span style="color:var(--gray);font-size:11px">Networks Tested:</span> <strong id="google-audit-networks">—</strong></div>
+                    <div><span style="color:var(--gray);font-size:11px">Winning Network:</span> <strong id="google-audit-network">—</strong></div>
+                    <div><span style="color:var(--gray);font-size:11px">Winning ROAS:</span> <strong id="google-audit-roas">—</strong></div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-label">Google Revenue</div>
-                    <div class="metric-value" id="g-revenue">₹0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Google ROAS</div>
-                    <div class="metric-value" id="g-roas" style="color:var(--purple)">0.00x</div>
-                </div>
-            </div>
-            <div class="grid-3">
-                <div class="metric-card">
-                    <div class="metric-label">Google Orders</div>
-                    <div class="metric-value" id="g-orders">0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Google CPA</div>
-                    <div class="metric-value" id="g-cpa">₹0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Google CTR</div>
-                    <div class="metric-value" id="g-ctr">0.0%</div>
+                <div style="overflow:auto">
+                    <table class="slide-table" id="table-google-campaigns">
+                        <thead><tr><th>Campaign</th><th>Spend</th><th>Orders</th><th>Sales</th><th>ROAS</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </div>
             <div class="slide-footer">
-                <div>Google Ads API Search reporting</div>
+                <div>Google Ads Manager</div>
                 <div>Slide 9 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 10: GOOGLE ADS CAMPAIGN BREAKDOWNS -->
+        <!-- SLIDE 10: BEST PERFORMING CREATIVES (GOOGLE) -->
         <div class="slide" id="slide-10">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Google Platform</div>
-                    <h2>Google Ads Campaign Breakdown</h2>
+                    <div class="slide-subtitle">Search Text Copy</div>
+                    <h2>Best Performing Creatives (Google Ads)</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div style="flex:1; display:flex; align-items:center; overflow-y:auto">
-                <table class="slide-table" id="table-google-campaigns">
-                    <thead>
-                        <tr>
-                            <th>Campaign Name</th>
-                            <th>Spend</th>
-                            <th>Conversions</th>
-                            <th>Value</th>
-                            <th>ROAS</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Populated by JS -->
-                    </tbody>
-                </table>
-            </div>
+            <div class="grid-3" id="google-creatives-grid" style="flex:1"></div>
             <div class="slide-footer">
-                <div>Google AdWords Campaign stats</div>
+                <div>Google Search Ad Copy</div>
                 <div>Slide 10 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 11: ORGANIC TRAFFIC CHANNELS -->
+        <!-- SLIDE 11: ORGANIC & NON-PAID TRAFFIC -->
         <div class="slide" id="slide-11">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Traffic Channels</div>
-                    <h2>Organic Traffic Channels Performance</h2>
+                    <div class="slide-subtitle">Earned Channels Session Performance</div>
+                    <h2>Organic & Non-Paid Traffic Channels</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div style="flex:1; display:flex; align-items:center">
-                <table class="slide-table" id="table-ga4-channels">
-                    <thead>
-                        <tr>
-                            <th>Traffic Source / Default Channel Group</th>
-                            <th>Sessions</th>
-                            <th>Conversion Rate (%)</th>
-                            <th>Revenue</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Populated by JS -->
-                    </tbody>
-                </table>
-            </div>
+            <div class="grid-3" id="organic-cards" style="flex:1"></div>
             <div class="slide-footer">
-                <div>Google Analytics 4 default channel grouping stats</div>
+                <div>Google Analytics 4</div>
                 <div>Slide 11 of 21</div>
             </div>
         </div>
@@ -695,314 +614,204 @@
         <div class="slide" id="slide-12">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Search Console</div>
-                    <h2>Google Search Console Landing Pages</h2>
+                    <div class="slide-subtitle">Organic Click Distribution</div>
+                    <h2>Search Performance: Top Landing Pages</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div style="flex:1; display:flex; align-items:center">
+            <div style="flex:1; overflow:auto">
                 <table class="slide-table" id="table-gsc-pages">
-                    <thead>
-                        <tr>
-                            <th>Landing Page URI</th>
-                            <th>Clicks</th>
-                            <th>Impressions</th>
-                            <th>CTR</th>
-                            <th>Position</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Populated by JS -->
-                    </tbody>
+                    <thead><tr><th>Page</th><th>Clicks</th><th>Impressions</th><th>CTR</th><th>Avg Position</th></tr></thead>
+                    <tbody></tbody>
                 </table>
             </div>
             <div class="slide-footer">
-                <div>Organic search pages ranked by clicks count</div>
+                <div>Google Search Console</div>
                 <div>Slide 12 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 13: GSC HIGH-INTENT SEARCH QUERIES -->
+        <!-- SLIDE 13: GSC SEARCH QUERIES -->
         <div class="slide" id="slide-13">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Search Console</div>
-                    <h2>High-Intent Search Queries</h2>
+                    <div class="slide-subtitle">Search Keyword Impression Insights</div>
+                    <h2>Search Performance: Top Search Queries</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div style="flex:1; display:flex; align-items:center">
+            <div style="flex:1; overflow:auto">
                 <table class="slide-table" id="table-gsc-queries">
-                    <thead>
-                        <tr>
-                            <th>Organic Query / Keyword</th>
-                            <th>Clicks</th>
-                            <th>Impressions</th>
-                            <th>CTR</th>
-                            <th>Position</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Populated by JS -->
-                    </tbody>
+                    <thead><tr><th>Query</th><th>Clicks</th><th>Impressions</th><th>CTR</th><th>Avg Position</th></tr></thead>
+                    <tbody></tbody>
                 </table>
             </div>
             <div class="slide-footer">
-                <div>Search console queries ranked by clicks count</div>
+                <div>Google Search Console</div>
                 <div>Slide 13 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 14: COHORT RETENTION -->
+        <!-- SLIDE 14: CUSTOMER RETENTION & LOYALTY -->
         <div class="slide" id="slide-14">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Customer Retention</div>
-                    <h2>Cohort Customer Retention Performance</h2>
+                    <div class="slide-subtitle">Cohort Purchase Curve</div>
+                    <h2>Customer Retention & Loyalty Performance</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="grid-3" style="margin-bottom:15px">
-                <div class="metric-card">
-                    <div class="metric-label">Retention Revenue</div>
-                    <div class="metric-value" id="ret-revenue">₹0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Returning Rate</div>
-                    <div class="metric-value" id="ret-rate" style="color:var(--green)">0.0%</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Repeat AOV</div>
-                    <div class="metric-value" id="ret-aov">₹0</div>
-                </div>
+            <div class="grid-3" style="margin-bottom:14px; flex:none">
+                <div class="metric-card"><div class="metric-label">Retention Revenue</div><div class="metric-value" id="ret-revenue">₹0</div></div>
+                <div class="metric-card"><div class="metric-label">Returning Rate</div><div class="metric-value" id="ret-rate" style="color:var(--green)">0.0%</div></div>
+                <div class="metric-card"><div class="metric-label">Repeat AOV</div><div class="metric-value" id="ret-aov">₹0</div></div>
             </div>
-            <div class="card" style="flex:1; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:20px; display:flex; flex-direction:column; justify-content:center">
-                <h4 style="font-size:12px; color:var(--blue); margin-bottom:8px">Cohort Cohort Analysis</h4>
-                <p style="font-size:11.5px; color:#cbd5e1; line-height:1.5" id="ret-inferences">
-                    Returning customers accounts for 0.0% of the customer base. Retaining existing customers requires active email marketing retention workflows.
-                </p>
+            <div style="flex:1; overflow:auto">
+                <table class="slide-table" id="table-cohort">
+                    <thead><tr><th>Acquisition Cohort</th><th>Cohort Size</th><th>Month 0</th><th>Month 1</th><th>Month 2</th><th>Month 3</th></tr></thead>
+                    <tbody></tbody>
+                </table>
             </div>
+            <div class="narrative-box" id="ret-inferences" style="margin-top:10px"></div>
             <div class="slide-footer">
-                <div>Shopify order history cohort aggregates</div>
+                <div>Repeat Purchase Cohort Matrix</div>
                 <div>Slide 14 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 15: RETENTION BROADCASTING -->
+        <!-- SLIDE 15: RETENTION & BROADCAST PERFORMANCE -->
         <div class="slide" id="slide-15">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Owned Media</div>
-                    <h2>Retention Broadcasting Performance</h2>
+                    <div class="slide-subtitle">Own-Media Performance Summary</div>
+                    <h2>Retention & Broadcast Performance</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="grid-2">
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:24px; border-radius:12px; display:flex; flex-direction:column; justify-content:space-between">
-                    <div>
-                        <h3 style="font-size:14px; margin-bottom:12px; color:var(--blue)">✉ Email Marketing</h3>
-                        <div style="display:flex; flex-direction:column; gap:8px; font-size:12px; color:#94a3b8">
-                            <div>Spend: <strong style="color:#fff" id="o-email-spend">₹0</strong></div>
-                            <div>Revenue: <strong style="color:#fff" id="o-email-rev">₹0</strong></div>
-                            <div>Orders: <strong style="color:#fff" id="o-email-orders">0</strong></div>
-                            <div>Sent: <strong style="color:#fff" id="o-email-sent">0</strong></div>
-                            <div>Open Rate / Click Rate: <strong style="color:#fff" id="o-email-rates">0% / 0%</strong></div>
-                        </div>
-                    </div>
-                </div>
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:24px; border-radius:12px; display:flex; flex-direction:column; justify-content:space-between">
-                    <div>
-                        <h3 style="font-size:14px; margin-bottom:12px; color:var(--green)">💬 WhatsApp Broadcast</h3>
-                        <div style="display:flex; flex-direction:column; gap:8px; font-size:12px; color:#94a3b8">
-                            <div>Spend: <strong style="color:#fff" id="o-wa-spend">₹0</strong></div>
-                            <div>Revenue: <strong style="color:#fff" id="o-wa-rev">₹0</strong></div>
-                            <div>Orders: <strong style="color:#fff" id="o-wa-orders">0</strong></div>
-                            <div>Sent: <strong style="color:#fff" id="o-wa-sent">0</strong></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div class="grid-3" id="owned-media-cards" style="flex:1"></div>
             <div class="slide-footer">
-                <div>Manual Owned Media Metrics</div>
+                <div>Manual Entry — Email / WhatsApp / Push</div>
                 <div>Slide 15 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 16: TOP PRODUCTS LEADERBOARD -->
+        <!-- SLIDE 16: EXECUTED STRATEGIC INITIATIVES -->
         <div class="slide" id="slide-16">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Shopify Storefront</div>
-                    <h2>Top Products Leaderboard</h2>
+                    <div class="slide-subtitle">AI-Assisted Summary</div>
+                    <h2>Executed Strategic Approaches & Initiatives</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div style="flex:1; display:flex; align-items:center">
-                <table class="slide-table" id="table-products">
-                    <thead>
-                        <tr>
-                            <th>Product Title / Variant</th>
-                            <th>Quantity Sold</th>
-                            <th>Gross Sales Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Populated by JS -->
-                    </tbody>
-                </table>
-            </div>
+            <div class="grid-3" id="initiatives-grid" style="flex:1"></div>
             <div class="slide-footer">
-                <div>Top 8 products sorted by sales value</div>
+                <div>AI-Drafted from Reported Metrics</div>
                 <div>Slide 16 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 17: TOP SHIPPING CITIES -->
+        <!-- SLIDE 17: STRATEGY DEEP-DIVE -->
         <div class="slide" id="slide-17">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Order Logistics</div>
-                    <h2>Top Shipping Cities</h2>
+                    <div class="slide-subtitle">Strategic Initiative Breakdown</div>
+                    <h2>Strategy Deep-Dive</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div style="flex:1; display:flex; align-items:center">
-                <table class="slide-table" id="table-locations">
-                    <thead>
-                        <tr>
-                            <th>Location / Shipping Province</th>
-                            <th>Orders Count</th>
-                            <th>Revenue (Gross Sales)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Populated by JS -->
-                    </tbody>
-                </table>
-            </div>
+            <div class="narrative-box" id="strategy-deepdive-title" style="margin-bottom:14px; font-weight:800; font-size:13px; color:#fff; flex:none"></div>
+            <div class="grid-2" id="strategy-deepdive-steps" style="flex:1"></div>
             <div class="slide-footer">
-                <div>Top 8 provinces sorted by orders count</div>
+                <div>AI-Drafted from Reported Metrics</div>
                 <div>Slide 17 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 18: SHOPIFY CUSTOM UTM CAMPAIGNS -->
+        <!-- SLIDE 18: PERFORMANCE INFERENCES & DIAGNOSTICS -->
         <div class="slide" id="slide-18">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">Attribution Details</div>
-                    <h2>Shopify Campaign Performance</h2>
+                    <div class="slide-subtitle">Automated Strategy Analysis Scan</div>
+                    <h2>Performance Inferences & Diagnostics</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div style="flex:1; display:flex; align-items:center">
-                <table class="slide-table" id="table-shopify-campaigns">
-                    <thead>
-                        <tr>
-                            <th>UTM Source / Campaign Group</th>
-                            <th>Orders Count</th>
-                            <th>Revenue (Gross Sales)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Populated by JS -->
-                    </tbody>
-                </table>
-            </div>
+            <div class="grid-2" id="inferences-grid" style="flex:1"></div>
             <div class="slide-footer">
-                <div>Attribution UTM codes captured on checkout</div>
+                <div>AI-Generated Insights</div>
                 <div>Slide 18 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 19: AI STRATEGY & INFERENCES -->
+        <!-- SLIDE 19: STRATEGIC ACTION PLAN & RECOMMENDATIONS -->
         <div class="slide" id="slide-19">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">AI Analysis</div>
-                    <h2>Performance Highlights & Inferences</h2>
+                    <div class="slide-subtitle">Proposed Actions for Next Month</div>
+                    <h2>Strategic Action Plan & Recommendations</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:20px; font-size:13px; line-height:1.6; color:#cbd5e1" id="ai-highlights-box">
-                <!-- Bullet points populated by JS -->
-            </div>
+            <div class="grid-2" id="recommendations-grid" style="flex:1"></div>
             <div class="slide-footer">
-                <div>AI-Assisted strategic brief notes</div>
+                <div>AI-Generated Recommendations</div>
                 <div>Slide 19 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 20: AI STRATEGIC RECOMMENDATIONS -->
+        <!-- SLIDE 20: GROWTH PROJECTIONS & BUDGET ALLOCATIONS -->
         <div class="slide" id="slide-20">
             <div class="slide-header">
                 <div class="slide-title-group">
-                    <div class="slide-subtitle">AI Analysis</div>
-                    <h2>Strategic Action Recommendations</h2>
+                    <div class="slide-subtitle">Next Month Projections</div>
+                    <h2>Growth Projections & Budget Allocations</h2>
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:20px; font-size:13px; line-height:1.6; color:#cbd5e1" id="ai-recommendations-box">
-                <!-- Bullet points populated by JS -->
+            <div class="grid-2">
+                <div style="display:flex;flex-direction:column;justify-content:center">
+                    <div style="font-size:11px;font-weight:800;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;margin-bottom:16px">Revenue Trajectory Trend</div>
+                    <div id="trend-chart" style="display:flex;align-items:flex-end;gap:20px;height:170px"></div>
+                </div>
+                <div class="grid-2" id="forecast-tiles" style="gap:16px"></div>
             </div>
             <div class="slide-footer">
-                <div>AI-Assisted action items timeline</div>
+                <div>Based on trailing MoM growth</div>
                 <div>Slide 20 of 21</div>
             </div>
         </div>
 
-        <!-- SLIDE 21: NEXT MONTH FORECAST PROJECTIONS -->
+        <!-- SLIDE 21: CLOSING -->
         <div class="slide" id="slide-21">
-            <div class="slide-header">
-                <div class="slide-title-group">
-                    <div class="slide-subtitle">Next Month Target</div>
-                    <h2>Next Month Forecast Projections</h2>
-                </div>
-                <div class="slide-logo">Digifyce<span>.</span></div>
-            </div>
-            <div style="flex:1; display:flex; flex-direction:column; justify-content:center">
-                <p style="font-size:14px; line-height:1.6; color:#cbd5e1; margin-bottom:20px">
-                    Based on your target ROAS of <strong style="color:#fff" id="fc-target-roas">3.00x</strong> and current month blended AOV of <strong style="color:#fff" id="fc-aov">₹0</strong>, here are the target spends and conversions required to scale:
-                </p>
-                <div class="grid-3">
-                    <div class="metric-card" style="border-color:rgba(168,85,247,0.3)">
-                        <div class="metric-label">Target Revenue</div>
-                        <div class="metric-value" id="fc-rev" style="color:var(--purple)">₹0</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Required Spend</div>
-                        <div class="metric-value" id="fc-spend">₹0</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Required Orders</div>
-                        <div class="metric-value" id="fc-orders">0</div>
-                    </div>
-                </div>
+            <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center">
+                <h1 style="font-family:var(--font-hd); font-size:44px; font-weight:900; margin-bottom:14px; color:#fff">Thank You!</h1>
+                <p style="font-size:16px; color:var(--gray); font-weight:600; margin-bottom:26px">Let's scale brand performance next month.</p>
+                <p style="font-size:11.5px; color:var(--gray)">Account Team: agent@digifyce.in &nbsp;|&nbsp; Support: support@digifyce.in &nbsp;|&nbsp; Portal: platform.digifyce.in</p>
             </div>
             <div class="slide-footer">
-                <div>Scenario modeling projections</div>
+                <div>Digifyce Agency Partner</div>
                 <div>Slide 21 of 21</div>
             </div>
         </div>
 
     </div>
 
-    <!-- Slide Controllers Overlay -->
     <div id="deck-controls">
-        <button class="ctrl-btn" onclick="prevSlide()">◀ Prev</button>
+        <button class="ctrl-btn" onclick="prevSlide()">← Prev</button>
         <div class="slide-counter" id="slide-num">1 / 21</div>
-        <button class="ctrl-btn" onclick="nextSlide()">Next ▶</button>
-        <button class="ctrl-btn" onclick="toggleFullscreen()" style="margin-left: auto">Fullscreen ⛶</button>
+        <button class="ctrl-btn" onclick="nextSlide()">Next →</button>
+        <button class="ctrl-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
     </div>
 
     <script>
         let currentSlide = 1;
         const totalSlides = 21;
-        
+
         function showSlide(index) {
             if (index < 1) index = 1;
             if (index > totalSlides) index = totalSlides;
-            
+
             document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
             const s = document.getElementById('slide-' + index);
             if (s) {
@@ -1035,6 +844,18 @@
             if (e.key === 'ArrowLeft') prevSlide();
         });
 
+        // The real export implementation is assigned to window._pptxExportFn once the report
+        // data has finished loading (see bottom of bindReportData). This wrapper is what the
+        // button actually calls, so a click before load finishes gets a message instead of a
+        // ReferenceError.
+        function downloadMonthlyPptx() {
+            if (typeof window._pptxExportFn === 'function') {
+                window._pptxExportFn();
+            } else {
+                alert('Report data is still loading — please wait a moment and try again.');
+            }
+        }
+
         // ── DYNAMIC METRICS BINDING ──
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token') || '';
@@ -1044,7 +865,7 @@
             const apiUrl = directId
                 ? `/api/report-view.php?id=${directId}`
                 : `/api/report-view.php?token=${token}`;
-            
+
             fetch(apiUrl)
                 .then(res => res.json())
                 .then(res => {
@@ -1068,9 +889,23 @@
             const comps = data.comparisons || {};
             const prev = data.prev_period || {};
             const prevTotals = prev.totals || {};
-            
+            const channels = data.channels || {};
+            const prevChannels = prev.channels || {};
+            const ai = data.ai || {};
+
+            // Gross Revenue / Blended ROAS are computed server-side from Shopify + Marketplace only
+            // (see api/reports.php) — NOT totals.revenue, which sums every channel's own attributed
+            // revenue for what are largely the *same* underlying Shopify orders and would triple-count.
+            const grossRevenue = data.gross_revenue ?? 0;
+            const grossRoas = data.gross_roas ?? 0;
+            const prevGrossRevenue = prev.gross_revenue ?? 0;
+            const prevGrossRoas = prev.gross_roas ?? 0;
+
             // Format helpers
             const curr = (v) => '₹' + Math.round(v || 0).toLocaleString();
+            const pctLabel = (v) => (v === null || v === undefined) ? '—' : `${v >= 0 ? '+' : ''}${v}%`;
+            const trendClassOf = (v) => (v === null || v === undefined) ? '' : (v >= 0 ? 'trend-up' : 'trend-down');
+            const chPct = (c, p) => (p > 0) ? Math.round(((c - p) / p) * 1000) / 10 : null;
             const pct = (v, elId) => {
                 const el = document.getElementById(elId);
                 if (!el) return;
@@ -1080,306 +915,642 @@
                     return;
                 }
                 const sign = v >= 0 ? '+' : '';
-                el.textContent = `${sign}${v}% WoW`;
+                el.textContent = `${sign}${v}% vs prior`;
                 el.className = 'metric-trend ' + (v >= 0 ? 'trend-up' : 'trend-down');
             };
+            const tileHTML = (label, value, changeVal) => {
+                const trendHtml = (changeVal === null || changeVal === undefined)
+                    ? `<div class="metric-trend">—</div>`
+                    : `<div class="metric-trend ${changeVal >= 0 ? 'trend-up' : 'trend-down'}">${changeVal >= 0 ? '+' : ''}${changeVal}% vs prior</div>`;
+                return `<div class="metric-card"><div class="metric-label">${label}</div><div class="metric-value">${value}</div>${trendHtml}</div>`;
+            };
+            const stripHtml = (html) => (html || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+
+            // Repeat-purchase figures — reused by the High Level Overview tile and the Retention slide.
+            // Uses Shopify-specific AOV (not blended AOV, which mixes in email/WhatsApp/marketplace
+            // orders and would give repeat-revenue a mismatched-units result).
+            const shFull = channels.shopify || { spend: 0, revenue: 0, conversions: 0, customers_acquired: 0 };
+            const shopifyAov = shFull.conversions > 0 ? shFull.revenue / shFull.conversions : 0;
+            const repeatRev = Math.max(0, shFull.revenue - (shFull.customers_acquired * shopifyAov));
+            const repRateNum = shFull.conversions > 0 ? ((shFull.conversions - shFull.customers_acquired) / shFull.conversions * 100) : 0;
+            const repRate = repRateNum.toFixed(1) + '%';
+
+            const ga4Funnel = data.ga4_funnel || {};
+            const hasFunnelData = (ga4Funnel.session_start || 0) > 0;
+            const shopifyPurchases = totals.conversions || 0;
 
             // Cover Slide
             document.getElementById('cover-brand').textContent = report.brand_name || 'Brand Name';
-            const mLabel = report.period_start ? new Date(report.period_start).toLocaleDateString('en-US', {month:'long', year:'numeric'}) : 'Month Year';
+            const mLabel = report.period_start ? new Date(report.period_start).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Month Year';
             document.getElementById('cover-date').textContent = mLabel;
 
-            // Slide 2: Consolidated Stats
-            document.getElementById('h-spend').textContent = curr(totals.spend);
-            pct(comps.spend, 'h-spend-trend');
-            document.getElementById('h-revenue').textContent = curr(totals.revenue);
-            pct(comps.revenue, 'h-revenue-trend');
-            document.getElementById('h-roas').textContent = (totals.roas || 0).toFixed(2) + 'x';
-            pct(comps.roas, 'h-roas-trend');
-            document.getElementById('h-orders').textContent = totals.conversions || 0;
-            pct(comps.conversions, 'h-orders-trend');
-            document.getElementById('h-cpa').textContent = curr(totals.cpa);
-            pct(comps.cpa, 'h-cpa-trend');
-            document.getElementById('h-aov').textContent = curr(totals.aov);
-            pct(comps.aov, 'h-aov-trend');
-            
             const rangeStr = `${report.period_start} to ${report.period_end}`;
+
+            // ── SLIDE 2: HIGH LEVEL OVERVIEW ──
+            document.getElementById('hl-exec-summary').textContent = ai.executive_summary
+                || `Gross revenue reached ${curr(grossRevenue)} on ${curr(totals.spend)} of spend (${(grossRoas || 0).toFixed(2)}x blended ROAS) for ${mLabel}.`;
+            document.getElementById('hl-tiles').innerHTML = [
+                tileHTML('Gross Revenue', curr(grossRevenue), comps.gross_revenue),
+                tileHTML('Marketplace Revenue', curr((channels.marketplace || {}).revenue), chPct((channels.marketplace || {}).revenue, (prevChannels.marketplace || {}).revenue)),
+                tileHTML('Shopify Revenue', curr(shFull.revenue), chPct(shFull.revenue, (prevChannels.shopify || {}).revenue)),
+                tileHTML('Consolidated Spend', curr(totals.spend), comps.spend),
+                tileHTML('Blended ROAS', (grossRoas || 0).toFixed(2) + 'x', comps.gross_roas),
+                tileHTML('Meta ROAS', ((channels.meta || {}).roas || 0).toFixed(2) + 'x', chPct((channels.meta || {}).roas, (prevChannels.meta || {}).roas)),
+                tileHTML('Google ROAS', ((channels.google || {}).roas || 0).toFixed(2) + 'x', chPct((channels.google || {}).roas, (prevChannels.google || {}).roas)),
+                tileHTML('Marketplace ROAS', ((channels.marketplace || {}).roas || 0).toFixed(2) + 'x', chPct((channels.marketplace || {}).roas, (prevChannels.marketplace || {}).roas)),
+                tileHTML('Returning Customer Rate', repRate, null)
+            ].join('');
             document.getElementById('slide2-period').textContent = rangeStr;
+
+            // ── SLIDE 3: MoM TABLE w/ WHY ──
+            const popTbody = document.querySelector('#table-comparison tbody');
+            const momReasons = ai.mom_reasons || {};
+            const metricsList = [
+                ['spend', 'Total Ad Spend', curr, totals.spend, prevTotals.spend, comps.spend],
+                ['revenue', 'Gross Revenue', curr, grossRevenue, prevGrossRevenue, comps.gross_revenue],
+                ['conversions', 'Total Orders Count', (v) => v, totals.conversions, prevTotals.conversions, comps.conversions],
+                ['roas', 'Blended ROAS', (v) => (v || 0).toFixed(2) + 'x', grossRoas, prevGrossRoas, comps.gross_roas],
+                ['cpa', 'Blended Cost Per Acquisition (CPA)', curr, totals.cpa, prevTotals.cpa, comps.cpa],
+                ['aov', 'Blended Average Order Value (AOV)', curr, totals.aov, prevTotals.aov, comps.aov]
+            ];
+            popTbody.innerHTML = metricsList.map(([key, label, fmt, cVal, pVal, change]) => {
+                const changeText = pctLabel(change);
+                const why = momReasons[key] || '—';
+                return `<tr>
+                    <td style="font-weight:700">${label}</td>
+                    <td>${fmt(pVal || 0)}</td>
+                    <td style="font-weight:600">${fmt(cVal || 0)}</td>
+                    <td class="${trendClassOf(change)}" style="font-weight:800">${changeText}</td>
+                    <td style="color:#94a3b8">${why}</td>
+                </tr>`;
+            }).join('');
             document.getElementById('slide3-period').textContent = rangeStr;
 
-            // Slide 3: MoM Table
-            const popTbody = document.querySelector('#table-comparison tbody');
-            const metricsList = [
-                ['spend', 'Total Ad Spend', curr],
-                ['revenue', 'Total Sales Revenue', curr],
-                ['conversions', 'Total Orders Count', (v)=>v],
-                ['roas', 'Blended ROAS', (v) => (v || 0).toFixed(2) + 'x'],
-                ['cpa', 'Blended Cost Per Acquisition (CPA)', curr],
-                ['aov', 'Blended Average Order Value (AOV)', curr]
-            ];
-            popTbody.innerHTML = metricsList.map(([key, label, fmt]) => {
-                const cVal = totals[key] || 0;
-                const pVal = prevTotals[key] || 0;
-                const change = comps[key];
-                const changeText = change !== null ? (change >= 0 ? '+' : '') + change + '%' : '—';
-                const trendClass = change !== null ? (change >= 0 ? 'trend-up' : 'trend-down') : '';
-                return `<tr>
-                    <td style="font-weight:700">${label}</td>
-                    <td>${fmt(pVal)}</td>
-                    <td style="font-weight:600">${fmt(cVal)}</td>
-                    <td class="${trendClass}" style="font-weight:800">${changeText}</td>
-                </tr>`;
-            }).join('');
+            // ── SLIDE 4: WEB CONVERSION FUNNEL ──
+            if (hasFunnelData) {
+                const shopifySessions = ga4Funnel.session_start;
+                const shopifyCart = ga4Funnel.add_to_cart || 0;
+                const shopifyCheckout = ga4Funnel.begin_checkout || 0;
 
-            // Slide 4: Web Conversion Funnel (Shopify storefront data)
-            const sh = data.channels && data.channels.shopify ? data.channels.shopify : {};
-            const shopifySessions = sh.sessions || totals.conversions * 45 || 1000;
-            const shopifyPurchases = totals.conversions || 0;
-            
-            // Build placeholder dropoffs
-            const shopifyCart = Math.round(shopifySessions * 0.08);
-            const shopifyCheckout = Math.round(shopifySessions * 0.035);
-            
-            document.getElementById('funnel-val-sessions').textContent = shopifySessions.toLocaleString();
-            document.getElementById('funnel-val-cart').textContent = shopifyCart.toLocaleString();
-            document.getElementById('funnel-val-checkout').textContent = shopifyCheckout.toLocaleString();
-            document.getElementById('funnel-val-purchase').textContent = shopifyPurchases.toLocaleString();
-            
-            const rCart = shopifySessions > 0 ? ((shopifyCart / shopifySessions) * 100).toFixed(1) : 0;
-            const rCheck = shopifyCart > 0 ? ((shopifyCheckout / shopifyCart) * 100).toFixed(1) : 0;
-            const rPurch = shopifySessions > 0 ? ((shopifyPurchases / shopifySessions) * 100).toFixed(2) : 0;
-            
-            document.getElementById('funnel-bar-cart').style.width = rCart + '%';
-            document.getElementById('funnel-bar-checkout').style.width = (shopifyCheckout / shopifySessions * 100) + '%';
-            document.getElementById('funnel-bar-purchase').style.width = (shopifyPurchases / shopifySessions * 100) + '%';
-            
-            document.getElementById('funnel-conv-cart').textContent = rCart + '%';
-            document.getElementById('funnel-conv-checkout').textContent = rCheck + '%';
-            document.getElementById('funnel-conv-purchase').textContent = rPurch + '%';
-            document.getElementById('funnel-inferences-text').innerHTML = `The overall website conversion rate is tracked at <strong>${rPurch}%</strong> over ${shopifySessions.toLocaleString()} sessions. Checkout dropoff from Add to Cart is <strong>${(100 - rCheck).toFixed(1)}%</strong>, indicating conversion rate optimization (CRO) opportunities.`;
+                document.getElementById('funnel-val-sessions').textContent = shopifySessions.toLocaleString();
+                document.getElementById('funnel-val-cart').textContent = shopifyCart.toLocaleString();
+                document.getElementById('funnel-val-checkout').textContent = shopifyCheckout.toLocaleString();
+                document.getElementById('funnel-val-purchase').textContent = shopifyPurchases.toLocaleString();
 
-            // Slide 5: Attribution Matrix
+                const rCart = shopifySessions > 0 ? ((shopifyCart / shopifySessions) * 100).toFixed(1) : 0;
+                const rCheck = shopifyCart > 0 ? ((shopifyCheckout / shopifyCart) * 100).toFixed(1) : 0;
+                const rPurch = shopifySessions > 0 ? ((shopifyPurchases / shopifySessions) * 100).toFixed(2) : 0;
+
+                document.getElementById('funnel-bar-cart').style.width = rCart + '%';
+                document.getElementById('funnel-bar-checkout').style.width = (shopifySessions > 0 ? (shopifyCheckout / shopifySessions * 100) : 0) + '%';
+                document.getElementById('funnel-bar-purchase').style.width = (shopifySessions > 0 ? (shopifyPurchases / shopifySessions * 100) : 0) + '%';
+
+                document.getElementById('funnel-conv-cart').textContent = rCart + '%';
+                document.getElementById('funnel-conv-checkout').textContent = rCheck + '%';
+                document.getElementById('funnel-conv-purchase').textContent = rPurch + '%';
+                document.getElementById('funnel-inferences-text').innerHTML = ai.funnel_diagnostics
+                    || `The overall website conversion rate is tracked at <strong>${rPurch}%</strong> over ${shopifySessions.toLocaleString()} sessions. Checkout dropoff from Add to Cart is <strong>${(100 - rCheck).toFixed(1)}%</strong>.`;
+            } else {
+                ['sessions', 'cart', 'checkout'].forEach(k => {
+                    document.getElementById(`funnel-val-${k}`).textContent = '—';
+                });
+                document.getElementById('funnel-val-purchase').textContent = shopifyPurchases.toLocaleString();
+                ['cart', 'checkout', 'purchase'].forEach(k => {
+                    document.getElementById(`funnel-bar-${k}`).style.width = '0%';
+                    document.getElementById(`funnel-conv-${k}`).textContent = '—';
+                });
+                document.getElementById('funnel-inferences-text').innerHTML = `GA4 ecommerce event tracking (session_start / add_to_cart / begin_checkout) is not connected or has no recorded events for this period, so session and drop-off figures cannot be shown. Only confirmed Shopify purchases (<strong>${shopifyPurchases.toLocaleString()}</strong>) are known for this period.`;
+            }
+
+            // ── SLIDE 5: PRODUCT PERFORMANCE BY REGION ──
+            const prTbody = document.querySelector('#table-product-region tbody');
+            const products = data.shopify_products || [];
+            const productDrivers = ai.product_drivers || {};
+            if (products.length === 0) {
+                prTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No Shopify products sales aggregated.</td></tr>`;
+                document.getElementById('product-region-callout').textContent = 'No product/region data available for this period.';
+            } else {
+                prTbody.innerHTML = products.map((p, i) => `<tr>
+                    <td style="font-weight:700">#${i + 1}</td>
+                    <td style="font-weight:700">${p.name}</td>
+                    <td>${p.primary_region || '—'}</td>
+                    <td style="font-weight:700;color:var(--green)">${p.revenue_share || 0}%</td>
+                    <td style="color:#94a3b8">${productDrivers[p.name] || '—'}</td>
+                </tr>`).join('');
+                const top = products[0];
+                document.getElementById('product-region-callout').textContent =
+                    `${top.primary_region || 'Unknown region'} is the leading shipping destination for your top product (${top.name}), representing ${top.revenue_share || 0}% of top-product revenue.`;
+            }
+
+            // ── SLIDE 6: ATTRIBUTION MAP ──
             const attTbody = document.querySelector('#table-attribution tbody');
-            const channels = data.channels || {};
-            attTbody.innerHTML = Object.entries(channels).map(([ch, m]) => {
-                const label = ch.toUpperCase().replace('_', ' ');
-                return `<tr>
-                    <td style="font-weight:700">${label}</td>
-                    <td>${curr(m.spend)}</td>
-                    <td>${m.conversions || 0}</td>
-                    <td>${curr(m.revenue)}</td>
-                    <td>${curr(m.cpa)}</td>
-                    <td style="font-weight:700;color:var(--green)">${(m.roas || 0).toFixed(2)}x</td>
-                </tr>`;
-            }).join('');
+            const ga4Chs = data.ga4_channels || {};
+            const paidKeys = ['meta', 'google', 'marketplace'];
+            const attRows = [];
+            Object.entries(channels).forEach(([ch, m]) => {
+                if (ch === 'push') return; // not an attribution channel — see api/reports.php note
+                attRows.push({ label: ch.toUpperCase().replace(/_/g, ' '), sessions: null, orders: m.conversions || 0, revenue: m.revenue || 0, roas: m.roas || 0, paid: paidKeys.includes(ch) });
+            });
+            Object.entries(ga4Chs).forEach(([name, m]) => {
+                attRows.push({ label: name, sessions: m.sessions || 0, orders: null, revenue: m.revenue || 0, roas: null, paid: false });
+            });
+            const attTotalRevenue = attRows.reduce((s, r) => s + (r.revenue || 0), 0);
+            if (attRows.length === 0) {
+                attTbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--gray)">No channel attribution data found.</td></tr>`;
+                document.getElementById('attribution-split-callout').textContent = 'No attribution data available for this period.';
+            } else {
+                attTbody.innerHTML = attRows.map(r => `<tr>
+                    <td style="font-weight:700">${r.label}</td>
+                    <td>${r.sessions === null ? '—' : r.sessions.toLocaleString()}</td>
+                    <td>${r.orders === null ? '—' : r.orders}</td>
+                    <td>${curr(r.revenue)}</td>
+                    <td>${attTotalRevenue > 0 ? (r.revenue / attTotalRevenue * 100).toFixed(1) : '0.0'}%</td>
+                    <td style="font-weight:700;color:var(--green)">${r.roas === null ? '—' : r.roas.toFixed(2) + 'x'}</td>
+                </tr>`).join('');
+                const paidRevenue = attRows.filter(r => r.paid).reduce((s, r) => s + (r.revenue || 0), 0);
+                const nonPaidRevenue = attTotalRevenue - paidRevenue;
+                document.getElementById('attribution-split-callout').textContent =
+                    `Paid Acquisition: ${attTotalRevenue > 0 ? (paidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(paidRevenue)}) | Non-Paid / Owned: ${attTotalRevenue > 0 ? (nonPaidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(nonPaidRevenue)})`;
+            }
 
-            // Slide 6: Meta Ads overview
-            const meta = channels.meta || { spend:0, revenue:0, conversions:0, clicks:0, sessions:0 };
-            document.getElementById('m-spend').textContent = curr(meta.spend);
-            document.getElementById('m-revenue').textContent = curr(meta.revenue);
-            document.getElementById('m-roas').textContent = (meta.roas || 0).toFixed(2) + 'x';
-            document.getElementById('m-orders').textContent = meta.conversions || 0;
-            document.getElementById('m-cpa').textContent = curr(meta.cpa);
-            const mCtrVal = meta.sessions > 0 ? ((meta.clicks / meta.sessions) * 100).toFixed(1) + '%' : '0.0%';
-            document.getElementById('m-ctr').textContent = mCtrVal;
+            // ── SLIDE 7: META CAMPAIGNS DEEP-DIVE ──
+            const metaAudit = data.meta_ad_audit || {};
+            document.getElementById('meta-audit-angles').textContent = metaAudit.angles_tested ? metaAudit.angles_tested + ' creatives' : '—';
+            document.getElementById('meta-audit-placement').textContent = metaAudit.winning_placement
+                ? `${metaAudit.winning_placement} (${(metaAudit.winning_placement_roas || 0).toFixed(2)}x ROAS)` : '—';
+            document.getElementById('meta-audit-angle').textContent = metaAudit.winning_angle || '—';
 
-            // Slide 7: Meta Campaigns list
             const mcTbody = document.querySelector('#table-meta-campaigns tbody');
             const mcList = data.meta_campaigns || [];
-            if (mcList.length === 0) {
-                mcTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No campaign data synced for this month.</td></tr>`;
-            } else {
-                mcTbody.innerHTML = mcList.map(c => `<tr>
+            mcTbody.innerHTML = mcList.length === 0
+                ? `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No campaign data synced for this month.</td></tr>`
+                : mcList.map(c => `<tr>
                     <td style="font-weight:700">${c.name}</td>
                     <td>${curr(c.spent)}</td>
                     <td>${c.orders}</td>
                     <td>${curr(c.sales)}</td>
                     <td style="font-weight:700;color:var(--blue)">${c.roas}</td>
                 </tr>`).join('');
-            }
 
-            // Slide 8: Meta Creatives winners
-            const creativesBox = document.getElementById('meta-creatives-grid');
+            // ── SLIDE 8: META CREATIVES ──
+            const metaCreativesBox = document.getElementById('meta-creatives-grid');
             const crList = data.meta_creatives || [];
-            if (crList.length === 0) {
-                creativesBox.innerHTML = `<div style="grid-column:span 3;text-align:center;color:var(--gray);padding:40px 0">No active Meta creative audits found.</div>`;
-            } else {
-                creativesBox.innerHTML = crList.map((cr, idx) => `
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:20px; border-radius:12px; display:flex; flex-direction:column; justify-content:space-between">
-                        <div>
-                            <div style="width:28px;height:28px;background:var(--blue-gradient);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;margin-bottom:12px">#${idx+1}</div>
-                            <h4 style="font-size:12px;color:#fff;margin-bottom:8px">${cr.name}</h4>
-                            <div style="font-size:11px;color:var(--gray);margin-bottom:4px">Sales Revenue: <strong style="color:#fff">${curr(cr.revenue)}</strong></div>
-                            <div style="font-size:11px;color:var(--gray);margin-bottom:4px">CTR: <strong style="color:#fff">${cr.ctr}</strong></div>
-                            <div style="font-size:11px;color:var(--gray)">Cost Per Acquisition: <strong style="color:#fff">${cr.cpa}</strong></div>
-                        </div>
+            metaCreativesBox.innerHTML = crList.length === 0
+                ? `<div style="grid-column:span 3;text-align:center;color:var(--gray);padding:40px 0">No active Meta creative audits found.</div>`
+                : crList.map((cr, idx) => `
+                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:16px; border-radius:12px; display:flex; flex-direction:column; gap:10px">
+                        <div style="width:28px;height:28px;background:var(--blue-gradient);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff">#${idx + 1}</div>
+                        ${cr.image_url ? `<img src="${cr.image_url}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;background:#111" onerror="this.style.display='none'">` : `<div style="width:100%;height:110px;border-radius:8px;background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:11px">No preview available</div>`}
+                        <h4 style="font-size:12px;color:#fff">${cr.name}</h4>
+                        ${cr.body ? `<div style="font-size:10.5px;color:var(--gray);line-height:1.4">${stripHtml(cr.body).slice(0, 110)}${cr.body.length > 110 ? '…' : ''}</div>` : ''}
+                        <div style="font-size:11px;color:var(--gray)">Revenue: <strong style="color:#fff">${curr(cr.revenue)}</strong></div>
+                        <div style="font-size:11px;color:var(--gray)">CTR: <strong style="color:#fff">${cr.ctr}</strong> &nbsp;|&nbsp; CPA: <strong style="color:#fff">${cr.cpa}</strong></div>
                     </div>
                 `).join('');
-            }
 
-            // Slide 9: Google Ads overview
-            const gads = channels.google || { spend:0, revenue:0, conversions:0, clicks:0, sessions:0 };
-            document.getElementById('g-spend').textContent = curr(gads.spend);
-            document.getElementById('g-revenue').textContent = curr(gads.revenue);
-            document.getElementById('g-roas').textContent = (gads.roas || 0).toFixed(2) + 'x';
-            document.getElementById('g-orders').textContent = gads.conversions || 0;
-            document.getElementById('g-cpa').textContent = curr(gads.cpa);
-            const gCtrVal = gads.sessions > 0 ? ((gads.clicks / gads.sessions) * 100).toFixed(1) + '%' : '0.0%';
-            document.getElementById('g-ctr').textContent = gCtrVal;
+            // ── SLIDE 9: GOOGLE CAMPAIGNS DEEP-DIVE ──
+            const googleAudit = data.google_ad_audit || {};
+            document.getElementById('google-audit-networks').textContent = googleAudit.networks_tested || '—';
+            document.getElementById('google-audit-network').textContent = googleAudit.winning_network || '—';
+            document.getElementById('google-audit-roas').textContent = googleAudit.winning_network_roas ? googleAudit.winning_network_roas.toFixed(2) + 'x' : '—';
 
-            // Slide 10: Google Campaigns list
             const gcTbody = document.querySelector('#table-google-campaigns tbody');
             const gcList = data.google_campaigns || [];
-            if (gcList.length === 0) {
-                gcTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No Google campaigns synced for this month.</td></tr>`;
-            } else {
-                gcTbody.innerHTML = gcList.map(c => `<tr>
+            gcTbody.innerHTML = gcList.length === 0
+                ? `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No Google campaigns synced for this month.</td></tr>`
+                : gcList.map(c => `<tr>
                     <td style="font-weight:700">${c.name}</td>
                     <td>${curr(c.spent)}</td>
                     <td>${c.orders}</td>
                     <td>${curr(c.sales)}</td>
                     <td style="font-weight:700;color:var(--purple)">${c.roas}</td>
                 </tr>`).join('');
-            }
 
-            // Slide 11: Organic Traffic Sources
-            const ga4Tbody = document.querySelector('#table-ga4-channels tbody');
-            const ga4Chs = data.ga4_channels || {};
-            if (Object.keys(ga4Chs).length === 0) {
-                ga4Tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gray)">No Google Analytics traffic data found.</td></tr>`;
-            } else {
-                ga4Tbody.innerHTML = Object.entries(ga4Chs).map(([name, m]) => `<tr>
-                    <td style="font-weight:700">${name}</td>
-                    <td>${m.sessions.toLocaleString()}</td>
-                    <td style="font-family:var(--fm)">${m.convRate}%</td>
-                    <td style="font-weight:700">${curr(m.revenue)}</td>
-                </tr>`).join('');
-            }
+            // ── SLIDE 10: GOOGLE SEARCH AD CREATIVES ──
+            const googleCreativesBox = document.getElementById('google-creatives-grid');
+            const gsAds = data.google_search_ads || [];
+            googleCreativesBox.innerHTML = gsAds.length === 0
+                ? `<div style="grid-column:span 3;text-align:center;color:var(--gray);padding:40px 0">No Google Search ad copy synced for this month.</div>`
+                : gsAds.map((a, idx) => `
+                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:16px; border-radius:12px; display:flex; flex-direction:column; gap:8px">
+                        <div style="font-size:10px;color:var(--green);font-weight:700">Ad · Sponsored</div>
+                        <div style="font-size:13px;color:#93c5fd;font-weight:700">${a.headline}</div>
+                        <div style="font-size:11px;color:var(--gray);line-height:1.4">${a.description}</div>
+                        <div style="font-size:11px;color:var(--gray);margin-top:auto">Clicks: <strong style="color:#fff">${(a.clicks || 0).toLocaleString()}</strong> &nbsp;|&nbsp; ROAS: <strong style="color:#fff">${(a.roas || 0).toFixed(2)}x</strong></div>
+                    </div>
+                `).join('');
 
-            // Slide 12: GSC Landing Pages
+            // ── SLIDE 11: ORGANIC & NON-PAID TRAFFIC (3 cards) ──
+            const organicBox = document.getElementById('organic-cards');
+            const organicLabels = ['SEO / Search', 'Direct', 'Social Organic'];
+            organicBox.innerHTML = organicLabels.map(lbl => {
+                const m = ga4Chs[lbl] || { sessions: 0, convRate: '0.00', revenue: 0 };
+                return `<div class="metric-card" style="text-align:left">
+                    <div class="metric-label">${lbl}</div>
+                    <div style="font-size:11px;color:var(--gray);margin-top:8px">Sessions</div>
+                    <div style="font-weight:800;font-size:16px;color:#fff">${(m.sessions || 0).toLocaleString()}</div>
+                    <div style="font-size:11px;color:var(--gray);margin-top:6px">Conv. Rate / Revenue</div>
+                    <div style="font-weight:700;font-size:12px;color:#fff">${m.convRate}% &nbsp;/&nbsp; ${curr(m.revenue)}</div>
+                </div>`;
+            }).join('');
+
+            // ── SLIDE 12: GSC LANDING PAGES ──
             const gscPagesTbody = document.querySelector('#table-gsc-pages tbody');
             const gscPagesList = data.gsc_pages || [];
-            if (gscPagesList.length === 0) {
-                gscPagesTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No Search Console page rankings found.</td></tr>`;
-            } else {
-                gscPagesTbody.innerHTML = gscPagesList.map(p => `<tr>
-                    <td style="font-family:var(--fm);color:var(--blue)">${p.page}</td>
+            gscPagesTbody.innerHTML = gscPagesList.length === 0
+                ? `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No Search Console page rankings found.</td></tr>`
+                : gscPagesList.map(p => `<tr>
+                    <td style="font-family:monospace;color:var(--blue)">${p.page}</td>
                     <td>${p.clicks.toLocaleString()}</td>
                     <td>${p.impressions.toLocaleString()}</td>
                     <td>${p.ctr}</td>
                     <td style="font-weight:700">${p.position}</td>
                 </tr>`).join('');
-            }
 
-            // Slide 13: GSC Search Queries
+            // ── SLIDE 13: GSC SEARCH QUERIES ──
             const gscQueriesTbody = document.querySelector('#table-gsc-queries tbody');
             const gscQueriesList = data.gsc_queries || [];
-            if (gscQueriesList.length === 0) {
-                gscQueriesTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No Search Console query rankings found.</td></tr>`;
-            } else {
-                gscQueriesTbody.innerHTML = gscQueriesList.map(q => `<tr>
+            gscQueriesTbody.innerHTML = gscQueriesList.length === 0
+                ? `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No Search Console query rankings found.</td></tr>`
+                : gscQueriesList.map(q => `<tr>
                     <td style="font-weight:700">${q.query}</td>
                     <td>${q.clicks.toLocaleString()}</td>
                     <td>${q.impressions.toLocaleString()}</td>
                     <td>${q.ctr}</td>
                     <td style="font-weight:700">${q.position}</td>
                 </tr>`).join('');
-            }
 
-            // Slide 14: Cohort Retention
-            const shFull = channels.shopify || { spend:0, revenue:0, conversions:0, customers_acquired:0 };
-            const repeatRev = Math.max(0, shFull.revenue - (shFull.customers_acquired * totals.aov));
-            const repRate = shFull.conversions > 0 ? ((shFull.conversions - shFull.customers_acquired) / shFull.conversions * 100).toFixed(1) + '%' : '0.0%';
-            
+            // ── SLIDE 14: RETENTION & COHORT MATRIX ──
             document.getElementById('ret-revenue').textContent = curr(repeatRev);
             document.getElementById('ret-rate').textContent = repRate;
-            document.getElementById('ret-aov').textContent = curr(totals.aov);
-            document.getElementById('ret-inferences').innerHTML = `Returning customer sales accounts for <strong>${repRate}</strong> of overall storefront transactions during the month. Re-acquisition value metrics show repeat purchase averages at <strong>${curr(totals.aov)}</strong> AOV, validating brand customer loyalty parameters.`;
+            document.getElementById('ret-aov').textContent = curr(shopifyAov);
+            document.getElementById('ret-inferences').innerHTML = `Returning customer sales accounts for <strong>${repRate}</strong> of overall storefront transactions during the month, at a repeat-purchase AOV of <strong>${curr(shopifyAov)}</strong>.`;
 
-            // Slide 15: Retention Broadcasting (Email/WhatsApp manual data)
+            const cohortTbody = document.querySelector('#table-cohort tbody');
+            const cohortMatrix = data.cohort_matrix || [];
+            if (cohortMatrix.length === 0) {
+                cohortTbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--gray)">No cohort history yet — this builds up automatically as monthly syncs accumulate order history over time.</td></tr>`;
+            } else {
+                cohortTbody.innerHTML = cohortMatrix.map(row => {
+                    const cells = [0, 1, 2, 3].map(i => {
+                        const v = row.months ? row.months[i] : null;
+                        return `<td style="font-weight:700">${v === null || v === undefined ? '—' : v + '%'}</td>`;
+                    }).join('');
+                    return `<tr><td style="font-weight:700">${row.cohort_month}</td><td>${row.cohort_size.toLocaleString()} customers</td>${cells}</tr>`;
+                }).join('');
+            }
+
+            // ── SLIDE 15: RETENTION & BROADCAST (Email / WhatsApp / Push) ──
             const owned = data.owned_media || {};
-            const eMail = owned.email || { spend:0, revenue:0, orders:0, sent:0, open_rate:0, click_rate:0 };
-            const wa = owned.whatsapp || { spend:0, revenue:0, orders:0, sent:0 };
-            
-            document.getElementById('o-email-spend').textContent = curr(eMail.spend);
-            document.getElementById('o-email-rev').textContent = curr(eMail.revenue);
-            document.getElementById('o-email-orders').textContent = eMail.orders;
-            document.getElementById('o-email-sent').textContent = eMail.sent.toLocaleString();
-            document.getElementById('o-email-rates').textContent = `${eMail.open_rate}% / ${eMail.click_rate}%`;
+            const eMail = owned.email || { spend: 0, revenue: 0, orders: 0, sent: 0, open_rate: 0, click_rate: 0 };
+            const wa = owned.whatsapp || { spend: 0, revenue: 0, orders: 0, sent: 0 };
+            const push = owned.push || { revenue: 0, sent: 0, open_rate: 0, click_rate: 0 };
+            document.getElementById('owned-media-cards').innerHTML = `
+                <div class="metric-card" style="text-align:left">
+                    <div style="font-weight:800;font-size:12.5px;margin-bottom:10px">✉ Email Marketing</div>
+                    <div style="font-size:11px;color:var(--gray)">Sent</div><div style="font-weight:700;margin-bottom:6px">${(eMail.sent || 0).toLocaleString()}</div>
+                    <div style="font-size:11px;color:var(--gray)">Open / Click Rate</div><div style="font-weight:700;margin-bottom:6px">${eMail.open_rate}% / ${eMail.click_rate}%</div>
+                    <div style="font-size:11px;color:var(--gray)">Revenue</div><div style="font-weight:800;color:var(--green)">${curr(eMail.revenue)}</div>
+                </div>
+                <div class="metric-card" style="text-align:left">
+                    <div style="font-weight:800;font-size:12.5px;margin-bottom:10px">💬 WhatsApp</div>
+                    <div style="font-size:11px;color:var(--gray)">Sent</div><div style="font-weight:700;margin-bottom:6px">${(wa.sent || 0).toLocaleString()}</div>
+                    <div style="font-size:11px;color:var(--gray)">Orders</div><div style="font-weight:700;margin-bottom:6px">${wa.orders || 0}</div>
+                    <div style="font-size:11px;color:var(--gray)">Revenue</div><div style="font-weight:800;color:var(--green)">${curr(wa.revenue)}</div>
+                </div>
+                <div class="metric-card" style="text-align:left">
+                    <div style="font-weight:800;font-size:12.5px;margin-bottom:10px">🔔 Push Notifications</div>
+                    <div style="font-size:11px;color:var(--gray)">Sent</div><div style="font-weight:700;margin-bottom:6px">${(push.sent || 0).toLocaleString()}</div>
+                    <div style="font-size:11px;color:var(--gray)">Open / Click Rate</div><div style="font-weight:700;margin-bottom:6px">${push.open_rate}% / ${push.click_rate}%</div>
+                    <div style="font-size:11px;color:var(--gray)">Revenue (assist)</div><div style="font-weight:800;color:var(--green)">${curr(push.revenue)}</div>
+                </div>
+            `;
 
-            document.getElementById('o-wa-spend').textContent = curr(wa.spend);
-            document.getElementById('o-wa-rev').textContent = curr(wa.revenue);
-            document.getElementById('o-wa-orders').textContent = wa.orders;
-            document.getElementById('o-wa-sent').textContent = wa.sent.toLocaleString();
+            // ── SLIDE 16: EXECUTED STRATEGIC INITIATIVES (AI-drafted) ──
+            const initiativesBox = document.getElementById('initiatives-grid');
+            const initiatives = ai.initiatives || [];
+            initiativesBox.innerHTML = initiatives.length === 0
+                ? `<div style="grid-column:span 3;text-align:center;color:var(--gray);padding:40px 0">No initiatives generated for this period.</div>`
+                : initiatives.map(it => `
+                    <div class="narrative-box" style="display:flex;flex-direction:column;gap:8px">
+                        <div style="font-weight:800;font-size:13px;color:#fff">${it.name || 'Initiative'}</div>
+                        <div><span style="color:var(--blue);font-weight:700;font-size:10.5px">GOAL:</span> ${it.goal || '—'}</div>
+                        <div><span style="color:var(--purple);font-weight:700;font-size:10.5px">EXECUTION:</span> ${it.execution || '—'}</div>
+                        <div><span style="color:var(--green);font-weight:700;font-size:10.5px">RESULT:</span> ${it.result || '—'}</div>
+                    </div>
+                `).join('');
 
-            // Slide 16: Top products
-            const prodTbody = document.querySelector('#table-products tbody');
-            const products = data.shopify_products || [];
-            if (products.length === 0) {
-                prodTbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--gray)">No Shopify products sales aggregated.</td></tr>`;
-            } else {
-                prodTbody.innerHTML = products.map(p => `<tr>
-                    <td style="font-weight:700">${p.name}</td>
-                    <td style="font-weight:600">${p.orders.toLocaleString()} units</td>
-                    <td>${curr(p.revenue)}</td>
-                </tr>`).join('');
-            }
+            // ── SLIDE 17: STRATEGY DEEP-DIVE (AI-drafted) ──
+            const sdd = ai.strategy_deep_dive || {};
+            document.getElementById('strategy-deepdive-title').textContent = sdd.initiative_name || 'No strategy deep-dive available for this period.';
+            const sddSteps = [
+                ['1', 'Hypothesis Formulation', sdd.hypothesis],
+                ['2', 'Creative Campaign Deployment', sdd.creative_deployment],
+                ['3', 'Broadcast Execution', sdd.broadcast_execution],
+                ['4', 'Outcome Measurement', sdd.outcome]
+            ];
+            document.getElementById('strategy-deepdive-steps').innerHTML = sddSteps.map(([n, title, detail]) => `
+                <div class="narrative-box" style="display:flex;gap:12px">
+                    <div style="width:26px;height:26px;border-radius:7px;background:var(--blue-gradient);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0">${n}</div>
+                    <div><div style="font-weight:800;font-size:12.5px;color:#fff;margin-bottom:4px">${title}</div><div style="color:#cbd5e1">${detail || '—'}</div></div>
+                </div>
+            `).join('');
 
-            // Slide 17: Top Shipping locations
-            const locTbody = document.querySelector('#table-locations tbody');
-            const locations = data.shopify_locations || [];
-            if (locations.length === 0) {
-                locTbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--gray)">No Shopify order city listings found.</td></tr>`;
-            } else {
-                locTbody.innerHTML = locations.map(l => `<tr>
-                    <td style="font-weight:700">${l.location}</td>
-                    <td style="font-weight:600">${l.orders} orders</td>
-                    <td>${curr(l.revenue)}</td>
-                </tr>`).join('');
-            }
+            // ── SLIDE 18: PERFORMANCE INFERENCES (AI-generated, 4 cards) ──
+            const inferencesBox = document.getElementById('inferences-grid');
+            const inferences = ai.inferences || [];
+            inferencesBox.innerHTML = inferences.length === 0
+                ? `<div style="grid-column:span 2;text-align:center;color:var(--gray);padding:40px 0">No inferences generated for this period.</div>`
+                : inferences.map((inf, i) => `
+                    <div class="narrative-box" style="display:flex;gap:12px">
+                        <div style="width:26px;height:26px;border-radius:7px;background:var(--blue-gradient);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0">${i + 1}</div>
+                        <div><div style="font-weight:800;font-size:12.5px;color:#fff;margin-bottom:4px">${inf.title || ''}</div><div style="color:#cbd5e1">${inf.detail || ''}</div></div>
+                    </div>
+                `).join('');
 
-            // Slide 18: Shopify Custom UTM Campaigns
-            const utmTbody = document.querySelector('#table-shopify-campaigns tbody');
-            const utmCampaigns = data.shopify_campaigns || [];
-            if (utmCampaigns.length === 0) {
-                utmTbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--gray)">No Shopify referral campaign parameters tracked.</td></tr>`;
-            } else {
-                utmTbody.innerHTML = utmCampaigns.map(c => `<tr>
-                    <td style="font-weight:700">${c.source} / ${c.campaign}</td>
-                    <td style="font-weight:600">${c.orders} checkouts</td>
-                    <td>${curr(c.revenue)}</td>
-                </tr>`).join('');
-            }
+            // ── SLIDE 19: STRATEGIC ACTION PLAN (AI-generated, 4 cards) ──
+            const recommendationsBox = document.getElementById('recommendations-grid');
+            const recommendations = ai.recommendations || [];
+            recommendationsBox.innerHTML = recommendations.length === 0
+                ? `<div style="grid-column:span 2;text-align:center;color:var(--gray);padding:40px 0">No recommendations generated for this period.</div>`
+                : recommendations.map((rec, i) => `
+                    <div class="narrative-box" style="display:flex;gap:12px">
+                        <div style="width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0">${i + 1}</div>
+                        <div><div style="font-weight:800;font-size:12.5px;color:#fff;margin-bottom:4px">${rec.title || ''}</div><div style="color:#cbd5e1">${rec.detail || ''}</div></div>
+                    </div>
+                `).join('');
 
-            // Slide 19: AI Strategy Inferences
-            const highlightsBox = document.getElementById('ai-highlights-box');
-            const hlText = report.highlights || "• Consistently monitored client conversion counts.<br>• Adjusted Google Performance Max campaigns to target returning customer cohorts.";
-            highlightsBox.innerHTML = hlText.split('<br>').map(b => `<div style="display:flex;align-items:start;gap:12px;background:rgba(255,255,255,0.01);padding:14px;border-radius:8px;border:1px solid rgba(255,255,255,0.03)">
-                <span style="color:var(--blue)">✦</span>
-                <div>${b.replace(/^[•\s\-]+/, '')}</div>
-            </div>`).join('');
+            // ── SLIDE 20: GROWTH PROJECTIONS (real trailing-trend forecast, not hardcoded) ──
+            // Growth rate is derived from actual MoM change, clamped to a sane range so one noisy
+            // month doesn't produce an absurd forecast. Target ROAS is a modest efficiency
+            // improvement on the brand's own real current ROAS, not a fixed constant.
+            let growthRate = (prevGrossRevenue > 0) ? ((grossRevenue - prevGrossRevenue) / prevGrossRevenue) : 0.1;
+            growthRate = Math.max(-0.3, Math.min(0.5, growthRate));
+            const fcRevenue = grossRevenue * (1 + growthRate);
+            const targetRoas = grossRoas > 0 ? Math.round(grossRoas * 1.05 * 100) / 100 : 3.0;
+            const fcSpend = targetRoas > 0 ? fcRevenue / targetRoas : 0;
+            const fcOrders = shopifyAov > 0 ? Math.round(fcRevenue / shopifyAov) : 0;
 
-            // Slide 20: AI Strategic Recommendations
-            const recommendationsBox = document.getElementById('ai-recommendations-box');
-            const recText = report.next_steps || "• Refine high blended CPA targets by launching catalog ads.<br>• Implement weekly email marketing broadcast campaigns.";
-            recommendationsBox.innerHTML = recText.split('<br>').map(b => `<div style="display:flex;align-items:start;gap:12px;background:rgba(255,255,255,0.01);padding:14px;border-radius:8px;border:1px solid rgba(255,255,255,0.03)">
-                <span style="color:var(--green)">⚡</span>
-                <div>${b.replace(/^[•\s\-]+/, '')}</div>
-            </div>`).join('');
+            const trendBars = [
+                { label: prev.start ? new Date(prev.start).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Prior', value: prevGrossRevenue, color: '#64748b' },
+                { label: report.period_start ? new Date(report.period_start).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Current', value: grossRevenue, color: '#3b82f6' },
+                { label: 'Forecast (F)', value: fcRevenue, color: '#10b981' }
+            ];
+            const maxTrend = Math.max(...trendBars.map(b => b.value), 1);
+            document.getElementById('trend-chart').innerHTML = trendBars.map(b => `
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
+                    <div style="font-size:11px;font-weight:800;color:#fff;margin-bottom:6px">${curr(b.value)}</div>
+                    <div style="width:100%;background:${b.color};border-radius:8px 8px 0 0;height:${Math.max(6, (b.value / maxTrend) * 100)}%"></div>
+                    <div style="font-size:10px;color:var(--gray);font-weight:700;margin-top:8px">${b.label}</div>
+                </div>
+            `).join('');
 
-            // Slide 21: Next Month Forecast
-            const targetRoas = 3.0; // Default target
-            document.getElementById('fc-target-roas').textContent = targetRoas.toFixed(2) + 'x';
-            document.getElementById('fc-aov').textContent = curr(totals.aov);
-            
-            // Forecast spend to double revenue
-            const fcRevenue = totals.revenue * 1.25; // 25% target scale
-            const fcSpend = fcRevenue / targetRoas;
-            const fcOrders = totals.aov > 0 ? Math.round(fcRevenue / totals.aov) : 0;
-            
-            document.getElementById('fc-rev').textContent = curr(fcRevenue);
-            document.getElementById('fc-spend').textContent = curr(fcSpend);
-            document.getElementById('fc-orders').textContent = fcOrders.toLocaleString();
+            document.getElementById('forecast-tiles').innerHTML = [
+                tileHTML('Target Sales', curr(fcRevenue), null),
+                tileHTML('Target Budget', curr(fcSpend), null),
+                tileHTML('Target Orders', fcOrders.toLocaleString(), null),
+                tileHTML('Target ROAS', targetRoas.toFixed(2) + 'x', null)
+            ].join('');
+
+            // ── PPTX EXPORT ──────────────────────────────────────────────────────
+            // Builds a downloadable deck mirroring the 21 on-screen slides, from the same bound
+            // data — previously pptxgenjs was loaded on this page but never invoked, so there was
+            // no way to actually hand this deck to a client as a file.
+            window._pptxExportFn = async function() {
+                const btn = document.getElementById('btn-download-pptx');
+                if (btn) { btn.disabled = true; btn.textContent = 'Building PPTX…'; }
+                try {
+                    const pptx = new PptxGenJS();
+                    pptx.layout = 'LAYOUT_WIDE';
+                    pptx.title = `${report.brand_name || 'Brand'} — Monthly Performance Report`;
+
+                    const CLR = {
+                        primary: '3B82F6', purple: 'A855F7', dark: '0F172A', mid: '64748B', green: '10B981',
+                        red: 'F43F5E', bg: 'F8FAFC', border: 'E2E8F0', white: 'FFFFFF'
+                    };
+                    const FONT = 'Plus Jakarta Sans';
+                    const pctText = (v) => (v === null || v === undefined) ? '—' : `${v >= 0 ? '+' : ''}${v}%`;
+
+                    function baseSlide(group, title) {
+                        const s = pptx.addSlide();
+                        s.background = { color: CLR.white };
+                        s.addShape('rect', { x: 0, y: 0, w: 13.33, h: 0.9, fill: { color: CLR.dark } });
+                        s.addText('DIGIFYCE', { x: 0.4, y: 0.22, w: 3, h: 0.5, fontSize: 16, bold: true, color: CLR.white, fontFace: FONT });
+                        s.addText(group.toUpperCase(), { x: 9.53, y: 0.3, w: 3.4, h: 0.35, align: 'right', fontSize: 10, color: '93C5FD', fontFace: FONT, bold: true });
+                        s.addText(title, { x: 0.4, y: 1.05, w: 12.5, h: 0.5, fontSize: 22, bold: true, color: CLR.dark, fontFace: FONT });
+                        return s;
+                    }
+
+                    function statTiles(s, tiles, startY) {
+                        const cols = 3, tileW = 3.9, tileH = 1.3, gap = 0.25, startX = 0.4;
+                        tiles.forEach((t, i) => {
+                            const col = i % cols, row = Math.floor(i / cols);
+                            const x = startX + col * (tileW + gap);
+                            const y = startY + row * (tileH + gap);
+                            s.addShape('rect', { x, y, w: tileW, h: tileH, fill: { color: CLR.bg }, line: { color: CLR.border, width: 1 }, rectRadius: 0.08 });
+                            s.addText(t.label.toUpperCase(), { x: x + 0.15, y: y + 0.1, w: tileW - 0.3, h: 0.3, fontSize: 9, bold: true, color: CLR.mid, fontFace: FONT });
+                            s.addText(t.value, { x: x + 0.15, y: y + 0.35, w: tileW - 0.3, h: 0.5, fontSize: 18, bold: true, color: CLR.dark, fontFace: FONT });
+                            if (t.change !== undefined) {
+                                const chColor = t.change === null ? CLR.mid : (t.change >= 0 ? CLR.green : CLR.red);
+                                s.addText(pctText(t.change) + ' vs prior', { x: x + 0.15, y: y + 0.9, w: tileW - 0.3, h: 0.3, fontSize: 9, bold: true, color: chColor, fontFace: FONT });
+                            }
+                        });
+                    }
+
+                    function tableSlide(group, title, headers, rows, emptyMsg) {
+                        const s = baseSlide(group, title);
+                        if (!rows.length) {
+                            s.addText(emptyMsg || 'No data available for this period.', { x: 0.4, y: 2.2, w: 12.5, h: 0.5, fontSize: 13, color: CLR.mid, fontFace: FONT, italic: true });
+                            return s;
+                        }
+                        const tableRows = [headers.map(h => ({ text: h, options: { bold: true, color: CLR.white, fill: { color: CLR.dark }, fontSize: 9.5, fontFace: FONT } }))]
+                            .concat(rows.map(r => r.map(c => ({ text: String(c), options: { fontSize: 9.5, color: CLR.dark, fontFace: FONT } }))));
+                        s.addTable(tableRows, { x: 0.4, y: 1.75, w: 12.5, autoPage: false, border: { type: 'solid', color: CLR.border, pt: 0.5 }, valign: 'middle' });
+                        return s;
+                    }
+
+                    function narrativeCardsSlide(group, title, cards) {
+                        const s = baseSlide(group, title);
+                        const cols = cards.length > 4 ? 3 : 2;
+                        const gap = 0.3, startX = 0.4, startY = 1.75;
+                        const cardW = (12.5 - gap * (cols - 1)) / cols;
+                        const cardH = cols === 3 ? 2.4 : 2.6;
+                        cards.forEach((c, i) => {
+                            const col = i % cols, row = Math.floor(i / cols);
+                            const x = startX + col * (cardW + gap);
+                            const y = startY + row * (cardH + gap);
+                            s.addShape('rect', { x, y, w: cardW, h: cardH, fill: { color: CLR.bg }, line: { color: CLR.border, width: 1 }, rectRadius: 0.06 });
+                            s.addText(c.title || '', { x: x + 0.15, y: y + 0.12, w: cardW - 0.3, h: 0.4, fontSize: 11.5, bold: true, color: CLR.dark, fontFace: FONT });
+                            s.addText(c.body || '', { x: x + 0.15, y: y + 0.55, w: cardW - 0.3, h: cardH - 0.7, fontSize: 9.5, color: CLR.mid, fontFace: FONT, valign: 'top' });
+                        });
+                        return s;
+                    }
+
+                    const stripHtmlPptx = (html) => (html || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+
+                    // Slide 1: Cover
+                    const cover = pptx.addSlide();
+                    cover.background = { color: CLR.dark };
+                    cover.addText(report.brand_name || 'Brand', { x: 0.8, y: 2.7, w: 11.7, h: 1, fontSize: 40, bold: true, color: CLR.white, fontFace: FONT });
+                    cover.addText(`Marketing Performance Report — ${mLabel}`, { x: 0.8, y: 3.65, w: 11.7, h: 0.6, fontSize: 18, color: '93C5FD', fontFace: FONT });
+                    cover.addText('Agency: Digifyce Team   |   Contact: agent@digifyce.in   |   Portal: platform.digifyce.in', { x: 0.8, y: 6.6, w: 11.7, h: 0.4, fontSize: 11, color: 'CBD5E1', fontFace: FONT });
+
+                    // Slide 2: High Level Overview
+                    const s2 = baseSlide('Executive Summary', 'High Level Overview');
+                    s2.addText(ai.executive_summary || '', { x: 0.4, y: 1.7, w: 12.5, h: 0.55, fontSize: 10.5, color: CLR.mid, fontFace: FONT, valign: 'top' });
+                    statTiles(s2, [
+                        { label: 'Gross Revenue', value: curr(grossRevenue), change: comps.gross_revenue },
+                        { label: 'Marketplace Revenue', value: curr((channels.marketplace || {}).revenue), change: chPct((channels.marketplace || {}).revenue, (prevChannels.marketplace || {}).revenue) },
+                        { label: 'Shopify Revenue', value: curr(shFull.revenue), change: chPct(shFull.revenue, (prevChannels.shopify || {}).revenue) },
+                        { label: 'Consolidated Spend', value: curr(totals.spend), change: comps.spend },
+                        { label: 'Blended ROAS', value: (grossRoas || 0).toFixed(2) + 'x', change: comps.gross_roas },
+                        { label: 'Meta ROAS', value: ((channels.meta || {}).roas || 0).toFixed(2) + 'x', change: chPct((channels.meta || {}).roas, (prevChannels.meta || {}).roas) },
+                        { label: 'Google ROAS', value: ((channels.google || {}).roas || 0).toFixed(2) + 'x', change: chPct((channels.google || {}).roas, (prevChannels.google || {}).roas) },
+                        { label: 'Marketplace ROAS', value: ((channels.marketplace || {}).roas || 0).toFixed(2) + 'x', change: chPct((channels.marketplace || {}).roas, (prevChannels.marketplace || {}).roas) },
+                        { label: 'Returning Customer Rate', value: repRate }
+                    ], 2.4);
+
+                    // Slide 3: MoM Table
+                    tableSlide('Period Comparison', 'Month-over-Month Comparison',
+                        ['Metric', 'Previous', 'Current', 'Change', 'Why It Changed'],
+                        metricsList.map(([key, label, fmt, cVal, pVal, change]) => [label, fmt(pVal || 0), fmt(cVal || 0), pctText(change), momReasons[key] || '—']));
+
+                    // Slide 4: Conversion Funnel
+                    const funnelRows = hasFunnelData
+                        ? [
+                            ['Sessions', ga4Funnel.session_start.toLocaleString(), '100%'],
+                            ['Add to Cart', (ga4Funnel.add_to_cart || 0).toLocaleString(), ((ga4Funnel.add_to_cart || 0) / ga4Funnel.session_start * 100).toFixed(1) + '%'],
+                            ['Checkout', (ga4Funnel.begin_checkout || 0).toLocaleString(), ((ga4Funnel.begin_checkout || 0) / ga4Funnel.session_start * 100).toFixed(1) + '%'],
+                            ['Purchase', shopifyPurchases.toLocaleString(), (shopifyPurchases / ga4Funnel.session_start * 100).toFixed(2) + '%']
+                        ]
+                        : [];
+                    tableSlide('Storefront Performance', 'E-Commerce Conversion Funnel', ['Stage', 'Count', '% of Sessions'], funnelRows,
+                        `GA4 ecommerce event tracking is not connected — only confirmed purchases (${shopifyPurchases.toLocaleString()}) are known for this period.`);
+
+                    // Slide 5: Product×Region
+                    tableSlide('Sales & Shipping Cross-Reference', 'Product Performance by Region',
+                        ['Rank', 'Product', 'Primary Region', 'Revenue Share', 'Performance Driver'],
+                        products.map((p, i) => [`#${i + 1}`, p.name, p.primary_region || '—', (p.revenue_share || 0) + '%', productDrivers[p.name] || '—']),
+                        'No Shopify product sales aggregated.');
+
+                    // Slide 6: Attribution Map
+                    tableSlide('Revenue Origins & Channels', 'Attribution Map',
+                        ['Channel', 'Sessions', 'Orders', 'Revenue', 'Revenue Share', 'ROAS'],
+                        attRows.map(r => [r.label, r.sessions === null ? '—' : r.sessions.toLocaleString(), r.orders === null ? '—' : r.orders, curr(r.revenue), (attTotalRevenue > 0 ? (r.revenue / attTotalRevenue * 100).toFixed(1) : '0.0') + '%', r.roas === null ? '—' : r.roas.toFixed(2) + 'x']),
+                        'No channel attribution data found.');
+
+                    // Slide 7: Meta Campaigns Deep-Dive
+                    const s7 = tableSlide('Meta Ads Manager Structure', 'Paid Ads: Meta Campaigns Deep-Dive',
+                        ['Campaign', 'Spend', 'Orders', 'Sales', 'ROAS'],
+                        mcList.map(c => [c.name, curr(c.spent), c.orders, curr(c.sales), c.roas]),
+                        'No Meta campaign data synced for this month.');
+                    s7.addText(`Creatives Tested: ${metaAudit.angles_tested || '—'}   |   Winning Placement: ${metaAudit.winning_placement || '—'}   |   Winning Creative: ${metaAudit.winning_angle || '—'}`,
+                        { x: 0.4, y: 1.4, w: 12.5, h: 0.3, fontSize: 9.5, color: CLR.mid, fontFace: FONT, italic: true });
+
+                    // Slide 8: Meta Creatives
+                    narrativeCardsSlide('Creative Performance Audit', 'Best Performing Creatives (Meta Ads)',
+                        crList.map((cr, i) => ({ title: `#${i + 1}  ${cr.name}`, body: `${stripHtmlPptx(cr.body || '').slice(0, 140)}\n\nRevenue: ${curr(cr.revenue)}   CTR: ${cr.ctr}   CPA: ${cr.cpa}` })));
+
+                    // Slide 9: Google Campaigns Deep-Dive
+                    const s9 = tableSlide('Google Ads Manager Structure', 'Paid Ads: Google Campaigns Deep-Dive',
+                        ['Campaign', 'Spend', 'Orders', 'Sales', 'ROAS'],
+                        gcList.map(c => [c.name, curr(c.spent), c.orders, curr(c.sales), c.roas]),
+                        'No Google campaign data synced for this month.');
+                    s9.addText(`Networks Tested: ${googleAudit.networks_tested || '—'}   |   Winning Network: ${googleAudit.winning_network || '—'} (${(googleAudit.winning_network_roas || 0).toFixed(2)}x ROAS)`,
+                        { x: 0.4, y: 1.4, w: 12.5, h: 0.3, fontSize: 9.5, color: CLR.mid, fontFace: FONT, italic: true });
+
+                    // Slide 10: Google Search Ad Creatives
+                    narrativeCardsSlide('Search Text Copy', 'Best Performing Creatives (Google Ads)',
+                        gsAds.map((a, i) => ({ title: `#${i + 1}  ${a.headline}`, body: `${a.description}\n\nClicks: ${(a.clicks || 0).toLocaleString()}   ROAS: ${(a.roas || 0).toFixed(2)}x` })));
+
+                    // Slide 11: Organic & Non-Paid Traffic
+                    tableSlide('Earned Channels Session Performance', 'Organic & Non-Paid Traffic Channels',
+                        ['Channel', 'Sessions', 'Conv. Rate', 'Revenue'],
+                        organicLabels.map(lbl => { const m = ga4Chs[lbl] || { sessions: 0, convRate: '0.00', revenue: 0 }; return [lbl, (m.sessions || 0).toLocaleString(), m.convRate + '%', curr(m.revenue)]; }));
+
+                    // Slide 12: GSC Pages
+                    tableSlide('Organic Click Distribution', 'Search Performance: Top Landing Pages',
+                        ['Page', 'Clicks', 'Impressions', 'CTR', 'Avg Position'],
+                        gscPagesList.map(p => [p.page, p.clicks.toLocaleString(), p.impressions.toLocaleString(), p.ctr, p.position]),
+                        'No Search Console page data found.');
+
+                    // Slide 13: GSC Queries
+                    tableSlide('Search Keyword Impression Insights', 'Search Performance: Top Search Queries',
+                        ['Query', 'Clicks', 'Impressions', 'CTR', 'Avg Position'],
+                        gscQueriesList.map(q => [q.query, q.clicks.toLocaleString(), q.impressions.toLocaleString(), q.ctr, q.position]),
+                        'No Search Console query data found.');
+
+                    // Slide 14: Retention & Cohort Matrix
+                    const s14 = baseSlide('Cohort Purchase Curve', 'Customer Retention & Loyalty Performance');
+                    statTiles(s14, [
+                        { label: 'Retention Revenue', value: curr(repeatRev) },
+                        { label: 'Returning Rate', value: repRate },
+                        { label: 'Repeat AOV', value: curr(shopifyAov) }
+                    ], 1.75);
+                    if (cohortMatrix.length) {
+                        const cohortRows = [['Acquisition Cohort', 'Cohort Size', 'Month 0', 'Month 1', 'Month 2', 'Month 3'].map(h => ({ text: h, options: { bold: true, color: CLR.white, fill: { color: CLR.dark }, fontSize: 9.5, fontFace: FONT } }))]
+                            .concat(cohortMatrix.map(row => {
+                                const cells = [row.cohort_month, row.cohort_size.toLocaleString() + ' customers'].concat([0, 1, 2, 3].map(i => { const v = row.months ? row.months[i] : null; return (v === null || v === undefined) ? '—' : v + '%'; }));
+                                return cells.map(c => ({ text: String(c), options: { fontSize: 9.5, color: CLR.dark, fontFace: FONT } }));
+                            }));
+                        s14.addTable(cohortRows, { x: 0.4, y: 3.4, w: 12.5, autoPage: false, border: { type: 'solid', color: CLR.border, pt: 0.5 }, valign: 'middle' });
+                    }
+
+                    // Slide 15: Retention & Broadcast
+                    tableSlide('Own-Media Performance Summary', 'Retention & Broadcast Performance',
+                        ['Channel', 'Sent', 'Open / Click Rate', 'Revenue'],
+                        [
+                            ['Email Marketing', (eMail.sent || 0).toLocaleString(), `${eMail.open_rate}% / ${eMail.click_rate}%`, curr(eMail.revenue)],
+                            ['WhatsApp', (wa.sent || 0).toLocaleString(), '—', curr(wa.revenue)],
+                            ['Push Notifications', (push.sent || 0).toLocaleString(), `${push.open_rate}% / ${push.click_rate}%`, curr(push.revenue)]
+                        ]);
+
+                    // Slide 16: Executed Strategic Initiatives
+                    narrativeCardsSlide('AI-Assisted Summary', 'Executed Strategic Approaches & Initiatives',
+                        initiatives.map(it => ({ title: it.name || 'Initiative', body: `GOAL: ${it.goal || '—'}\n\nEXECUTION: ${it.execution || '—'}\n\nRESULT: ${it.result || '—'}` })));
+
+                    // Slide 17: Strategy Deep-Dive
+                    narrativeCardsSlide('Strategic Initiative Breakdown', `Strategy Deep-Dive: ${sdd.initiative_name || ''}`,
+                        [
+                            { title: '1. Hypothesis Formulation', body: sdd.hypothesis || '—' },
+                            { title: '2. Creative Campaign Deployment', body: sdd.creative_deployment || '—' },
+                            { title: '3. Broadcast Execution', body: sdd.broadcast_execution || '—' },
+                            { title: '4. Outcome Measurement', body: sdd.outcome || '—' }
+                        ]);
+
+                    // Slide 18: Performance Inferences
+                    narrativeCardsSlide('Automated Strategy Analysis Scan', 'Performance Inferences & Diagnostics',
+                        inferences.map((inf, i) => ({ title: `${i + 1}. ${inf.title || ''}`, body: inf.detail || '' })));
+
+                    // Slide 19: Strategic Action Plan
+                    narrativeCardsSlide('Proposed Actions for Next Month', 'Strategic Action Plan & Recommendations',
+                        recommendations.map((rec, i) => ({ title: `${i + 1}. ${rec.title || ''}`, body: rec.detail || '' })));
+
+                    // Slide 20: Growth Projections
+                    const s20 = baseSlide('Next Month Projections', 'Growth Projections & Budget Allocations');
+                    statTiles(s20, [
+                        { label: 'Target Sales', value: curr(fcRevenue) },
+                        { label: 'Target Budget', value: curr(fcSpend) },
+                        { label: 'Target Orders', value: fcOrders.toLocaleString() },
+                        { label: 'Target ROAS', value: targetRoas.toFixed(2) + 'x' }
+                    ], 1.75);
+
+                    // Slide 21: Closing
+                    const closing = pptx.addSlide();
+                    closing.background = { color: CLR.dark };
+                    closing.addText('Thank You!', { x: 0.8, y: 3.0, w: 11.7, h: 0.9, fontSize: 36, bold: true, color: CLR.white, fontFace: FONT });
+                    closing.addText("Let's scale brand performance next month.", { x: 0.8, y: 3.85, w: 11.7, h: 0.5, fontSize: 16, color: '93C5FD', fontFace: FONT });
+                    closing.addText('Digifyce Agency Partner   |   agent@digifyce.in   |   platform.digifyce.in', { x: 0.8, y: 6.6, w: 11.7, h: 0.4, fontSize: 11, color: 'CBD5E1', fontFace: FONT });
+
+                    const safeBrand = (report.brand_name || 'Brand').replace(/[^a-z0-9]+/gi, '_');
+                    await pptx.writeFile({ fileName: `${safeBrand}_Monthly_Report_${report.period_start || ''}.pptx` });
+                } catch (err) {
+                    console.error(err);
+                    alert('Failed to generate PPTX: ' + err.message);
+                } finally {
+                    if (btn) { btn.disabled = false; btn.textContent = '⬇ Download PPTX'; }
+                }
+            };
         }
 
         // Initialize display

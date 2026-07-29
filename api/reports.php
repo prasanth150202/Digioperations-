@@ -351,6 +351,12 @@ if ($method === 'POST' && $action === 'create') {
             ];
         }
         
+        // Note: Push Notifications are intentionally NOT added to $currentStats['channels']
+        // (the Attribution Map) or blended into totals — push revenue drives customers back to
+        // the Shopify storefront already counted above, it isn't a distinct paid channel with its
+        // own spend, so it would double-count. It's still available via report_data.owned_media.push
+        // (passed straight through above) for the standalone Retention & Broadcast slide.
+
         // Blend totals
         $currentStats['totals']['spend'] += $manualSpend;
         $currentStats['totals']['revenue'] += $manualRevenue;
@@ -376,38 +382,24 @@ if ($method === 'POST' && $action === 'create') {
         'cpa' => $pctChange($currentStats['totals']['cpa'], $prevStats['totals']['cpa']),
         'aov' => $pctChange($currentStats['totals']['aov'], $prevStats['totals']['aov']),
     ];
-    
-    // 3. Query AI to generate highlights summary
-    $aiHighlights = ['highlights' => '', 'blockers' => '', 'next_steps' => ''];
-    try {
-        $systemMsg = "You are a professional performance marketing dashboard. Analyze the data and generate short summary notes. Respond ONLY in valid JSON format matching this schema: {\"highlights\": \"HTML bullet points of what went well\", \"blockers\": \"HTML bullet points of performance blockers or concerns\", \"next_steps\": \"HTML bullet points of next actions\"}. Do not write any markdown fences or surrounding text, just the raw JSON.";
-        
-        $userMsg = "Brand: {$brand['name']}\n";
-        $userMsg .= "Report Type: " . ucfirst($reportType) . "\n";
-        $userMsg .= "Period: {$startDate} to {$endDate}\n\n";
-        $userMsg .= "Current Period Stats:\n";
-        $userMsg .= "- Total Spend: ₹" . number_format($currentStats['totals']['spend']) . " (WoW: {$comparisons['spend']}%)\n";
-        $userMsg .= "- Total Revenue: ₹" . number_format($currentStats['totals']['revenue']) . " (WoW: {$comparisons['revenue']}%)\n";
-        $userMsg .= "- Blended ROAS: {$currentStats['totals']['roas']}x (WoW: {$comparisons['roas']}%)\n";
-        $userMsg .= "- No of Orders: {$currentStats['totals']['conversions']} (WoW: {$comparisons['conversions']}%)\n";
-        $userMsg .= "- Blended CPA: ₹{$currentStats['totals']['cpa']} (WoW: {$comparisons['cpa']}%)\n";
-        $userMsg .= "- Blended AOV: ₹{$currentStats['totals']['aov']} (WoW: {$comparisons['aov']}%)\n\n";
-        $userMsg .= "Channel Metrics:\n";
-        foreach ($currentStats['channels'] as $cName => $metrics) {
-            $userMsg .= "- " . ucfirst($cName) . ": Spend ₹" . number_format($metrics['spend']) . ", Revenue ₹" . number_format($metrics['revenue']) . ", ROAS {$metrics['roas']}x, Orders {$metrics['conversions']}, CPA ₹{$metrics['cpa']}\n";
-        }
-        
-        $aiResult = callJSON($systemMsg, $userMsg);
-        if (isset($aiResult['highlights'])) $aiHighlights['highlights'] = $aiResult['highlights'];
-        if (isset($aiResult['blockers'])) $aiHighlights['blockers'] = $aiResult['blockers'];
-        if (isset($aiResult['next_steps'])) $aiHighlights['next_steps'] = $aiResult['next_steps'];
-    } catch (Throwable $e) {
-        // Fallback default summaries if AI fails or key is missing
-        $aiHighlights['highlights'] = "• Campaign generated total revenue of ₹" . number_format($currentStats['totals']['revenue']) . " with a blended ROAS of {$currentStats['totals']['roas']}x.<br>• Ad spend was managed at ₹" . number_format($currentStats['totals']['spend']) . ".";
-        $aiHighlights['blockers'] = "• No significant blockers identified in the automated scan.";
-        $aiHighlights['next_steps'] = "• Monitor blended CPA (currently ₹" . number_format($currentStats['totals']['cpa']) . ") to optimize audience targets.<br>• Adjust high-performing channel budgets.";
-    }
-    
+
+    // ── CORRECTED GROSS REVENUE ──
+    // $currentStats['totals']['revenue'] sums every channel's own revenue figure, but Meta/Google/
+    // Email/WhatsApp "revenue" is each platform's *self-attributed* credit for orders that already
+    // happened on Shopify — it is not incremental money. Only Shopify (the storefront) and
+    // Marketplace (a separate checkout entirely) are genuinely non-overlapping revenue pools, so
+    // "Gross Revenue" and "Blended ROAS" for the deck are computed from those two alone, matching
+    // how the reference report defines them (Gross Revenue = Shopify + Marketplace).
+    $grossRevenue = ($currentStats['channels']['shopify']['revenue'] ?? 0) + ($currentStats['channels']['marketplace']['revenue'] ?? 0);
+    $grossRoas = $currentStats['totals']['spend'] > 0 ? round($grossRevenue / $currentStats['totals']['spend'], 2) : 0.0;
+    $prevGrossRevenue = ($prevStats['channels']['shopify']['revenue'] ?? 0) + ($prevStats['channels']['marketplace']['revenue'] ?? 0);
+    $prevGrossRoas = $prevStats['totals']['spend'] > 0 ? round($prevGrossRevenue / $prevStats['totals']['spend'], 2) : 0.0;
+    $comparisons['gross_revenue'] = $pctChange($grossRevenue, $prevGrossRevenue);
+    $comparisons['gross_roas'] = $pctChange($grossRoas, $prevGrossRoas);
+
+    // 3. AI narrative generation happens further below, once $reportData (meta/google/shopify/
+    // GSC/cohort data) has been assembled — the monthly deck's narratives need that context.
+
     // 4. Generate unique client token
     $safeBrandName = preg_replace('/[^A-Za-z0-9]+/', '-', $brand['name']);
     $safeBrandName = trim($safeBrandName, '-');
@@ -430,11 +422,16 @@ if ($method === 'POST' && $action === 'create') {
         'period_end' => $endDate,
         'channels' => $currentStats['channels'],
         'totals' => $currentStats['totals'],
+        'gross_revenue' => $grossRevenue,
+        'gross_roas' => $grossRoas,
         'comparisons' => $comparisons,
         'prev_period' => [
             'start' => $prevStartDateStr,
             'end' => $prevEndDateStr,
-            'totals' => $prevStats['totals']
+            'totals' => $prevStats['totals'],
+            'channels' => $prevStats['channels'],
+            'gross_revenue' => $prevGrossRevenue,
+            'gross_roas' => $prevGrossRoas
         ]
     ];
     
@@ -444,16 +441,138 @@ if ($method === 'POST' && $action === 'create') {
         
         $reportData['meta_campaigns'] = $apiSyncData['meta_campaigns'] ?? [];
         $reportData['meta_creatives'] = $apiSyncData['meta_creatives'] ?? [];
+        $reportData['meta_ad_audit'] = $apiSyncData['meta_ad_audit'] ?? [];
         $reportData['google_campaigns'] = $apiSyncData['google_campaigns'] ?? [];
+        $reportData['google_ad_audit'] = $apiSyncData['google_ad_audit'] ?? [];
+        $reportData['google_search_ads'] = $apiSyncData['google_search_ads'] ?? [];
         $reportData['ga4_channels'] = $apiSyncData['ga4_channels'] ?? [];
+        $reportData['ga4_funnel'] = $apiSyncData['ga4_funnel'] ?? [];
         $reportData['gsc_pages'] = $apiSyncData['gsc_pages'] ?? [];
         $reportData['gsc_queries'] = $apiSyncData['gsc_queries'] ?? [];
         
         $reportData['shopify_products'] = $apiSyncData['shopify_products'] ?? [];
         $reportData['shopify_locations'] = $apiSyncData['shopify_locations'] ?? [];
         $reportData['shopify_campaigns'] = $apiSyncData['shopify_campaigns'] ?? [];
+        $reportData['cohort_matrix'] = $apiSyncData['cohort_matrix'] ?? [];
     }
-    
+
+    // ── AI NARRATIVE GENERATION ──
+    // Weekly reports keep the original lightweight schema. Monthly reports ask for the full set
+    // of narratives the deck needs: an executive summary, a per-metric "why" for the MoM table,
+    // per-product performance drivers, funnel diagnostics, 4 numbered inference cards, 4 numbered
+    // recommendation cards, and (since these are genuinely editorial content no metric can
+    // generate on its own) AI-drafted "Executed Initiatives" case studies and a "Strategy Deep-Dive"
+    // — drafted from the highlights/metrics available, not a real record of what was executed.
+    $aiHighlights = ['highlights' => '', 'blockers' => '', 'next_steps' => ''];
+    $aiMonthly = [
+        'executive_summary' => '', 'mom_reasons' => new stdClass(), 'product_drivers' => new stdClass(),
+        'funnel_diagnostics' => '', 'inferences' => [], 'recommendations' => [],
+        'initiatives' => [], 'strategy_deep_dive' => new stdClass()
+    ];
+
+    $totals = $currentStats['totals'];
+    $channelSummaryLines = [];
+    foreach ($currentStats['channels'] as $cName => $metrics) {
+        $channelSummaryLines[] = "- " . ucfirst(str_replace('_', ' ', $cName)) . ": Spend ₹" . number_format($metrics['spend'] ?? 0) . ", Revenue ₹" . number_format($metrics['revenue'] ?? 0) . ", ROAS " . ($metrics['roas'] ?? 0) . "x, Orders " . ($metrics['conversions'] ?? 0) . ", CPA ₹" . ($metrics['cpa'] ?? 0);
+    }
+
+    if ($reportType === 'monthly') {
+        try {
+            $systemMsg = "You are a performance marketing analyst writing an agency monthly client report. Analyze the supplied data and produce grounded, specific narratives — reference the actual numbers given, never invent figures not present in the input. Respond ONLY with a raw JSON object matching this exact schema (no markdown fences, no surrounding text): "
+                . '{"executive_summary": "2-3 sentence paragraph summarizing overall performance, referencing real spend/revenue/ROAS figures", '
+                . '"mom_reasons": {"spend": "one sentence on why spend changed", "revenue": "...", "conversions": "...", "roas": "...", "cpa": "...", "aov": "..."}, '
+                . '"product_drivers": {"<exact product name as given>": "one sentence on why this product performed well", "...": "..."}, '
+                . '"funnel_diagnostics": "1-2 sentences on funnel drop-off causes, or note that funnel event tracking is not connected if no funnel data was given", '
+                . '"inferences": [{"title": "short bolded-style claim", "detail": "one sentence explanation"}, ... exactly 4 items], '
+                . '"recommendations": [{"title": "short action title", "detail": "one sentence with a quantified target for next month"}, ... exactly 4 items], '
+                . '"initiatives": [{"name": "initiative name", "goal": "one sentence", "execution": "one sentence", "result": "one sentence with a real number from the data"}, ... exactly 3 items, inferred from the highlights/metrics — label them as agency activity consistent with the data, not fabricated events], '
+                . '"strategy_deep_dive": {"initiative_name": "same as one of the 3 initiatives above", "hypothesis": "one sentence", "creative_deployment": "one sentence", "broadcast_execution": "one sentence", "outcome": "one sentence with a real number"}, '
+                . '"highlights": "HTML bullet points (<br> separated) of what went well", "blockers": "HTML bullet points of concerns", "next_steps": "HTML bullet points of next actions"}';
+
+            $userMsg = "Brand: {$brand['name']}\n";
+            $userMsg .= "Period: {$startDate} to {$endDate}\n\n";
+            $userMsg .= "Current Period Totals:\n";
+            $userMsg .= "- Total Spend: ₹" . number_format($totals['spend']) . " (MoM: " . ($comparisons['spend'] ?? '—') . "%)\n";
+            $userMsg .= "- Gross Revenue (Shopify + Marketplace only — do not confuse with the sum of all channel figures below, which overlap): ₹" . number_format($grossRevenue) . " (MoM: " . ($comparisons['gross_revenue'] ?? '—') . "%)\n";
+            $userMsg .= "- Blended ROAS (Gross Revenue / Total Spend): {$grossRoas}x (MoM: " . ($comparisons['gross_roas'] ?? '—') . "%)\n";
+            $userMsg .= "- Orders: {$totals['conversions']} (MoM: " . ($comparisons['conversions'] ?? '—') . "%)\n";
+            $userMsg .= "- Blended CPA: ₹{$totals['cpa']} (MoM: " . ($comparisons['cpa'] ?? '—') . "%)\n";
+            $userMsg .= "- Blended AOV: ₹{$totals['aov']} (MoM: " . ($comparisons['aov'] ?? '—') . "%)\n\n";
+            $userMsg .= "Channel Metrics:\n" . implode("\n", $channelSummaryLines) . "\n\n";
+
+            if (!empty($reportData['shopify_products'])) {
+                $userMsg .= "Top Products (name / revenue share / primary shipping region):\n";
+                foreach ($reportData['shopify_products'] as $p) {
+                    $userMsg .= "- {$p['name']}: {$p['revenue_share']}% of product revenue, primary region {$p['primary_region']}\n";
+                }
+                $userMsg .= "\n";
+            }
+
+            if (!empty($reportData['ga4_funnel']) && !empty($reportData['ga4_funnel']['session_start'])) {
+                $f = $reportData['ga4_funnel'];
+                $userMsg .= "Conversion Funnel: Sessions {$f['session_start']}, Add to Cart {$f['add_to_cart']}, Checkout {$f['begin_checkout']}, Purchases {$totals['conversions']}\n\n";
+            } else {
+                $userMsg .= "Conversion Funnel: GA4 ecommerce event tracking not connected — no funnel data available.\n\n";
+            }
+
+            if (!empty($reportData['meta_ad_audit']) && is_array($reportData['meta_ad_audit'])) {
+                $ma = $reportData['meta_ad_audit'];
+                $userMsg .= "Meta Ads Audit: " . ($ma['angles_tested'] ?? 0) . " creatives tested, winning placement " . ($ma['winning_placement'] ?? '—') . " at " . ($ma['winning_placement_roas'] ?? 0) . "x ROAS, winning creative \"" . ($ma['winning_angle'] ?? '—') . "\"\n\n";
+            }
+
+            if (!empty($reportData['google_ad_audit']) && is_array($reportData['google_ad_audit'])) {
+                $ga = $reportData['google_ad_audit'];
+                $userMsg .= "Google Ads Audit: winning network " . ($ga['winning_network'] ?? '—') . " at " . ($ga['winning_network_roas'] ?? 0) . "x ROAS\n\n";
+            }
+
+            if (!empty($reportData['cohort_matrix'])) {
+                $latestCohort = end($reportData['cohort_matrix']);
+                $userMsg .= "Most recent acquisition cohort ({$latestCohort['cohort_month']}): {$latestCohort['cohort_size']} customers, Month 1 repeat rate " . ($latestCohort['months'][1] ?? 'N/A') . "%\n\n";
+            }
+
+            if (!empty($reportData['owned_media'])) {
+                $om = $reportData['owned_media'];
+                if (!empty($om['email'])) $userMsg .= "Email: Revenue ₹" . number_format($om['email']['revenue'] ?? 0) . ", Open Rate " . ($om['email']['open_rate'] ?? 0) . "%\n";
+                if (!empty($om['whatsapp'])) $userMsg .= "WhatsApp: Revenue ₹" . number_format($om['whatsapp']['revenue'] ?? 0) . ", Orders " . ($om['whatsapp']['orders'] ?? 0) . "\n";
+                if (!empty($om['push'])) $userMsg .= "Push Notifications: Revenue ₹" . number_format($om['push']['revenue'] ?? 0) . ", Open Rate " . ($om['push']['open_rate'] ?? 0) . "%\n";
+                $userMsg .= "\n";
+            }
+
+            $aiResult = callJSON($systemMsg, $userMsg, 3500);
+            foreach (['highlights', 'blockers', 'next_steps'] as $k) {
+                if (isset($aiResult[$k])) $aiHighlights[$k] = $aiResult[$k];
+            }
+            foreach (['executive_summary', 'mom_reasons', 'product_drivers', 'funnel_diagnostics', 'inferences', 'recommendations', 'initiatives', 'strategy_deep_dive'] as $k) {
+                if (isset($aiResult[$k])) $aiMonthly[$k] = $aiResult[$k];
+            }
+        } catch (Throwable $e) {
+            $aiHighlights['highlights'] = "• Campaign generated total revenue of ₹" . number_format($totals['revenue']) . " with a blended ROAS of {$totals['roas']}x.<br>• Ad spend was managed at ₹" . number_format($totals['spend']) . ".";
+            $aiHighlights['blockers'] = "• AI narrative generation failed for this report (" . htmlspecialchars($e->getMessage()) . ") — showing raw metrics only.";
+            $aiHighlights['next_steps'] = "• Monitor blended CPA (currently ₹{$totals['cpa']}) to optimize audience targets.<br>• Adjust high-performing channel budgets.";
+            $aiMonthly['executive_summary'] = "Revenue reached ₹" . number_format($totals['revenue']) . " on ₹" . number_format($totals['spend']) . " of spend ({$totals['roas']}x blended ROAS). AI-generated narrative sections could not be produced for this report.";
+        }
+        $reportData['ai'] = $aiMonthly;
+    } else {
+        // Weekly reports keep the original lightweight summary-only call.
+        try {
+            $systemMsg = "You are a professional performance marketing dashboard. Analyze the data and generate short summary notes. Respond ONLY in valid JSON format matching this schema: {\"highlights\": \"HTML bullet points of what went well\", \"blockers\": \"HTML bullet points of performance blockers or concerns\", \"next_steps\": \"HTML bullet points of next actions\"}. Do not write any markdown fences or surrounding text, just the raw JSON.";
+            $userMsg = "Brand: {$brand['name']}\nReport Type: Weekly\nPeriod: {$startDate} to {$endDate}\n\n";
+            $userMsg .= "Current Period Stats:\n- Total Spend: ₹" . number_format($totals['spend']) . " (WoW: " . ($comparisons['spend'] ?? '—') . "%)\n";
+            $userMsg .= "- Total Revenue: ₹" . number_format($totals['revenue']) . " (WoW: " . ($comparisons['revenue'] ?? '—') . "%)\n";
+            $userMsg .= "- Blended ROAS: {$totals['roas']}x (WoW: " . ($comparisons['roas'] ?? '—') . "%)\n\n";
+            $userMsg .= "Channel Metrics:\n" . implode("\n", $channelSummaryLines);
+
+            $aiResult = callJSON($systemMsg, $userMsg);
+            if (isset($aiResult['highlights'])) $aiHighlights['highlights'] = $aiResult['highlights'];
+            if (isset($aiResult['blockers'])) $aiHighlights['blockers'] = $aiResult['blockers'];
+            if (isset($aiResult['next_steps'])) $aiHighlights['next_steps'] = $aiResult['next_steps'];
+        } catch (Throwable $e) {
+            $aiHighlights['highlights'] = "• Campaign generated total revenue of ₹" . number_format($totals['revenue']) . " with a blended ROAS of {$totals['roas']}x.<br>• Ad spend was managed at ₹" . number_format($totals['spend']) . ".";
+            $aiHighlights['blockers'] = "• No significant blockers identified in the automated scan.";
+            $aiHighlights['next_steps'] = "• Monitor blended CPA (currently ₹{$totals['cpa']}) to optimize audience targets.<br>• Adjust high-performing channel budgets.";
+        }
+    }
+
     // UPSERT LOGIC
     // Check if report already exists for this exact period and type
     $existing = dbGet('SELECT id FROM reports WHERE brand_id=? AND period_start=? AND period_end=? AND report_type=?', 
