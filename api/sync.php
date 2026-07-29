@@ -59,9 +59,15 @@ if (!empty($int['shopify_subdomain'])) {
 // Normalize the GSC site URL — "sc-domain:example.com" is Search Console's own scheme-like
 // prefix for a Domain property and should never be preceded by http(s)://, but it's an easy
 // combination to type by mistake (e.g. "http://sc-domain:example.com"), which Google's API
-// correctly rejects as not a valid site URL.
+// correctly rejects as not a valid site URL. Also undo an accidentally pre-encoded colon
+// (literal "%3A" typed/pasted in instead of ":") before checking, and strip a stray leading
+// "%3A" left behind if "sc-domain" itself got lost in an earlier bad edit.
 if (!empty($int['gsc_site_url'])) {
-    $int['gsc_site_url'] = preg_replace('#^https?://(sc-domain:)#i', '$1', trim($int['gsc_site_url']));
+    $g = trim($int['gsc_site_url']);
+    $g = str_ireplace('%3a', ':', $g);
+    $g = preg_replace('#^https?://(sc-domain:)#i', '$1', $g);
+    $g = preg_replace('#^:#', 'sc-domain:', $g); // e.g. stray ":example.com" -> "sc-domain:example.com"
+    $int['gsc_site_url'] = $g;
 }
 
 // ── GOOGLE CLIENT REFRESH TOKEN HELPER ──

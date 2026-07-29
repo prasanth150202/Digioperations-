@@ -115,8 +115,14 @@ if ($method === 'PUT' && $id) {
         }
         // Normalize the GSC site URL on save too — "sc-domain:example.com" should never be
         // preceded by http(s)://, but it's an easy mistake to combine the two conventions.
+        // Also undo an accidentally pre-encoded colon and repair a stray leading ":" left behind
+        // if "sc-domain" itself got lost in an earlier bad edit.
         if (!empty($merged['gsc_site_url'])) {
-            $merged['gsc_site_url'] = preg_replace('#^https?://(sc-domain:)#i', '$1', trim($merged['gsc_site_url']));
+            $g = trim($merged['gsc_site_url']);
+            $g = str_ireplace('%3a', ':', $g);
+            $g = preg_replace('#^https?://(sc-domain:)#i', '$1', $g);
+            $g = preg_replace('#^:#', 'sc-domain:', $g);
+            $merged['gsc_site_url'] = $g;
         }
         $finalIntegrations = json_encode($merged);
     }
