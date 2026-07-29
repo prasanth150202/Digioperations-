@@ -6807,13 +6807,37 @@ async function startGoogleOAuth() {
 
 // ── BRAND CONNECTIONS & INTEGRATIONS MODAL ──────────────────────────────────
 let _editBrandSlug = null;
+let _editBrandDirty = false;
+let _editBrandDirtyTrackingBound = false;
+
+function closeEditBrandModal() {
+  if (_editBrandDirty && !confirm('You have unsaved changes that will be lost. Close without saving?')) {
+    return;
+  }
+  _editBrandDirty = false;
+  closeMo('mo-edit-brand');
+}
+
 async function editBrandIntegrations(slug) {
   _editBrandSlug = slug;
   const brand = await api('/api/brands/' + slug);
   if (!brand) return;
-  
+
+  // Delegated listener: any field changing inside the modal marks it dirty, so Cancel can warn
+  // before silently discarding an unsaved checkbox/field change. Attached here (lazily, once)
+  // rather than at script load, since app.js runs in <head> before this modal's markup exists.
+  if (!_editBrandDirtyTrackingBound) {
+    const modal = document.getElementById('mo-edit-brand');
+    if (modal) {
+      ['input', 'change'].forEach(evt => {
+        modal.addEventListener(evt, () => { _editBrandDirty = true; });
+      });
+      _editBrandDirtyTrackingBound = true;
+    }
+  }
+
   document.getElementById('edit-brand-subtitle').textContent = `Configure API integrations for ${brand.name}`;
-  
+
   let int = {};
   try {
     int = typeof brand.integrations_json === 'object' ? brand.integrations_json : JSON.parse(brand.integrations_json || '{}');
@@ -6837,8 +6861,9 @@ async function editBrandIntegrations(slug) {
   document.getElementById('int-test-status').textContent = 'Not checked';
   document.getElementById('int-test-status').className = '';
   document.getElementById('int-test-status').style.color = 'var(--mid)';
-  
+
   setIntegrationTab('shopify');
+  _editBrandDirty = false; // programmatic field resets above don't count as user edits
   openMo('mo-edit-brand');
 }
 
@@ -6887,7 +6912,9 @@ async function submitEditBrand() {
   const r = await api('/api/brands/' + _editBrandSlug, 'PUT', { integrations_json: intPayload });
   if (r && r.ok) {
     showToast('Brand integrations saved!', 'success');
-    closeMo('mo-edit-brand');
+    // Stay open after saving — closing immediately forced re-opening the modal just to
+    // confirm the save landed or to keep configuring another tab (e.g. Meta after Shopify).
+    _editBrandDirty = false;
     renderAdminBrands();
   } else {
     alert(r?.error || 'Failed to save brand integrations.');
