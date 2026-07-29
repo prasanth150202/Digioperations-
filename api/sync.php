@@ -96,18 +96,19 @@ if ($action === 'test_connections') {
     $mh = curl_multi_init();
     $handles = []; // key => curl handle, for every check we actually queue up
 
-    // Resolve real (unmasked) tokens up front
-    $shopifyTok = $int['shopify_access_token'] ?? '';
+    // Resolve real (unmasked) tokens up front — trimmed defensively in case stray whitespace/
+    // newlines got saved into an older record before the save form started trimming on its own.
+    $shopifyTok = trim($int['shopify_access_token'] ?? '');
     if (empty($shopifyTok) || $shopifyTok === str_repeat('·', 8) || $shopifyTok === str_repeat('•', 16)) {
         $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
         $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
-        $shopifyTok = $dbInt['shopify_access_token'] ?? '';
+        $shopifyTok = trim($dbInt['shopify_access_token'] ?? '');
     }
-    $metaTok = $int['meta_access_token'] ?? '';
+    $metaTok = trim($int['meta_access_token'] ?? '');
     if (empty($metaTok) || $metaTok === str_repeat('·', 8) || $metaTok === str_repeat('•', 16)) {
         $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
         $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
-        $metaTok = $dbInt['meta_access_token'] ?? '';
+        $metaTok = trim($dbInt['meta_access_token'] ?? '');
     }
 
     // 1. Shopify
@@ -125,7 +126,7 @@ if ($action === 'test_connections') {
     if (!empty($accts) && !empty($metaTok)) {
         $testAcct = $accts[0];
         if (!str_starts_with($testAcct, 'act_')) $testAcct = 'act_' . $testAcct;
-        $ch = curl_init("https://graph.facebook.com/v21.0/{$testAcct}?fields=id,name&access_token={$metaTok}");
+        $ch = curl_init("https://graph.facebook.com/v21.0/{$testAcct}?fields=id,name&access_token=" . urlencode($metaTok));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
@@ -249,19 +250,19 @@ if (empty($startDate) || empty($endDate)) {
     json_err('start_date and end_date required');
 }
 
-// Resolve password / token obfuscation values
-$shopifyToken = $int['shopify_access_token'] ?? '';
+// Resolve password / token obfuscation values (trimmed defensively — see test_connections above)
+$shopifyToken = trim($int['shopify_access_token'] ?? '');
 if ($shopifyToken === str_repeat('·', 8)) {
     $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
     $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
-    $shopifyToken = $dbInt['shopify_access_token'] ?? '';
+    $shopifyToken = trim($dbInt['shopify_access_token'] ?? '');
 }
 
-$metaToken = $int['meta_access_token'] ?? '';
+$metaToken = trim($int['meta_access_token'] ?? '');
 if ($metaToken === str_repeat('·', 8)) {
     $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
     $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
-    $metaToken = $dbInt['meta_access_token'] ?? '';
+    $metaToken = trim($dbInt['meta_access_token'] ?? '');
 }
 
 // 1. Google OAuth Client Access
@@ -518,7 +519,7 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
         
         // 1. Campaign Breakdown
         $cf = urlencode("campaign_name,spend,impressions,clicks,actions,action_values");
-        $curlUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$cf}&level=campaign&time_range=" . urlencode($timeRange) . "&limit=100&access_token={$metaToken}";
+        $curlUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$cf}&level=campaign&time_range=" . urlencode($timeRange) . "&limit=100&access_token=" . urlencode($metaToken);
         
         $ch = curl_init($curlUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -549,7 +550,7 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
         
         // 2. Creative Ad breakdown
         $adf = urlencode("ad_id,ad_name,spend,ctr,actions,action_values");
-        $adUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$adf}&level=ad&limit=50&time_range=" . urlencode($timeRange) . "&access_token={$metaToken}";
+        $adUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$adf}&level=ad&limit=50&time_range=" . urlencode($timeRange) . "&access_token=" . urlencode($metaToken);
 
         $chAd = curl_init($adUrl);
         curl_setopt($chAd, CURLOPT_RETURNTRANSFER, true);
@@ -585,7 +586,7 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
 
         // 3. Placement breakdown — which surface (Reels/Stories/Feed) actually won
         $pf = urlencode("spend,actions,action_values");
-        $placementUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$pf}&level=account&breakdowns=publisher_platform,platform_position&time_range=" . urlencode($timeRange) . "&limit=50&access_token={$metaToken}";
+        $placementUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$pf}&level=account&breakdowns=publisher_platform,platform_position&time_range=" . urlencode($timeRange) . "&limit=50&access_token=" . urlencode($metaToken);
         $chPl = curl_init($placementUrl);
         curl_setopt($chPl, CURLOPT_RETURNTRANSFER, true);
         $respPl = curl_exec($chPl);
@@ -608,7 +609,7 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
 
         // 4. Daily Breakdown logs
         $df = urlencode("date_start,spend,impressions,clicks,actions,action_values");
-        $dailyUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$df}&level=account&time_increment=1&time_range=" . urlencode($timeRange) . "&limit=100&access_token={$metaToken}";
+        $dailyUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$df}&level=account&time_increment=1&time_range=" . urlencode($timeRange) . "&limit=100&access_token=" . urlencode($metaToken);
         
         $chD = curl_init($dailyUrl);
         curl_setopt($chD, CURLOPT_RETURNTRANSFER, true);
@@ -646,7 +647,7 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
     foreach ($metaCreatives as &$topAd) {
         if (empty($topAd['ad_id'])) continue;
         $cf2 = urlencode("creative{thumbnail_url,image_url,body,object_story_spec}");
-        $creativeUrl = "https://graph.facebook.com/v21.0/{$topAd['ad_id']}?fields={$cf2}&access_token={$metaToken}";
+        $creativeUrl = "https://graph.facebook.com/v21.0/{$topAd['ad_id']}?fields={$cf2}&access_token=" . urlencode($metaToken);
         $chCr = curl_init($creativeUrl);
         curl_setopt($chCr, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($chCr, CURLOPT_TIMEOUT, 10);
