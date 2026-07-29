@@ -208,13 +208,32 @@ if ($action === 'test_connections') {
         } else {
             // Got a real HTTP response back — surface the API's own error message if present,
             // instead of just the bare status code, so a wrong token/ID is diagnosable at a glance.
+            // Different APIs shape their error bodies differently (Meta: error.message, Google:
+            // error.message, Shopify: errors as a plain string OR an object of field => [messages]),
+            // so try each in turn and fall back to a raw body snippet rather than showing nothing.
             $body = curl_multi_getcontent($ch);
             $decoded = json_decode($body, true);
             $apiMsg = '';
             if (is_array($decoded)) {
-                $apiMsg = $decoded['error']['message'] ?? $decoded['errors'][0]['message'] ?? $decoded['error_description'] ?? '';
+                if (!empty($decoded['error']['message'])) {
+                    $apiMsg = $decoded['error']['message'];
+                } elseif (!empty($decoded['errors'])) {
+                    if (is_string($decoded['errors'])) {
+                        $apiMsg = $decoded['errors'];
+                    } elseif (is_array($decoded['errors'])) {
+                        $first = reset($decoded['errors']);
+                        $apiMsg = is_string($first) ? $first : (is_array($first) ? ($first['message'] ?? json_encode($first)) : json_encode($decoded['errors']));
+                    }
+                } elseif (!empty($decoded['error_description'])) {
+                    $apiMsg = $decoded['error_description'];
+                } elseif (!empty($decoded['message'])) {
+                    $apiMsg = $decoded['message'];
+                }
             }
-            $res[$key] = 'Failed (' . $code . ($apiMsg ? ': ' . mb_strimwidth($apiMsg, 0, 90, '…') : '') . ')';
+            if ($apiMsg === '' && !empty($body)) {
+                $apiMsg = trim(strip_tags($body));
+            }
+            $res[$key] = 'Failed (' . $code . ($apiMsg !== '' ? ': ' . substr($apiMsg, 0, 100) : '') . ')';
         }
         curl_multi_remove_handle($mh, $ch);
         curl_close($ch);
