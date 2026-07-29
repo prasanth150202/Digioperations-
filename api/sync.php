@@ -56,6 +56,8 @@ function getGoogleAccessToken() {
     
     $ch = curl_init("https://oauth2.googleapis.com/token");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
         'client_id' => $clientId,
@@ -63,7 +65,7 @@ function getGoogleAccessToken() {
         'refresh_token' => $refreshToken,
         'grant_type' => 'refresh_token'
     ]));
-    
+
     $resp = curl_exec($ch);
     $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
@@ -74,72 +76,57 @@ function getGoogleAccessToken() {
 }
 
 // ── ACTION: TEST CONNECTIONS ──
+// Every check below runs through one curl_multi batch instead of sequential curl_exec calls,
+// so the total wait is bounded by the single slowest check (~10-15s) rather than their sum
+// (previously up to ~50s+ with all 5 integrations configured, which read as the UI "hanging").
 if ($action === 'test_connections') {
     $res = ['shopify' => 'disabled', 'meta' => 'disabled', 'google_ads' => 'disabled', 'ga4' => 'disabled', 'gsc' => 'disabled'];
-    
+    $mh = curl_multi_init();
+    $handles = []; // key => curl handle, for every check we actually queue up
+
+    // Resolve real (unmasked) tokens up front
+    $shopifyTok = $int['shopify_access_token'] ?? '';
+    if (empty($shopifyTok) || $shopifyTok === str_repeat('·', 8) || $shopifyTok === str_repeat('•', 16)) {
+        $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
+        $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
+        $shopifyTok = $dbInt['shopify_access_token'] ?? '';
+    }
+    $metaTok = $int['meta_access_token'] ?? '';
+    if (empty($metaTok) || $metaTok === str_repeat('·', 8) || $metaTok === str_repeat('•', 16)) {
+        $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
+        $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
+        $metaTok = $dbInt['meta_access_token'] ?? '';
+    }
+
     // 1. Shopify
-    if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && (!empty($int['shopify_access_token']) || true)) {
-        $sub = $int['shopify_subdomain'];
-        $tok = $int['shopify_access_token'] ?? '';
-        // If token is empty or looks like a masked value, fetch real token from DB
-        if (empty($tok) || $tok === str_repeat('·', 8) || $tok === str_repeat('•', 16)) {
-            $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
-            $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
-            $tok = $dbInt['shopify_access_token'] ?? '';
-        }
-        
-        if (!empty($sub) && !empty($tok)) {
-            $ch = curl_init("https://{$sub}.myshopify.com/admin/api/2025-01/shop.json");
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-Shopify-Access-Token: {$tok}"]);
-            curl_exec($ch);
-            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            $res['shopify'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
-        } else {
-            $res['shopify'] = 'disabled';
-        }
+    if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !empty($shopifyTok)) {
+        $ch = curl_init("https://{$int['shopify_subdomain']}.myshopify.com/admin/api/2025-01/shop.json");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-Shopify-Access-Token: {$shopifyTok}"]);
+        $handles['shopify'] = $ch;
     }
-    
+
     // 2. Meta
-    if (!empty($int['meta_ad_account_ids'])) {
-        $tok = $int['meta_access_token'] ?? '';
-        // If token is empty or masked, fetch from DB
-        if (empty($tok) || $tok === str_repeat('·', 8) || $tok === str_repeat('•', 16)) {
-            $dbBrand = dbGet('SELECT integrations_json FROM brands WHERE id=?', [$brand['id']]);
-            $dbInt = json_decode($dbBrand['integrations_json'] ?? '{}', true);
-            $tok = $dbInt['meta_access_token'] ?? '';
-        }
-        $accts = array_filter(array_map('trim', explode(',', $int['meta_ad_account_ids'])));
-        if (!empty($accts) && !empty($tok)) {
-            $testAcct = $accts[0];
-            // Auto-add act_ prefix if not present (Meta Graph API requires it)
-            if (!str_starts_with($testAcct, 'act_')) $testAcct = 'act_' . $testAcct;
-            $ch = curl_init("https://graph.facebook.com/v21.0/{$testAcct}?fields=id,name&access_token={$tok}");
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-            curl_exec($ch);
-            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            $res['meta'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
-        } else {
-            $res['meta'] = 'disabled';
-        }
+    $accts = array_filter(array_map('trim', explode(',', $int['meta_ad_account_ids'] ?? '')));
+    if (!empty($accts) && !empty($metaTok)) {
+        $testAcct = $accts[0];
+        if (!str_starts_with($testAcct, 'act_')) $testAcct = 'act_' . $testAcct;
+        $ch = curl_init("https://graph.facebook.com/v21.0/{$testAcct}?fields=id,name&access_token={$metaTok}");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        $handles['meta'] = $ch;
     }
-    
-    // 3. Google API access
+
+    // 3. Google family (Ads / GA4 / GSC) — share one OAuth token, itself now timeout-bounded
     $gAccessToken = getGoogleAccessToken();
     if ($gAccessToken) {
-        // Test Google Ads
         if (!empty($int['google_ads_enabled']) && !empty($int['google_ads_customer_id'])) {
             $cust = str_replace('-', '', $int['google_ads_customer_id']);
             $devTok = getSetting('google_developer_token');
             $mcc = !empty($int['google_ads_mcc_id']) ? str_replace('-', '', $int['google_ads_mcc_id']) : $cust;
-            
-            $q = "SELECT campaign.id FROM campaign LIMIT 1";
             $ch = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
@@ -151,36 +138,24 @@ if ($action === 'test_connections') {
                 "login-customer-id: {$mcc}",
                 "Content-Type: application/json"
             ]);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['query' => $q]));
-            curl_exec($ch);
-            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            $res['google_ads'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['query' => "SELECT campaign.id FROM campaign LIMIT 1"]));
+            $handles['google_ads'] = $ch;
         }
-        
-        // Test GA4
+
         if (!empty($int['ga4_property_id'])) {
-            $gaPid = $int['ga4_property_id'];
-            $ch = curl_init("https://analyticsdata.googleapis.com/v1beta/properties/{$gaPid}:runReport");
+            $ch = curl_init("https://analyticsdata.googleapis.com/v1beta/properties/{$int['ga4_property_id']}:runReport");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
             curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Authorization: Bearer {$gAccessToken}",
-                "Content-Type: application/json"
-            ]);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$gAccessToken}", "Content-Type: application/json"]);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
                 'dateRanges' => [['startDate' => date('Y-m-d'), 'endDate' => date('Y-m-d')]],
                 'metrics' => [['name' => 'sessions']]
             ]));
-            curl_exec($ch);
-            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            $res['ga4'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
+            $handles['ga4'] = $ch;
         }
-        
-        // Test GSC
+
         if (!empty($int['gsc_site_url'])) {
             $gscUrl = urlencode($int['gsc_site_url']);
             $ch = curl_init("https://www.googleapis.com/webmasters/v3/sites/{$gscUrl}/searchAnalytics/query");
@@ -188,24 +163,34 @@ if ($action === 'test_connections') {
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
             curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Authorization: Bearer {$gAccessToken}",
-                "Content-Type: application/json"
-            ]);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$gAccessToken}", "Content-Type: application/json"]);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
                 'startDate' => date('Y-m-d', strtotime('-7 days')),
                 'endDate' => date('Y-m-d', strtotime('-1 day')),
                 'rowLimit' => 1
             ]));
-            curl_exec($ch);
-            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            $res['gsc'] = ($code === 200) ? 'Connected' : 'Failed (' . $code . ')';
+            $handles['gsc'] = $ch;
         }
-    } else {
+    } else if (!empty($int['google_ads_enabled']) || !empty($int['ga4_property_id']) || !empty($int['gsc_site_url'])) {
         $res['google_ads'] = $res['ga4'] = $res['gsc'] = 'Failed (Google OAuth unauthorized)';
     }
-    
+
+    // Run every queued check concurrently
+    foreach ($handles as $ch) curl_multi_add_handle($mh, $ch);
+    $running = null;
+    do {
+        curl_multi_exec($mh, $running);
+        curl_multi_select($mh, 1.0);
+    } while ($running > 0);
+
+    foreach ($handles as $key => $ch) {
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $res[$key] = ($code === 200) ? 'Connected' : 'Failed (' . ($code ?: 'timeout') . ')';
+        curl_multi_remove_handle($mh, $ch);
+        curl_close($ch);
+    }
+    curl_multi_close($mh);
+
     json_out(array_merge(['ok' => true], $res));
 }
 

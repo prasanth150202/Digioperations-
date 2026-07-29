@@ -7011,9 +7011,14 @@ function renderMonthlyReportsTable() {
 
   list.innerHTML = filtered.map(h => {
     const startStr = h.period_start ? new Date(h.period_start).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '—';
-    const spend = typeof h.total_spend === 'number' ? '₹' + Math.round(h.total_spend).toLocaleString() : '—';
-    const rev = typeof h.total_revenue === 'number' ? '₹' + Math.round(h.total_revenue).toLocaleString() : '—';
-    const roas = typeof h.overall_roas === 'number' ? Number(h.overall_roas).toFixed(2) + 'x' : '—';
+    // MySQL DECIMAL columns come back through PDO (and therefore JSON) as numeric strings, not
+    // numbers, so a strict typeof-number check here always failed and showed "—" for every row.
+    const spendNum = parseFloat(h.total_spend);
+    const revNum = parseFloat(h.total_revenue);
+    const roasNum = parseFloat(h.overall_roas);
+    const spend = Number.isFinite(spendNum) ? '₹' + Math.round(spendNum).toLocaleString() : '—';
+    const rev = Number.isFinite(revNum) ? '₹' + Math.round(revNum).toLocaleString() : '—';
+    const roas = Number.isFinite(roasNum) ? roasNum.toFixed(2) + 'x' : '—';
     const created = h.created_at ? new Date(h.created_at).toLocaleDateString() : '—';
     
     // Use unique_token (from report_links join) as the deck URL parameter
