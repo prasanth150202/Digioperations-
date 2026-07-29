@@ -56,6 +56,14 @@ if (!empty($int['shopify_subdomain'])) {
     $int['shopify_subdomain'] = $sd;
 }
 
+// Normalize the GSC site URL — "sc-domain:example.com" is Search Console's own scheme-like
+// prefix for a Domain property and should never be preceded by http(s)://, but it's an easy
+// combination to type by mistake (e.g. "http://sc-domain:example.com"), which Google's API
+// correctly rejects as not a valid site URL.
+if (!empty($int['gsc_site_url'])) {
+    $int['gsc_site_url'] = preg_replace('#^https?://(sc-domain:)#i', '$1', trim($int['gsc_site_url']));
+}
+
 // ── GOOGLE CLIENT REFRESH TOKEN HELPER ──
 function getGoogleAccessToken() {
     $clientId = getSetting('google_client_id');
@@ -140,7 +148,7 @@ if ($action === 'test_connections') {
             $cust = str_replace('-', '', $int['google_ads_customer_id']);
             $devTok = getSetting('google_developer_token');
             $mcc = !empty($int['google_ads_mcc_id']) ? str_replace('-', '', $int['google_ads_mcc_id']) : $cust;
-            $ch = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+            $ch = curl_init("https://googleads.googleapis.com/v21/customers/{$cust}/googleAds:search");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
@@ -691,7 +699,7 @@ if ($gAccessToken && !empty($int['google_ads_enabled']) && !empty($int['google_a
     // 1. Fetch campaigns details (including network/channel type, for the ad-structure audit)
     $q = "SELECT campaign.name, campaign.advertising_channel_type, metrics.cost_micros, metrics.conversions, metrics.conversions_value, metrics.impressions, metrics.clicks FROM campaign WHERE segments.date BETWEEN '{$startDate}' AND '{$endDate}' AND campaign.status = 'ENABLED' ORDER BY metrics.cost_micros DESC LIMIT 50";
 
-    $ch = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+    $ch = curl_init("https://googleads.googleapis.com/v21/customers/{$cust}/googleAds:search");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -738,7 +746,7 @@ if ($gAccessToken && !empty($int['google_ads_enabled']) && !empty($int['google_a
     // 1b. Fetch top responsive search ad copy (for the creative preview slide)
     $googleSearchAds = [];
     $qAds = "SELECT ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions, metrics.clicks, metrics.conversions_value, metrics.cost_micros FROM ad_group_ad WHERE segments.date BETWEEN '{$startDate}' AND '{$endDate}' AND ad_group_ad.status = 'ENABLED' AND campaign.advertising_channel_type = 'SEARCH' ORDER BY metrics.conversions_value DESC LIMIT 3";
-    $chAds = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+    $chAds = curl_init("https://googleads.googleapis.com/v21/customers/{$cust}/googleAds:search");
     curl_setopt($chAds, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($chAds, CURLOPT_POST, true);
     curl_setopt($chAds, CURLOPT_TIMEOUT, 15);
@@ -769,7 +777,7 @@ if ($gAccessToken && !empty($int['google_ads_enabled']) && !empty($int['google_a
 
     // 2. Fetch daily logs
     $qDaily = "SELECT segments.date, metrics.cost_micros, metrics.conversions, metrics.conversions_value, metrics.impressions, metrics.clicks FROM campaign WHERE segments.date BETWEEN '{$startDate}' AND '{$endDate}'";
-    $chD = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+    $chD = curl_init("https://googleads.googleapis.com/v21/customers/{$cust}/googleAds:search");
     curl_setopt($chD, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($chD, CURLOPT_POST, true);
     curl_setopt($chD, CURLOPT_HTTPHEADER, [

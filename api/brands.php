@@ -113,6 +113,11 @@ if ($method === 'PUT' && $id) {
             $sd = preg_replace('#\.myshopify\.com.*$#i', '', $sd);
             $merged['shopify_subdomain'] = trim($sd, "/ \t\n\r\0\x0B");
         }
+        // Normalize the GSC site URL on save too — "sc-domain:example.com" should never be
+        // preceded by http(s)://, but it's an easy mistake to combine the two conventions.
+        if (!empty($merged['gsc_site_url'])) {
+            $merged['gsc_site_url'] = preg_replace('#^https?://(sc-domain:)#i', '$1', trim($merged['gsc_site_url']));
+        }
         $finalIntegrations = json_encode($merged);
     }
     
