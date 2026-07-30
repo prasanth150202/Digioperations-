@@ -7,13 +7,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@600;800;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0f172a;
-            --card-dark: #1e293b;
-            --border-dark: #334155;
+            /* Names kept from the original dark theme (--bg-dark etc.) to avoid touching every
+               var() call site, but the deck is now light-themed to match the reference deck and
+               the PPTX export (which was already light) — the two views were previously two
+               completely different color schemes. */
+            --bg-dark: #f1f5f9;
+            --card-dark: #ffffff;
+            --border-dark: #e2e8f0;
+            --text-dark: #0f172a;
+            --text-body: #475569;
             --blue: #3b82f6;
             --blue-gradient: linear-gradient(135deg, #3b82f6, #6366f1);
             --green: #10b981;
-            --red: #f43f5e;
+            --red: #ef4444;
             --purple: #a855f7;
             --gray: #64748b;
             --font: 'Plus Jakarta Sans', sans-serif;
@@ -28,7 +34,7 @@
 
         body {
             background-color: var(--bg-dark);
-            color: #f1f5f9;
+            color: var(--text-dark);
             font-family: var(--font);
             display: flex;
             flex-direction: column;
@@ -44,10 +50,10 @@
             width: 100%;
             max-width: 1120px; /* 16:9 aspect scale */
             aspect-ratio: 16 / 9;
-            background: radial-gradient(circle at 10% 20%, rgba(30, 41, 59, 1) 0%, rgba(15, 23, 42, 1) 90%);
+            background: #ffffff;
             border: 1px solid var(--border-dark);
             border-radius: 20px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.15);
             position: relative;
             overflow: hidden;
             display: flex;
@@ -76,7 +82,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            border-bottom: 1px solid var(--border-dark);
             padding-bottom: 15px;
             margin-bottom: 20px;
         }
@@ -86,9 +92,7 @@
             font-size: 26px;
             font-weight: 800;
             letter-spacing: -0.5px;
-            background: linear-gradient(to right, #fff, #94a3b8);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--text-dark);
         }
 
         .slide-subtitle {
@@ -104,7 +108,7 @@
             font-family: var(--font-hd);
             font-size: 16px;
             font-weight: 900;
-            color: #fff;
+            color: var(--text-dark);
             letter-spacing: 1px;
         }
 
@@ -117,7 +121,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-top: 1px solid var(--border-dark);
             padding-top: 12px;
             margin-top: 20px;
             font-size: 11px;
@@ -153,16 +157,16 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            background: var(--card-dark);
+            background: #ffffff;
             padding: 10px 20px;
             border-radius: 12px;
             border: 1px solid var(--border-dark);
         }
 
         .ctrl-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #fff;
+            background: #f1f5f9;
+            border: 1px solid var(--border-dark);
+            color: var(--text-dark);
             padding: 8px 16px;
             border-radius: 8px;
             cursor: pointer;
@@ -174,6 +178,7 @@
         .ctrl-btn:hover {
             background: var(--blue);
             border-color: var(--blue);
+            color: #fff;
         }
 
         .slide-counter {
@@ -186,8 +191,8 @@
 
         /* Widescreen Card Metrics */
         .metric-card {
-            background: rgba(30, 41, 59, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: #f8fafc;
+            border: 1px solid var(--border-dark);
             border-radius: 12px;
             padding: 20px;
             display: flex;
@@ -200,7 +205,7 @@
 
         .metric-card:hover {
             transform: translateY(-2px);
-            border-color: rgba(59, 130, 246, 0.3);
+            border-color: rgba(59, 130, 246, 0.4);
         }
 
         .metric-label {
@@ -216,7 +221,7 @@
             font-family: var(--font-hd);
             font-size: 28px;
             font-weight: 800;
-            color: #fff;
+            color: var(--text-dark);
         }
 
         .metric-trend {
@@ -236,7 +241,7 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 11.5px;
-            color: #cbd5e1;
+            color: var(--text-body);
         }
 
         .slide-table th {
@@ -246,16 +251,16 @@
             font-weight: 700;
             text-transform: uppercase;
             font-size: 9px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            border-bottom: 1px solid var(--border-dark);
         }
 
         .slide-table td {
             padding: 10px 12px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            border-bottom: 1px solid #f1f5f9;
         }
 
         .slide-table tr:hover td {
-            background: rgba(255, 255, 255, 0.02);
+            background: #f8fafc;
         }
 
         /* Funnel chart steps */
@@ -277,14 +282,14 @@
             width: 110px;
             font-size: 11px;
             font-weight: 700;
-            color: #94a3b8;
+            color: var(--text-body);
             text-align: right;
         }
 
         .funnel-bar-outer {
             flex: 1;
             height: 28px;
-            background: rgba(255, 255, 255, 0.05);
+            background: #f1f5f9;
             border-radius: 6px;
             overflow: hidden;
             position: relative;
@@ -317,22 +322,22 @@
 
         /* Narrative / AI text boxes */
         .narrative-box {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            background: #f8fafc;
+            border: 1px solid var(--border-dark);
             border-radius: 10px;
             padding: 14px 16px;
             font-size: 11.5px;
-            color: #cbd5e1;
+            color: var(--text-body);
             line-height: 1.6;
         }
 
         .callout-box {
-            background: rgba(59, 130, 246, 0.06);
-            border: 1px solid rgba(59, 130, 246, 0.2);
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.25);
             border-radius: 10px;
             padding: 12px 16px;
             font-size: 11.5px;
-            color: #cbd5e1;
+            color: var(--text-dark);
             text-align: center;
             font-weight: 600;
         }
@@ -383,7 +388,7 @@
         .funnel-stage-label {
             font-size: 12.5px;
             font-weight: 800;
-            color: #fff;
+            color: var(--text-dark);
         }
         .funnel-stage-dropoff {
             font-size: 10.5px;
@@ -397,9 +402,9 @@
 
         /* Ad structure audit — placeholder box for a pasted-in top-ad screenshot */
         .ad-snip-box {
-            border: 1.5px dashed rgba(255, 255, 255, 0.15);
+            border: 1.5px dashed var(--border-dark);
             border-radius: 10px;
-            background: rgba(255, 255, 255, 0.015);
+            background: #f8fafc;
             min-height: 120px;
             display: flex;
             flex-direction: column;
@@ -433,8 +438,8 @@
 
         /* Social ad mockup cards — Best Performing Creatives */
         .ad-mock-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            background: #f8fafc;
+            border: 1px solid var(--border-dark);
             border-radius: 12px;
             padding: 14px;
             display: flex;
@@ -462,7 +467,7 @@
         .ad-mock-brand {
             font-size: 11.5px;
             font-weight: 800;
-            color: #fff;
+            color: var(--text-dark);
             line-height: 1.2;
         }
         .ad-mock-sponsored {
@@ -471,14 +476,14 @@
         }
         .ad-mock-copy {
             font-size: 10.5px;
-            color: #cbd5e1;
+            color: var(--text-body);
             line-height: 1.4;
             max-height: 43px;
             overflow: hidden;
         }
         .ad-mock-media {
             border-radius: 8px;
-            background: rgba(255, 255, 255, 0.03);
+            background: #eef2f6;
             height: 110px;
             display: flex;
             align-items: center;
@@ -513,13 +518,13 @@
         .ad-mock-stats {
             display: flex;
             justify-content: space-between;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-top: 1px solid var(--border-dark);
             padding-top: 8px;
             font-size: 10.5px;
             color: var(--gray);
         }
         .ad-mock-stats strong {
-            color: #fff;
+            color: var(--text-dark);
         }
         .ad-mock-card.placeholder {
             align-items: center;
@@ -543,7 +548,7 @@
                 <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.2); padding:10px 20px; border-radius:30px; font-size:12px; font-weight:800; color:var(--blue); letter-spacing:2px; text-transform:uppercase; margin-bottom:20px">
                     Monthly Performance Deck
                 </div>
-                <h1 id="cover-brand" style="font-family:var(--font-hd); font-size:54px; font-weight:900; letter-spacing:-1.5px; margin-bottom:10px; color:#fff">
+                <h1 id="cover-brand" style="font-family:var(--font-hd); font-size:54px; font-weight:900; letter-spacing:-1.5px; margin-bottom:10px; color:var(--text-dark)">
                     Brand Name
                 </h1>
                 <p id="cover-date" style="font-size:18px; color:var(--gray); font-weight:600; margin-bottom:18px">
@@ -647,9 +652,9 @@
                         </div>
                     </div>
                 </div>
-                <div style="background:rgba(255,255,255,0.02); padding:24px; border-radius:12px; display:flex; flex-direction:column; justify-content:center">
+                <div style="background:#f8fafc; border:1px solid var(--border-dark); padding:24px; border-radius:12px; display:flex; flex-direction:column; justify-content:center">
                     <h3 style="font-size:14px; margin-bottom:12px; color:var(--blue)">Funnel Stage Diagnostics</h3>
-                    <p style="font-size:12px; color:#cbd5e1; line-height:1.6; margin-bottom:8px" id="funnel-inferences-text">
+                    <p style="font-size:12px; color:var(--text-body); line-height:1.6; margin-bottom:8px" id="funnel-inferences-text">
                         The overall website conversion rate is tracked at 0.00%.
                     </p>
                 </div>
@@ -928,7 +933,7 @@
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="narrative-box" id="strategy-deepdive-title" style="margin-bottom:14px; font-weight:800; font-size:13px; color:#fff; flex:none"></div>
+            <div class="narrative-box" id="strategy-deepdive-title" style="margin-bottom:14px; font-weight:800; font-size:13px; color:var(--text-dark); flex:none"></div>
             <div class="grid-2" id="strategy-deepdive-steps" style="flex:1"></div>
             <div class="slide-footer">
                 <div>AI-Drafted from Reported Metrics</div>
@@ -993,7 +998,7 @@
         <!-- SLIDE 21: CLOSING -->
         <div class="slide" id="slide-21">
             <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center">
-                <h1 style="font-family:var(--font-hd); font-size:44px; font-weight:900; margin-bottom:14px; color:#fff">Thank You!</h1>
+                <h1 style="font-family:var(--font-hd); font-size:44px; font-weight:900; margin-bottom:14px; color:var(--text-dark)">Thank You!</h1>
                 <p style="font-size:16px; color:var(--gray); font-weight:600; margin-bottom:26px">Let's scale brand performance next month.</p>
                 <p style="font-size:11.5px; color:var(--gray)">Account Team: agent@digifyce.in &nbsp;|&nbsp; Support: support@digifyce.in &nbsp;|&nbsp; Portal: platform.digifyce.in</p>
             </div>
@@ -1189,7 +1194,7 @@
                     <td>${fmt(pVal || 0)}</td>
                     <td style="font-weight:600">${fmt(cVal || 0)}</td>
                     <td class="${trendClassOf(change)}" style="font-weight:800">${changeText}</td>
-                    <td style="color:#94a3b8">${why}</td>
+                    <td style="color:var(--gray)">${why}</td>
                 </tr>`;
             }).join('');
             document.getElementById('slide3-period').textContent = rangeStr;
@@ -1252,7 +1257,7 @@
                     <td style="font-weight:700">${p.name}</td>
                     <td>${p.primary_region || '—'}</td>
                     <td style="font-weight:700;color:var(--green)">${p.revenue_share || 0}%</td>
-                    <td style="color:#94a3b8">${productDrivers[p.name] || '—'}</td>
+                    <td style="color:var(--gray)">${productDrivers[p.name] || '—'}</td>
                 </tr>`).join('');
                 const top = products[0];
                 document.getElementById('product-region-callout').textContent =
@@ -1340,7 +1345,7 @@
                     ${cr.body ? `<div class="ad-mock-copy">${stripHtml(cr.body).slice(0, 110)}${cr.body.length > 110 ? '…' : ''}</div>` : ''}
                     <div class="ad-mock-media">${mediaHtml}</div>
                     <div class="ad-mock-cta-row">
-                        <div style="font-size:10.5px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cr.name}</div>
+                        <div style="font-size:10.5px;font-weight:700;color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cr.name}</div>
                         <div class="ad-mock-cta-btn">${cr.cta || 'SHOP NOW'}</div>
                     </div>
                     <div class="ad-mock-stats">
@@ -1374,11 +1379,11 @@
             googleCreativesBox.innerHTML = gsAds.length === 0
                 ? `<div style="grid-column:span 3;text-align:center;color:var(--gray);padding:40px 0">No Google Search ad copy synced for this month.</div>`
                 : gsAds.map((a, idx) => `
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:16px; border-radius:12px; display:flex; flex-direction:column; gap:8px">
+                    <div style="background:#f8fafc; border:1px solid var(--border-dark); padding:16px; border-radius:12px; display:flex; flex-direction:column; gap:8px">
                         <div style="font-size:10px;color:var(--green);font-weight:700">Ad · Sponsored</div>
-                        <div style="font-size:13px;color:#93c5fd;font-weight:700">${a.headline}</div>
-                        <div style="font-size:11px;color:var(--gray);line-height:1.4">${a.description}</div>
-                        <div style="font-size:11px;color:var(--gray);margin-top:auto">Clicks: <strong style="color:#fff">${(a.clicks || 0).toLocaleString()}</strong> &nbsp;|&nbsp; ROAS: <strong style="color:#fff">${(a.roas || 0).toFixed(2)}x</strong></div>
+                        <div style="font-size:13px;color:var(--blue);font-weight:700">${a.headline}</div>
+                        <div style="font-size:11px;color:var(--text-body);line-height:1.4">${a.description}</div>
+                        <div style="font-size:11px;color:var(--gray);margin-top:auto">Clicks: <strong style="color:var(--text-dark)">${(a.clicks || 0).toLocaleString()}</strong> &nbsp;|&nbsp; ROAS: <strong style="color:var(--text-dark)">${(a.roas || 0).toFixed(2)}x</strong></div>
                     </div>
                 `).join('');
 
@@ -1390,9 +1395,9 @@
                 return `<div class="metric-card" style="text-align:left">
                     <div class="metric-label">${lbl}</div>
                     <div style="font-size:11px;color:var(--gray);margin-top:8px">Sessions</div>
-                    <div style="font-weight:800;font-size:16px;color:#fff">${(m.sessions || 0).toLocaleString()}</div>
+                    <div style="font-weight:800;font-size:16px;color:var(--text-dark)">${(m.sessions || 0).toLocaleString()}</div>
                     <div style="font-size:11px;color:var(--gray);margin-top:6px">Conv. Rate / Revenue</div>
-                    <div style="font-weight:700;font-size:12px;color:#fff">${m.convRate}% &nbsp;/&nbsp; ${curr(m.revenue)}</div>
+                    <div style="font-weight:700;font-size:12px;color:var(--text-dark)">${m.convRate}% &nbsp;/&nbsp; ${curr(m.revenue)}</div>
                 </div>`;
             }).join('');
 
@@ -1475,7 +1480,7 @@
                 ? `<div style="grid-column:span 3;text-align:center;color:var(--gray);padding:40px 0">No initiatives generated for this period.</div>`
                 : initiatives.map(it => `
                     <div class="narrative-box" style="display:flex;flex-direction:column;gap:8px">
-                        <div style="font-weight:800;font-size:13px;color:#fff">${it.name || 'Initiative'}</div>
+                        <div style="font-weight:800;font-size:13px;color:var(--text-dark)">${it.name || 'Initiative'}</div>
                         <div><span style="color:var(--blue);font-weight:700;font-size:10.5px">GOAL:</span> ${it.goal || '—'}</div>
                         <div><span style="color:var(--purple);font-weight:700;font-size:10.5px">EXECUTION:</span> ${it.execution || '—'}</div>
                         <div><span style="color:var(--green);font-weight:700;font-size:10.5px">RESULT:</span> ${it.result || '—'}</div>
@@ -1494,7 +1499,7 @@
             document.getElementById('strategy-deepdive-steps').innerHTML = sddSteps.map(([n, title, detail]) => `
                 <div class="narrative-box" style="display:flex;gap:12px">
                     <div style="width:26px;height:26px;border-radius:7px;background:var(--blue-gradient);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0">${n}</div>
-                    <div><div style="font-weight:800;font-size:12.5px;color:#fff;margin-bottom:4px">${title}</div><div style="color:#cbd5e1">${detail || '—'}</div></div>
+                    <div><div style="font-weight:800;font-size:12.5px;color:var(--text-dark);margin-bottom:4px">${title}</div><div style="color:var(--text-body)">${detail || '—'}</div></div>
                 </div>
             `).join('');
 
@@ -1506,7 +1511,7 @@
                 : inferences.map((inf, i) => `
                     <div class="narrative-box" style="display:flex;gap:12px">
                         <div style="width:26px;height:26px;border-radius:7px;background:var(--blue-gradient);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0">${i + 1}</div>
-                        <div><div style="font-weight:800;font-size:12.5px;color:#fff;margin-bottom:4px">${inf.title || ''}</div><div style="color:#cbd5e1">${inf.detail || ''}</div></div>
+                        <div><div style="font-weight:800;font-size:12.5px;color:var(--text-dark);margin-bottom:4px">${inf.title || ''}</div><div style="color:var(--text-body)">${inf.detail || ''}</div></div>
                     </div>
                 `).join('');
 
@@ -1518,7 +1523,7 @@
                 : recommendations.map((rec, i) => `
                     <div class="narrative-box" style="display:flex;gap:12px">
                         <div style="width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0">${i + 1}</div>
-                        <div><div style="font-weight:800;font-size:12.5px;color:#fff;margin-bottom:4px">${rec.title || ''}</div><div style="color:#cbd5e1">${rec.detail || ''}</div></div>
+                        <div><div style="font-weight:800;font-size:12.5px;color:var(--text-dark);margin-bottom:4px">${rec.title || ''}</div><div style="color:var(--text-body)">${rec.detail || ''}</div></div>
                     </div>
                 `).join('');
 
@@ -1541,7 +1546,7 @@
             const maxTrend = Math.max(...trendBars.map(b => b.value), 1);
             document.getElementById('trend-chart').innerHTML = trendBars.map(b => `
                 <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
-                    <div style="font-size:11px;font-weight:800;color:#fff;margin-bottom:6px">${curr(b.value)}</div>
+                    <div style="font-size:11px;font-weight:800;color:var(--text-dark);margin-bottom:6px">${curr(b.value)}</div>
                     <div style="width:100%;background:${b.color};border-radius:8px 8px 0 0;height:${Math.max(6, (b.value / maxTrend) * 100)}%"></div>
                     <div style="font-size:10px;color:var(--gray);font-weight:700;margin-top:8px">${b.label}</div>
                 </div>
