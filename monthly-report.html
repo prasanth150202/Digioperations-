@@ -1325,63 +1325,181 @@
                     pptx.title = `${report.brand_name || 'Brand'} — Monthly Performance Report`;
 
                     const CLR = {
-                        primary: '3B82F6', purple: 'A855F7', dark: '0F172A', mid: '64748B', green: '10B981',
-                        red: 'F43F5E', bg: 'F8FAFC', border: 'E2E8F0', white: 'FFFFFF'
+                        primary: '2563EB', cyan: '0EA5E9', teal: '0D9488', orange: 'EA580C',
+                        dark: '0F172A', mid: '64748B', border: 'E2E8F0', bg: 'F8FAFC', white: 'FFFFFF',
+                        green: '16A34A', greenBg: 'DCFCE7', red: 'DC2626', redBg: 'FEE2E2', blue: '2563EB', blueBg: 'DBEAFE'
                     };
                     const FONT = 'Plus Jakarta Sans';
+                    const TOTAL_PAGES = 21;
                     const pctText = (v) => (v === null || v === undefined) ? '—' : `${v >= 0 ? '+' : ''}${v}%`;
+                    const initialsOf = (name) => {
+                        const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+                        if (parts.length === 0) return 'B';
+                        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+                        return (parts[0][0] + parts[1][0]).toUpperCase();
+                    };
 
-                    function baseSlide(group, title) {
+                    // Draws a card with either a thin colored strip on the left edge ('left', used for
+                    // KPI tiles / callouts) or a full colored outline ('full', used for diagnostic /
+                    // audit boxes) or a plain neutral outline ('plain', used for creative & step cards).
+                    function accentBox(s, x, y, w, h, accent, style) {
+                        if (style === 'left') {
+                            s.addShape('rect', { x, y, w, h, fill: { color: accent } });
+                            s.addShape('rect', { x: x + 0.05, y, w: w - 0.05, h, fill: { color: CLR.white }, line: { color: CLR.border, width: 0.75 } });
+                        } else if (style === 'full') {
+                            s.addShape('roundRect', { x, y, w, h, rectRadius: 0.05, fill: { color: CLR.white }, line: { color: accent, width: 1.5 } });
+                        } else {
+                            s.addShape('roundRect', { x, y, w, h, rectRadius: 0.05, fill: { color: CLR.white }, line: { color: CLR.border, width: 1 } });
+                        }
+                    }
+
+                    function footer(s, pageNum) {
+                        s.addShape('line', { x: 0.4, y: 7.05, w: 12.53, h: 0, line: { color: CLR.border, width: 0.75 } });
+                        s.addText(`${report.brand_name || 'Brand'} Report — ${mLabel}`, { x: 0.4, y: 7.1, w: 8, h: 0.3, fontSize: 9, color: CLR.mid, fontFace: FONT });
+                        s.addText(`Page ${pageNum} of ${TOTAL_PAGES}`, { x: 9.53, y: 7.1, w: 3.4, h: 0.3, align: 'right', fontSize: 9, color: CLR.mid, fontFace: FONT });
+                    }
+
+                    function baseSlide(pageNum, group, title) {
                         const s = pptx.addSlide();
                         s.background = { color: CLR.white };
-                        s.addShape('rect', { x: 0, y: 0, w: 13.33, h: 0.9, fill: { color: CLR.dark } });
-                        s.addText('DIGIFYCE', { x: 0.4, y: 0.22, w: 3, h: 0.5, fontSize: 16, bold: true, color: CLR.white, fontFace: FONT });
-                        s.addText(group.toUpperCase(), { x: 9.53, y: 0.3, w: 3.4, h: 0.35, align: 'right', fontSize: 10, color: '93C5FD', fontFace: FONT, bold: true });
-                        s.addText(title, { x: 0.4, y: 1.05, w: 12.5, h: 0.5, fontSize: 22, bold: true, color: CLR.dark, fontFace: FONT });
+                        s.addShape('rect', { x: 0.4, y: 0.4, w: 0.07, h: 0.45, fill: { color: CLR.primary } });
+                        s.addText(title, { x: 0.6, y: 0.28, w: 8.9, h: 0.65, fontSize: 21, bold: true, color: CLR.dark, fontFace: FONT, valign: 'middle' });
+                        if (group) s.addText(group, { x: 7.53, y: 0.4, w: 5.4, h: 0.45, align: 'right', fontSize: 10.5, color: CLR.mid, fontFace: FONT, valign: 'middle' });
+                        s.addShape('line', { x: 0.4, y: 0.98, w: 12.53, h: 0, line: { color: CLR.border, width: 1 } });
+                        footer(s, pageNum);
                         return s;
                     }
 
-                    function statTiles(s, tiles, startY) {
-                        const cols = 3, tileW = 3.9, tileH = 1.3, gap = 0.25, startX = 0.4;
+                    function changeBadge(s, x, y, w, change) {
+                        let bg, fg, txt;
+                        if (change === null || change === undefined) { bg = CLR.bg; fg = CLR.mid; txt = '—'; }
+                        else if (change === 0) { bg = CLR.blueBg; fg = CLR.blue; txt = 'FLAT'; }
+                        else if (change > 0) { bg = CLR.greenBg; fg = CLR.green; txt = `+${change}%`; }
+                        else { bg = CLR.redBg; fg = CLR.red; txt = `${change}%`; }
+                        s.addShape('roundRect', { x, y, w, h: 0.28, rectRadius: 0.06, fill: { color: bg } });
+                        s.addText(txt, { x, y, w, h: 0.28, align: 'center', valign: 'middle', fontSize: 8.5, bold: true, color: fg, fontFace: FONT });
+                    }
+
+                    // tiles: [{label, value, change, compareText, note, accent}]
+                    function statTiles(s, tiles, startX, startY, totalW, cols) {
+                        cols = cols || 3;
+                        const gap = 0.22;
+                        const tileW = (totalW - gap * (cols - 1)) / cols;
+                        const tileH = 1.35;
                         tiles.forEach((t, i) => {
                             const col = i % cols, row = Math.floor(i / cols);
                             const x = startX + col * (tileW + gap);
                             const y = startY + row * (tileH + gap);
-                            s.addShape('rect', { x, y, w: tileW, h: tileH, fill: { color: CLR.bg }, line: { color: CLR.border, width: 1 }, rectRadius: 0.08 });
-                            s.addText(t.label.toUpperCase(), { x: x + 0.15, y: y + 0.1, w: tileW - 0.3, h: 0.3, fontSize: 9, bold: true, color: CLR.mid, fontFace: FONT });
-                            s.addText(t.value, { x: x + 0.15, y: y + 0.35, w: tileW - 0.3, h: 0.5, fontSize: 18, bold: true, color: CLR.dark, fontFace: FONT });
-                            if (t.change !== undefined) {
-                                const chColor = t.change === null ? CLR.mid : (t.change >= 0 ? CLR.green : CLR.red);
-                                s.addText(pctText(t.change) + ' vs prior', { x: x + 0.15, y: y + 0.9, w: tileW - 0.3, h: 0.3, fontSize: 9, bold: true, color: chColor, fontFace: FONT });
-                            }
+                            accentBox(s, x, y, tileW, tileH, t.accent || CLR.primary, 'left');
+                            s.addText(t.label.toUpperCase(), { x: x + 0.18, y: y + 0.12, w: tileW - 1.25, h: 0.3, fontSize: 8.5, bold: true, color: CLR.mid, fontFace: FONT });
+                            if (t.change !== undefined) changeBadge(s, x + tileW - 1.1, y + 0.1, 0.95, t.change);
+                            s.addText(t.value, { x: x + 0.18, y: y + 0.42, w: tileW - 0.36, h: 0.48, fontSize: 19, bold: true, color: CLR.dark, fontFace: FONT });
+                            const sub = t.compareText || t.note;
+                            if (sub) s.addText(sub, { x: x + 0.18, y: y + 0.98, w: tileW - 0.36, h: 0.3, fontSize: 8.5, color: CLR.mid, fontFace: FONT });
                         });
                     }
 
-                    function tableSlide(group, title, headers, rows, emptyMsg) {
-                        const s = baseSlide(group, title);
+                    function calloutBox(s, text, y, accent) {
+                        const h = 0.55;
+                        accentBox(s, 0.4, y, 12.53, h, accent || CLR.primary, 'left');
+                        s.addText(text, { x: 0.65, y, w: 12.2, h, fontSize: 10.5, bold: true, color: CLR.dark, fontFace: FONT, valign: 'middle' });
+                    }
+
+                    function pctCellStyle(value) {
+                        if (typeof value !== 'string') return null;
+                        if (value.startsWith('+')) return { fill: { color: CLR.greenBg }, color: CLR.green, bold: true };
+                        if (/^-/.test(value)) return { fill: { color: CLR.redBg }, color: CLR.red, bold: true };
+                        if (/flat/i.test(value)) return { fill: { color: CLR.blueBg }, color: CLR.blue, bold: true };
+                        return null;
+                    }
+
+                    function roasCellStyle(value) {
+                        const n = parseFloat(value);
+                        if (isNaN(n)) return null;
+                        if (n >= 3.5) return { fill: { color: CLR.greenBg }, color: CLR.green, bold: true };
+                        if (n >= 2) return { fill: { color: CLR.blueBg }, color: CLR.blue, bold: true };
+                        return { fill: { color: CLR.redBg }, color: CLR.red, bold: true };
+                    }
+
+                    function renderTable(s, x, y, w, headers, rows, cellStyle) {
+                        const tableRows = [headers.map(h => ({ text: h.toUpperCase(), options: { bold: true, color: CLR.dark, fill: { color: CLR.bg }, fontSize: 9, fontFace: FONT } }))]
+                            .concat(rows.map((r, ri) => r.map((c, ci) => {
+                                const styled = cellStyle ? cellStyle(ri, ci, c) : null;
+                                const base = { fontSize: 9.5, color: CLR.dark, fontFace: FONT, fill: { color: ri % 2 === 0 ? CLR.white : 'FBFCFE' } };
+                                return { text: String(c), options: Object.assign(base, styled || {}) };
+                            })));
+                        s.addTable(tableRows, { x, y, w, autoPage: false, border: { type: 'solid', color: CLR.border, pt: 0.5 }, valign: 'middle' });
+                    }
+
+                    function tableSlide(pageNum, group, title, headers, rows, opts) {
+                        opts = opts || {};
+                        const s = baseSlide(pageNum, group, title);
                         if (!rows.length) {
-                            s.addText(emptyMsg || 'No data available for this period.', { x: 0.4, y: 2.2, w: 12.5, h: 0.5, fontSize: 13, color: CLR.mid, fontFace: FONT, italic: true });
+                            s.addText(opts.emptyMsg || 'No data available for this period.', { x: 0.4, y: 1.5, w: 12.53, h: 0.5, fontSize: 13, color: CLR.mid, fontFace: FONT, italic: true });
                             return s;
                         }
-                        const tableRows = [headers.map(h => ({ text: h, options: { bold: true, color: CLR.white, fill: { color: CLR.dark }, fontSize: 9.5, fontFace: FONT } }))]
-                            .concat(rows.map(r => r.map(c => ({ text: String(c), options: { fontSize: 9.5, color: CLR.dark, fontFace: FONT } }))));
-                        s.addTable(tableRows, { x: 0.4, y: 1.75, w: 12.5, autoPage: false, border: { type: 'solid', color: CLR.border, pt: 0.5 }, valign: 'middle' });
+                        renderTable(s, 0.4, 1.2, 12.53, headers, rows, opts.cellStyle);
+                        if (opts.calloutText) calloutBox(s, opts.calloutText, 6.5, opts.calloutAccent);
                         return s;
                     }
 
-                    function narrativeCardsSlide(group, title, cards) {
-                        const s = baseSlide(group, title);
+                    // A left card of label/value diagnostic rows (funnel / cohort style) + description text.
+                    function diagnosticsCard(s, x, y, w, h, title, runs) {
+                        accentBox(s, x, y, w, h, CLR.dark, 'full');
+                        s.addText(title, { x: x + 0.25, y: y + 0.2, w: w - 0.5, h: 0.3, fontSize: 10.5, bold: true, color: CLR.dark, fontFace: FONT });
+                        s.addText(runs, { x: x + 0.25, y: y + 0.6, w: w - 0.5, h: h - 0.85, fontFace: FONT, valign: 'top', lineSpacingMultiple: 1.3 });
+                    }
+
+                    // cards: [{label, accent, rows:[[k,v],...], note}]
+                    function metricCardsSlide(pageNum, group, title, cards, calloutText) {
+                        const s = baseSlide(pageNum, group, title);
+                        const n = cards.length;
+                        const gap = 0.3, startX = 0.4, startY = 1.2;
+                        const cardW = (12.53 - gap * (n - 1)) / n;
+                        const cardH = calloutText ? 4.9 : 5.4;
+                        cards.forEach((c, i) => {
+                            const x = startX + i * (cardW + gap);
+                            accentBox(s, x, startY, cardW, cardH, c.accent || CLR.primary, 'full');
+                            s.addText(c.label, { x: x + 0.22, y: startY + 0.22, w: cardW - 0.44, h: 0.35, fontSize: 12, bold: true, color: c.accent || CLR.dark, fontFace: FONT });
+                            let ry = startY + 0.75;
+                            (c.rows || []).forEach(([k, v]) => {
+                                s.addText(k, { x: x + 0.22, y: ry, w: cardW - 0.44, h: 0.24, fontSize: 9, color: CLR.mid, fontFace: FONT });
+                                s.addText(String(v), { x: x + 0.22, y: ry + 0.22, w: cardW - 0.44, h: 0.34, fontSize: 15, bold: true, color: CLR.dark, fontFace: FONT });
+                                ry += 0.62;
+                            });
+                            if (c.note) s.addText(c.note, { x: x + 0.22, y: startY + cardH - 1.15, w: cardW - 0.44, h: 1.0, fontSize: 8.5, color: CLR.mid, fontFace: FONT, valign: 'top' });
+                        });
+                        if (calloutText) calloutBox(s, calloutText, startY + cardH + 0.2, CLR.primary);
+                        return s;
+                    }
+
+                    // cards: [{title, body}] plain bordered cards (creatives, strategy steps, inferences...)
+                    function narrativeCardsSlide(pageNum, group, title, cards, opts) {
+                        opts = opts || {};
+                        const s = baseSlide(pageNum, group, title);
+                        if (!cards.length) {
+                            s.addText('No data available for this period.', { x: 0.4, y: 1.5, w: 12.53, h: 0.5, fontSize: 13, color: CLR.mid, fontFace: FONT, italic: true });
+                            return s;
+                        }
                         const cols = cards.length > 4 ? 3 : 2;
-                        const gap = 0.3, startX = 0.4, startY = 1.75;
-                        const cardW = (12.5 - gap * (cols - 1)) / cols;
-                        const cardH = cols === 3 ? 2.4 : 2.6;
+                        const gap = 0.3, startX = 0.4, startY = 1.2;
+                        const cardW = (12.53 - gap * (cols - 1)) / cols;
+                        const cardH = cols === 3 ? 2.75 : 2.55;
                         cards.forEach((c, i) => {
                             const col = i % cols, row = Math.floor(i / cols);
                             const x = startX + col * (cardW + gap);
                             const y = startY + row * (cardH + gap);
-                            s.addShape('rect', { x, y, w: cardW, h: cardH, fill: { color: CLR.bg }, line: { color: CLR.border, width: 1 }, rectRadius: 0.06 });
-                            s.addText(c.title || '', { x: x + 0.15, y: y + 0.12, w: cardW - 0.3, h: 0.4, fontSize: 11.5, bold: true, color: CLR.dark, fontFace: FONT });
-                            s.addText(c.body || '', { x: x + 0.15, y: y + 0.55, w: cardW - 0.3, h: cardH - 0.7, fontSize: 9.5, color: CLR.mid, fontFace: FONT, valign: 'top' });
+                            accentBox(s, x, y, cardW, cardH, CLR.border, 'plain');
+                            let titleX = x + 0.18, titleW = cardW - 0.36;
+                            if (opts.numbered) {
+                                const badgeSize = 0.32;
+                                s.addShape('ellipse', { x: x + 0.18, y: y + 0.16, w: badgeSize, h: badgeSize, fill: { color: opts.badgeColor || CLR.primary } });
+                                s.addText(String(i + 1), { x: x + 0.18, y: y + 0.16, w: badgeSize, h: badgeSize, align: 'center', valign: 'middle', fontSize: 11, bold: true, color: CLR.white, fontFace: FONT });
+                                titleX = x + 0.18 + badgeSize + 0.15;
+                                titleW = cardW - 0.36 - badgeSize - 0.15;
+                            }
+                            s.addText(c.title || '', { x: titleX, y: y + 0.14, w: titleW, h: 0.4, fontSize: 11.5, bold: true, color: CLR.dark, fontFace: FONT, valign: 'middle' });
+                            s.addText(c.body || '', { x: x + 0.18, y: y + 0.62, w: cardW - 0.36, h: cardH - 0.78, fontSize: 9.5, color: CLR.mid, fontFace: FONT, valign: 'top' });
                         });
                         return s;
                     }
@@ -1390,157 +1508,248 @@
 
                     // Slide 1: Cover
                     const cover = pptx.addSlide();
-                    cover.background = { color: CLR.dark };
-                    cover.addText(report.brand_name || 'Brand', { x: 0.8, y: 2.7, w: 11.7, h: 1, fontSize: 40, bold: true, color: CLR.white, fontFace: FONT });
-                    cover.addText(`Marketing Performance Report — ${mLabel}`, { x: 0.8, y: 3.65, w: 11.7, h: 0.6, fontSize: 18, color: '93C5FD', fontFace: FONT });
-                    cover.addText('Agency: Digifyce Team   |   Contact: agent@digifyce.in   |   Portal: platform.digifyce.in', { x: 0.8, y: 6.6, w: 11.7, h: 0.4, fontSize: 11, color: 'CBD5E1', fontFace: FONT });
+                    cover.background = { color: CLR.bg };
+                    cover.addShape('ellipse', { x: -1.6, y: -1.6, w: 4.6, h: 4.6, fill: { color: 'EFF6FF' } });
+                    cover.addShape('ellipse', { x: 10.8, y: 5.2, w: 5, h: 5, fill: { color: 'EFF6FF' } });
+                    const badgeSize = 1.5, badgeX = (13.33 - badgeSize) / 2, badgeY = 2.15;
+                    cover.addShape('roundRect', { x: badgeX, y: badgeY, w: badgeSize, h: badgeSize, rectRadius: 0.2, fill: { color: CLR.primary } });
+                    cover.addText(initialsOf(report.brand_name), { x: badgeX, y: badgeY, w: badgeSize, h: badgeSize, align: 'center', valign: 'middle', fontSize: 32, bold: true, color: CLR.white, fontFace: FONT });
+                    cover.addText(report.brand_name || 'Brand', { x: 0.8, y: badgeY + badgeSize + 0.3, w: 11.73, h: 0.75, align: 'center', fontSize: 32, bold: true, color: CLR.dark, fontFace: FONT });
+                    cover.addText(`Marketing Performance Report — ${mLabel}`, { x: 0.8, y: badgeY + badgeSize + 1.1, w: 11.73, h: 0.5, align: 'center', fontSize: 16, color: CLR.mid, fontFace: FONT });
+                    cover.addText('Agency: Digifyce Team   |   Contact: agent@digifyce.in   |   Portal: platform.digifyce.in', { x: 0.8, y: 6.55, w: 11.73, h: 0.4, align: 'center', fontSize: 11, color: CLR.mid, fontFace: FONT });
 
                     // Slide 2: High Level Overview
-                    const s2 = baseSlide('Executive Summary', 'High Level Overview');
-                    s2.addText(ai.executive_summary || '', { x: 0.4, y: 1.7, w: 12.5, h: 0.55, fontSize: 10.5, color: CLR.mid, fontFace: FONT, valign: 'top' });
+                    const s2 = baseSlide(2, 'Shopify, Marketplace & Ad Networks Consolidated Summary', 'High Level Overview');
+                    const prevMLabel = prev.start ? new Date(prev.start).toLocaleDateString('en-US', { month: 'short' }) : 'Prior';
+                    accentBox(s2, 0.4, 1.2, 3.6, 5.65, CLR.dark, 'left');
+                    s2.addText('PERFORMANCE EXECUTIVE SUMMARY', { x: 0.65, y: 1.4, w: 3.2, h: 0.5, fontSize: 11, bold: true, color: CLR.dark, fontFace: FONT, valign: 'top' });
+                    s2.addText(ai.executive_summary || '', { x: 0.65, y: 2.0, w: 3.2, h: 4.7, fontSize: 10, color: CLR.mid, fontFace: FONT, valign: 'top', lineSpacingMultiple: 1.3 });
+                    const prevShFull = prevChannels.shopify || { spend: 0, revenue: 0, conversions: 0, customers_acquired: 0 };
+                    const prevRepRate = prevShFull.conversions > 0 ? ((prevShFull.conversions - prevShFull.customers_acquired) / prevShFull.conversions * 100) : 0;
                     statTiles(s2, [
-                        { label: 'Gross Revenue', value: curr(grossRevenue), change: comps.gross_revenue },
-                        { label: 'Marketplace Revenue', value: curr((channels.marketplace || {}).revenue), change: chPct((channels.marketplace || {}).revenue, (prevChannels.marketplace || {}).revenue) },
-                        { label: 'Shopify Revenue', value: curr(shFull.revenue), change: chPct(shFull.revenue, (prevChannels.shopify || {}).revenue) },
-                        { label: 'Consolidated Spend', value: curr(totals.spend), change: comps.spend },
-                        { label: 'Blended ROAS', value: (grossRoas || 0).toFixed(2) + 'x', change: comps.gross_roas },
-                        { label: 'Meta ROAS', value: ((channels.meta || {}).roas || 0).toFixed(2) + 'x', change: chPct((channels.meta || {}).roas, (prevChannels.meta || {}).roas) },
-                        { label: 'Google ROAS', value: ((channels.google || {}).roas || 0).toFixed(2) + 'x', change: chPct((channels.google || {}).roas, (prevChannels.google || {}).roas) },
-                        { label: 'Marketplace ROAS', value: ((channels.marketplace || {}).roas || 0).toFixed(2) + 'x', change: chPct((channels.marketplace || {}).roas, (prevChannels.marketplace || {}).roas) },
-                        { label: 'Returning Customer Rate', value: repRate }
-                    ], 2.4);
+                        { label: 'Gross Revenue', value: curr(grossRevenue), change: comps.gross_revenue, compareText: `vs. ${curr(prevGrossRevenue)} ${prevMLabel}`, accent: CLR.dark },
+                        { label: 'Marketplace Revenue', value: curr((channels.marketplace || {}).revenue), change: chPct((channels.marketplace || {}).revenue, (prevChannels.marketplace || {}).revenue), compareText: `vs. ${curr((prevChannels.marketplace || {}).revenue)} ${prevMLabel}`, accent: CLR.cyan },
+                        { label: 'Shopify Revenue', value: curr(shFull.revenue), change: chPct(shFull.revenue, (prevChannels.shopify || {}).revenue), compareText: `vs. ${curr((prevChannels.shopify || {}).revenue)} ${prevMLabel}`, accent: CLR.dark },
+                        { label: 'Consolidated Spend', value: curr(totals.spend), change: comps.spend, compareText: `vs. ${curr(prevTotals.spend)} ${prevMLabel}`, accent: CLR.red },
+                        { label: 'Blended ROAS', value: (grossRoas || 0).toFixed(2) + 'x', change: comps.gross_roas, compareText: `vs. ${(prevGrossRoas || 0).toFixed(2)}x ${prevMLabel}`, accent: CLR.primary },
+                        { label: 'Meta ROAS', value: ((channels.meta || {}).roas || 0).toFixed(2) + 'x', change: chPct((channels.meta || {}).roas, (prevChannels.meta || {}).roas), compareText: `vs. ${((prevChannels.meta || {}).roas || 0).toFixed(2)}x ${prevMLabel}`, accent: CLR.primary },
+                        { label: 'Google ROAS', value: ((channels.google || {}).roas || 0).toFixed(2) + 'x', change: chPct((channels.google || {}).roas, (prevChannels.google || {}).roas), compareText: `vs. ${((prevChannels.google || {}).roas || 0).toFixed(2)}x ${prevMLabel}`, accent: CLR.primary },
+                        { label: 'Marketplace ROAS', value: ((channels.marketplace || {}).roas || 0).toFixed(2) + 'x', change: chPct((channels.marketplace || {}).roas, (prevChannels.marketplace || {}).roas), compareText: `vs. ${((prevChannels.marketplace || {}).roas || 0).toFixed(2)}x ${prevMLabel}`, accent: CLR.cyan },
+                        { label: 'Returning Customer Rate', value: repRate, change: chPct(repRateNum, prevRepRate), compareText: `vs. ${prevRepRate.toFixed(1)}% ${prevMLabel}`, accent: CLR.primary }
+                    ], 4.25, 1.2, 8.68, 3);
 
                     // Slide 3: MoM Table
-                    tableSlide('Period Comparison', 'Month-over-Month Comparison',
+                    tableSlide(3, 'Dec vs Jan Performance Drivers', 'Month-over-Month Comparison',
                         ['Metric', 'Previous', 'Current', 'Change', 'Why It Changed'],
-                        metricsList.map(([key, label, fmt, cVal, pVal, change]) => [label, fmt(pVal || 0), fmt(cVal || 0), pctText(change), momReasons[key] || '—']));
+                        metricsList.map(([key, label, fmt, cVal, pVal, change]) => [label, fmt(pVal || 0), fmt(cVal || 0), pctText(change), momReasons[key] || '—']),
+                        { cellStyle: (ri, ci, v) => ci === 3 ? pctCellStyle(v) : null });
 
                     // Slide 4: Conversion Funnel
-                    const funnelRows = hasFunnelData
-                        ? [
-                            ['Sessions', ga4Funnel.session_start.toLocaleString(), '100%'],
-                            ['Add to Cart', (ga4Funnel.add_to_cart || 0).toLocaleString(), ((ga4Funnel.add_to_cart || 0) / ga4Funnel.session_start * 100).toFixed(1) + '%'],
-                            ['Checkout', (ga4Funnel.begin_checkout || 0).toLocaleString(), ((ga4Funnel.begin_checkout || 0) / ga4Funnel.session_start * 100).toFixed(1) + '%'],
-                            ['Purchase', shopifyPurchases.toLocaleString(), (shopifyPurchases / ga4Funnel.session_start * 100).toFixed(2) + '%']
-                        ]
-                        : [];
-                    tableSlide('Storefront Performance', 'E-Commerce Conversion Funnel', ['Stage', 'Count', '% of Sessions'], funnelRows,
-                        `GA4 ecommerce event tracking is not connected — only confirmed purchases (${shopifyPurchases.toLocaleString()}) are known for this period.`);
+                    const s4 = baseSlide(4, 'Stage-by-Stage Shopper Drop-off Diagnostics', 'E-Commerce Conversion Funnel');
+                    if (hasFunnelData) {
+                        const sessions = ga4Funnel.session_start, cart = ga4Funnel.add_to_cart || 0, checkout = ga4Funnel.begin_checkout || 0, purchase = shopifyPurchases;
+                        const pctOf = (v) => sessions > 0 ? (v / sessions * 100) : 0;
+                        const dropFrom = (c, p) => p > 0 ? (100 - (c / p * 100)) : 0;
+                        const stages = [
+                            { label: 'Sessions', count: sessions, pct: 100, drop: null },
+                            { label: 'Add to Cart', count: cart, pct: pctOf(cart), drop: dropFrom(cart, sessions), dropFromLabel: 'session' },
+                            { label: 'Checkout', count: checkout, pct: pctOf(checkout), drop: dropFrom(checkout, cart), dropFromLabel: 'cart' },
+                            { label: 'Purchase', count: purchase, pct: pctOf(purchase), drop: dropFrom(purchase, checkout), dropFromLabel: 'checkout' }
+                        ];
+                        diagnosticsCard(s4, 0.4, 1.2, 5.6, 5.5, 'FUNNEL STAGE DIAGNOSTICS', [
+                            { text: `Session-to-Cart (${pctOf(cart).toFixed(1)}% CVR): `, options: { bold: true, color: CLR.dark, fontSize: 10 } },
+                            { text: 'Healthy benchmark for catalog engagement.\n\n', options: { color: CLR.mid, fontSize: 10, breakLine: true } },
+                            { text: `Cart-to-Checkout (${dropFrom(checkout, cart).toFixed(1)}% Drop-off): `, options: { bold: true, color: CLR.dark, fontSize: 10 } },
+                            { text: `${(cart - checkout).toLocaleString()} users added to cart but did not check out.\n\n`, options: { color: CLR.mid, fontSize: 10, breakLine: true } },
+                            { text: `Checkout-to-Purchase (${dropFrom(purchase, checkout).toFixed(1)}% Drop-off): `, options: { bold: true, color: CLR.dark, fontSize: 10 } },
+                            { text: `${(checkout - purchase).toLocaleString()} abandoned checkouts remain a recovery opportunity.`, options: { color: CLR.mid, fontSize: 10, breakLine: true } }
+                        ]);
+                        const stageColors = [CLR.dark, CLR.primary, CLR.cyan, CLR.green];
+                        const fx = 6.3, fw = 3.1, fy = 1.5, rowH = 1.15, rowGap = 0.15;
+                        const labelX = fx + fw + 0.25, labelW = 12.93 - labelX;
+                        stages.forEach((st, i) => {
+                            const y = fy + i * (rowH + rowGap);
+                            const widthFactor = 1 - i * 0.15;
+                            const segW = fw * widthFactor, segX = fx + (fw - segW) / 2, segH = 0.62;
+                            s4.addShape('trapezoid', { x: segX, y, w: segW, h: segH, fill: { color: stageColors[i] } });
+                            s4.addText(String(i + 1), { x: segX, y, w: segW, h: segH, align: 'center', valign: 'middle', fontSize: 14, bold: true, color: CLR.white, fontFace: FONT });
+                            s4.addText(`${st.label}: ${st.count.toLocaleString()} (${st.pct.toFixed(1)}%)`, { x: labelX, y: y - 0.02, w: labelW, h: 0.32, fontSize: 11, bold: true, color: CLR.dark, fontFace: FONT });
+                            if (st.drop !== null) s4.addText(`${st.drop.toFixed(0)}% drop-off from ${st.dropFromLabel}`, { x: labelX, y: y + 0.28, w: labelW, h: 0.3, fontSize: 9, bold: true, color: CLR.red, fontFace: FONT });
+                        });
+                    } else {
+                        diagnosticsCard(s4, 0.4, 1.2, 12.53, 2.0, 'FUNNEL STAGE DIAGNOSTICS', [
+                            { text: `GA4 ecommerce event tracking is not connected or has no recorded events for this period. `, options: { color: CLR.mid, fontSize: 10.5 } },
+                            { text: `Only confirmed Shopify purchases (${shopifyPurchases.toLocaleString()}) are known for this period.`, options: { color: CLR.mid, fontSize: 10.5, breakLine: true } }
+                        ]);
+                    }
 
                     // Slide 5: Product×Region
-                    tableSlide('Sales & Shipping Cross-Reference', 'Product Performance by Region',
+                    tableSlide(5, 'Sales & Shipping Analysis Cross-Reference', 'Product Performance by Region',
                         ['Rank', 'Product', 'Primary Region', 'Revenue Share', 'Performance Driver'],
                         products.map((p, i) => [`#${i + 1}`, p.name, p.primary_region || '—', (p.revenue_share || 0) + '%', productDrivers[p.name] || '—']),
-                        'No Shopify product sales aggregated.');
+                        {
+                            emptyMsg: 'No Shopify product sales aggregated.',
+                            cellStyle: (ri, ci) => ci === 3 ? { color: CLR.green, bold: true } : null,
+                            calloutText: products.length ? `${products[0].primary_region || 'Unknown region'} is the leading shipping destination for your top product (${products[0].name}), representing ${products[0].revenue_share || 0}% of top-product revenue.` : null
+                        });
 
                     // Slide 6: Attribution Map
-                    tableSlide('Revenue Origins & Channels', 'Attribution Map',
+                    const paidRevenue = attRows.filter(r => r.paid).reduce((s, r) => s + (r.revenue || 0), 0);
+                    const nonPaidRevenue = attTotalRevenue - paidRevenue;
+                    tableSlide(6, 'Shopify Campaign Attribution Metrics', 'Attribution Map: Revenue Origins & Channels',
                         ['Channel', 'Sessions', 'Orders', 'Revenue', 'Revenue Share', 'ROAS'],
                         attRows.map(r => [r.label, r.sessions === null ? '—' : r.sessions.toLocaleString(), r.orders === null ? '—' : r.orders, curr(r.revenue), (attTotalRevenue > 0 ? (r.revenue / attTotalRevenue * 100).toFixed(1) : '0.0') + '%', r.roas === null ? '—' : r.roas.toFixed(2) + 'x']),
-                        'No channel attribution data found.');
+                        {
+                            emptyMsg: 'No channel attribution data found.',
+                            cellStyle: (ri, ci, v) => ci === 5 ? roasCellStyle(v) : null,
+                            calloutText: attRows.length ? `Paid Acquisition: ${attTotalRevenue > 0 ? (paidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(paidRevenue)}) | Non-Paid / Owned: ${attTotalRevenue > 0 ? (nonPaidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(nonPaidRevenue)})` : null
+                        });
 
                     // Slide 7: Meta Campaigns Deep-Dive
-                    const s7 = tableSlide('Meta Ads Manager Structure', 'Paid Ads: Meta Campaigns Deep-Dive',
-                        ['Campaign', 'Spend', 'Orders', 'Sales', 'ROAS'],
-                        mcList.map(c => [c.name, curr(c.spent), c.orders, curr(c.sales), c.roas]),
-                        'No Meta campaign data synced for this month.');
-                    s7.addText(`Creatives Tested: ${metaAudit.angles_tested || '—'}   |   Winning Placement: ${metaAudit.winning_placement || '—'}   |   Winning Creative: ${metaAudit.winning_angle || '—'}`,
-                        { x: 0.4, y: 1.4, w: 12.5, h: 0.3, fontSize: 9.5, color: CLR.mid, fontFace: FONT, italic: true });
+                    const s7 = baseSlide(7, 'Meta Ads Manager Structure & Placement Performance', 'Paid Ads: Meta Campaigns Deep-Dive');
+                    diagnosticsCard(s7, 0.4, 1.2, 5.6, 5.5, 'AD STRUCTURE AUDIT', [
+                        { text: 'No. of Angles Tested: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
+                        { text: `${metaAudit.angles_tested ? metaAudit.angles_tested + ' unique creatives' : '—'}\n\n`, options: { color: CLR.mid, fontSize: 10, breakLine: true } },
+                        { text: 'Winning Placement: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
+                        { text: `${metaAudit.winning_placement ? `${metaAudit.winning_placement} (${(metaAudit.winning_placement_roas || 0).toFixed(2)}x ROAS)` : '—'}\n\n`, options: { color: CLR.mid, fontSize: 10, breakLine: true } },
+                        { text: 'Winning Angle: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
+                        { text: metaAudit.winning_angle || '—', options: { color: CLR.mid, fontSize: 10, breakLine: true } }
+                    ]);
+                    if (mcList.length) renderTable(s7, 6.3, 1.2, 6.63, ['Campaign', 'Spend', 'Orders', 'Sales', 'ROAS'], mcList.map(c => [c.name, curr(c.spent), c.orders, curr(c.sales), c.roas]), (ri, ci, v) => ci === 4 ? roasCellStyle(v) : null);
+                    else s7.addText('No Meta campaign data synced for this month.', { x: 6.3, y: 1.5, w: 6.63, h: 0.5, fontSize: 11, color: CLR.mid, fontFace: FONT, italic: true });
 
                     // Slide 8: Meta Creatives
-                    narrativeCardsSlide('Creative Performance Audit', 'Best Performing Creatives (Meta Ads)',
+                    narrativeCardsSlide(8, 'Creative Performance Audit & Visual Previews', 'Best Performing Creatives (Meta Ads)',
                         crList.map((cr, i) => ({ title: `#${i + 1}  ${cr.name}`, body: `${stripHtmlPptx(cr.body || '').slice(0, 140)}\n\nRevenue: ${curr(cr.revenue)}   CTR: ${cr.ctr}   CPA: ${cr.cpa}` })));
 
                     // Slide 9: Google Campaigns Deep-Dive
-                    const s9 = tableSlide('Google Ads Manager Structure', 'Paid Ads: Google Campaigns Deep-Dive',
-                        ['Campaign', 'Spend', 'Orders', 'Sales', 'ROAS'],
-                        gcList.map(c => [c.name, curr(c.spent), c.orders, curr(c.sales), c.roas]),
-                        'No Google campaign data synced for this month.');
-                    s9.addText(`Networks Tested: ${googleAudit.networks_tested || '—'}   |   Winning Network: ${googleAudit.winning_network || '—'} (${(googleAudit.winning_network_roas || 0).toFixed(2)}x ROAS)`,
-                        { x: 0.4, y: 1.4, w: 12.5, h: 0.3, fontSize: 9.5, color: CLR.mid, fontFace: FONT, italic: true });
+                    const s9 = baseSlide(9, 'Google Ads Manager Structure & Placement Performance', 'Paid Ads: Google Campaigns Deep-Dive');
+                    diagnosticsCard(s9, 0.4, 1.2, 5.6, 5.5, 'SEARCH & SHOPPING AUDIT', [
+                        { text: 'No. of Angles Tested: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
+                        { text: `${googleAudit.networks_tested || '—'}\n\n`, options: { color: CLR.mid, fontSize: 10, breakLine: true } },
+                        { text: 'Winning Placement: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
+                        { text: `${googleAudit.winning_network ? `${googleAudit.winning_network} (${(googleAudit.winning_network_roas || 0).toFixed(2)}x ROAS)` : '—'}`, options: { color: CLR.mid, fontSize: 10, breakLine: true } }
+                    ]);
+                    if (gcList.length) renderTable(s9, 6.3, 1.2, 6.63, ['Campaign', 'Spend', 'Orders', 'Sales', 'ROAS'], gcList.map(c => [c.name, curr(c.spent), c.orders, curr(c.sales), c.roas]), (ri, ci, v) => ci === 4 ? roasCellStyle(v) : null);
+                    else s9.addText('No Google campaign data synced for this month.', { x: 6.3, y: 1.5, w: 6.63, h: 0.5, fontSize: 11, color: CLR.mid, fontFace: FONT, italic: true });
 
                     // Slide 10: Google Search Ad Creatives
-                    narrativeCardsSlide('Search Text Copy', 'Best Performing Creatives (Google Ads)',
+                    narrativeCardsSlide(10, 'Creative Search Text Copy & Shopping Card Previews', 'Best Performing Creatives (Google Ads)',
                         gsAds.map((a, i) => ({ title: `#${i + 1}  ${a.headline}`, body: `${a.description}\n\nClicks: ${(a.clicks || 0).toLocaleString()}   ROAS: ${(a.roas || 0).toFixed(2)}x` })));
 
                     // Slide 11: Organic & Non-Paid Traffic
-                    tableSlide('Earned Channels Session Performance', 'Organic & Non-Paid Traffic Channels',
-                        ['Channel', 'Sessions', 'Conv. Rate', 'Revenue'],
-                        organicLabels.map(lbl => { const m = ga4Chs[lbl] || { sessions: 0, convRate: '0.00', revenue: 0 }; return [lbl, (m.sessions || 0).toLocaleString(), m.convRate + '%', curr(m.revenue)]; }));
+                    metricCardsSlide(11, 'Earned Channels Session Performance', 'Organic & Non-Paid Traffic Channels Breakdown',
+                        organicLabels.map((lbl, i) => {
+                            const m = ga4Chs[lbl] || { sessions: 0, convRate: '0.00', revenue: 0 };
+                            return { label: lbl.toUpperCase(), accent: [CLR.dark, CLR.dark, CLR.cyan][i] || CLR.primary, rows: [['Sessions', (m.sessions || 0).toLocaleString()], ['Conv. Rate', m.convRate + '%'], ['Gross Revenue', curr(m.revenue)]] };
+                        }),
+                        `Traffic Insights: ${totals.spend ? '' : ''}${(ga4Chs['SEO / Search'] || ga4Chs['Direct'] || ga4Chs['Social Organic']) ? 'A meaningful share of store sessions are earned organically.' : 'No organic session data available for this period.'}`);
 
                     // Slide 12: GSC Pages
-                    tableSlide('Organic Click Distribution', 'Search Performance: Top Landing Pages',
-                        ['Page', 'Clicks', 'Impressions', 'CTR', 'Avg Position'],
-                        gscPagesList.map(p => [p.page, p.clicks.toLocaleString(), p.impressions.toLocaleString(), p.ctr, p.position]),
-                        'No Search Console page data found.');
+                    tableSlide(12, 'Organic Click Distribution', 'Search Performance: Top Landing Pages',
+                        ['Rank', 'Landing Page URL', 'Clicks', 'Impressions', 'CTR', 'Avg Position'],
+                        gscPagesList.map((p, i) => [`#${i + 1}`, p.page, p.clicks.toLocaleString(), p.impressions.toLocaleString(), p.ctr, p.position]),
+                        { emptyMsg: 'No Search Console page data found.' });
 
                     // Slide 13: GSC Queries
-                    tableSlide('Search Keyword Impression Insights', 'Search Performance: Top Search Queries',
-                        ['Query', 'Clicks', 'Impressions', 'CTR', 'Avg Position'],
-                        gscQueriesList.map(q => [q.query, q.clicks.toLocaleString(), q.impressions.toLocaleString(), q.ctr, q.position]),
-                        'No Search Console query data found.');
+                    tableSlide(13, 'Search Keyword Impression Insights', 'Search Performance: Top Search Queries',
+                        ['Rank', 'Search Keyword Query', 'Clicks', 'Impressions', 'CTR', 'Avg Position'],
+                        gscQueriesList.map((q, i) => [`#${i + 1}`, q.query, q.clicks.toLocaleString(), q.impressions.toLocaleString(), q.ctr, q.position]),
+                        { emptyMsg: 'No Search Console query data found.' });
 
                     // Slide 14: Retention & Cohort Matrix
-                    const s14 = baseSlide('Cohort Purchase Curve', 'Customer Retention & Loyalty Performance');
-                    statTiles(s14, [
-                        { label: 'Retention Revenue', value: curr(repeatRev) },
-                        { label: 'Returning Rate', value: repRate },
-                        { label: 'Repeat AOV', value: curr(shopifyAov) }
-                    ], 1.75);
+                    const s14 = baseSlide(14, 'Cohort Purchase Curve & Lifetime Value Diagnostics', 'Customer Retention & Loyalty Performance');
+                    diagnosticsCard(s14, 0.4, 1.2, 5.6, 5.5, 'CUSTOMER LOYALTY DIAGNOSTICS', [
+                        { text: 'Returning Revenue: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
+                        { text: `Drove ${repRate} of total sales (${curr(repeatRev)}) at a repeat AOV of ${curr(shopifyAov)}.\n\n`, options: { color: CLR.mid, fontSize: 10, breakLine: true } },
+                        { text: 'Cohort Trend: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
+                        { text: cohortMatrix.length ? 'See the retention matrix for month-over-month repeat-purchase decay by acquisition cohort.' : 'No cohort history yet — this builds up automatically as monthly syncs accumulate order history over time.', options: { color: CLR.mid, fontSize: 10, breakLine: true } }
+                    ]);
                     if (cohortMatrix.length) {
-                        const cohortRows = [['Acquisition Cohort', 'Cohort Size', 'Month 0', 'Month 1', 'Month 2', 'Month 3'].map(h => ({ text: h, options: { bold: true, color: CLR.white, fill: { color: CLR.dark }, fontSize: 9.5, fontFace: FONT } }))]
-                            .concat(cohortMatrix.map(row => {
-                                const cells = [row.cohort_month, row.cohort_size.toLocaleString() + ' customers'].concat([0, 1, 2, 3].map(i => { const v = row.months ? row.months[i] : null; return (v === null || v === undefined) ? '—' : v + '%'; }));
-                                return cells.map(c => ({ text: String(c), options: { fontSize: 9.5, color: CLR.dark, fontFace: FONT } }));
-                            }));
-                        s14.addTable(cohortRows, { x: 0.4, y: 3.4, w: 12.5, autoPage: false, border: { type: 'solid', color: CLR.border, pt: 0.5 }, valign: 'middle' });
+                        renderTable(s14, 6.3, 1.2, 6.63, ['Cohort', 'Size', 'Mo 0', 'Mo 1', 'Mo 2', 'Mo 3'],
+                            cohortMatrix.map(row => [row.cohort_month, row.cohort_size.toLocaleString(), ...[0, 1, 2, 3].map(i => { const v = row.months ? row.months[i] : null; return (v === null || v === undefined) ? '—' : v + '%'; })]));
                     }
 
                     // Slide 15: Retention & Broadcast
-                    tableSlide('Own-Media Performance Summary', 'Retention & Broadcast Performance',
-                        ['Channel', 'Sent', 'Open / Click Rate', 'Revenue'],
+                    metricCardsSlide(15, 'Own-Media Performance Summary', 'Retention & Broadcast Performance',
                         [
-                            ['Email Marketing', (eMail.sent || 0).toLocaleString(), `${eMail.open_rate}% / ${eMail.click_rate}%`, curr(eMail.revenue)],
-                            ['WhatsApp', (wa.sent || 0).toLocaleString(), '—', curr(wa.revenue)],
-                            ['Push Notifications', (push.sent || 0).toLocaleString(), `${push.open_rate}% / ${push.click_rate}%`, curr(push.revenue)]
+                            { label: 'EMAIL MARKETING', accent: CLR.teal, rows: [['Sent', (eMail.sent || 0).toLocaleString()], ['Open / Click Rate', `${eMail.open_rate}% / ${eMail.click_rate}%`], ['Revenue', curr(eMail.revenue)]] },
+                            { label: 'WHATSAPP', accent: CLR.green, rows: [['Sent', (wa.sent || 0).toLocaleString()], ['Orders', String(wa.orders || 0)], ['Revenue', curr(wa.revenue)]] },
+                            { label: 'PUSH NOTIFICATIONS', accent: CLR.orange, rows: [['Sent', (push.sent || 0).toLocaleString()], ['Open / Click Rate', `${push.open_rate}% / ${push.click_rate}%`], ['Revenue', curr(push.revenue)]] }
                         ]);
 
                     // Slide 16: Executed Strategic Initiatives
-                    narrativeCardsSlide('AI-Assisted Summary', 'Executed Strategic Approaches & Initiatives',
-                        initiatives.map(it => ({ title: it.name || 'Initiative', body: `GOAL: ${it.goal || '—'}\n\nEXECUTION: ${it.execution || '—'}\n\nRESULT: ${it.result || '—'}` })));
+                    narrativeCardsSlide(16, 'AI-Assisted Summary', 'Executed Strategic Approaches & Initiatives',
+                        initiatives.map((it, i) => ({ title: `${i + 1}. ${(it.name || 'Initiative').toUpperCase()}`, body: `Goal: ${it.goal || '—'}\n\nExecution: ${it.execution || '—'}\n\nResult: ${it.result || '—'}` })));
 
                     // Slide 17: Strategy Deep-Dive
-                    narrativeCardsSlide('Strategic Initiative Breakdown', `Strategy Deep-Dive: ${sdd.initiative_name || ''}`,
+                    narrativeCardsSlide(17, 'Strategic Initiative Breakdown', `Strategy Deep-Dive: ${sdd.initiative_name || 'No strategy deep-dive available'}`,
                         [
-                            { title: '1. Hypothesis Formulation', body: sdd.hypothesis || '—' },
-                            { title: '2. Creative Campaign Deployment', body: sdd.creative_deployment || '—' },
-                            { title: '3. Broadcast Execution', body: sdd.broadcast_execution || '—' },
-                            { title: '4. Outcome Measurement', body: sdd.outcome || '—' }
-                        ]);
+                            { title: 'Hypothesis Formulation', body: sdd.hypothesis || '—' },
+                            { title: 'Creative Campaign Deployment', body: sdd.creative_deployment || '—' },
+                            { title: 'Broadcast Execution', body: sdd.broadcast_execution || '—' },
+                            { title: 'Outcome Measurement', body: sdd.outcome || '—' }
+                        ], { numbered: true, badgeColor: CLR.primary });
 
                     // Slide 18: Performance Inferences
-                    narrativeCardsSlide('Automated Strategy Analysis Scan', 'Performance Inferences & Diagnostics',
-                        inferences.map((inf, i) => ({ title: `${i + 1}. ${inf.title || ''}`, body: inf.detail || '' })));
+                    narrativeCardsSlide(18, 'Automated Strategy Analysis Scan', 'Performance Inferences & Diagnostics',
+                        inferences.map((inf) => ({ title: inf.title || '', body: inf.detail || '' })), { numbered: true, badgeColor: CLR.primary });
 
                     // Slide 19: Strategic Action Plan
-                    narrativeCardsSlide('Proposed Actions for Next Month', 'Strategic Action Plan & Recommendations',
-                        recommendations.map((rec, i) => ({ title: `${i + 1}. ${rec.title || ''}`, body: rec.detail || '' })));
+                    narrativeCardsSlide(19, 'Proposed Actions for Next Month', 'Strategic Action Plan & Recommendations',
+                        recommendations.map((rec) => ({ title: rec.title || '', body: rec.detail || '' })), { numbered: true, badgeColor: CLR.green });
 
                     // Slide 20: Growth Projections
-                    const s20 = baseSlide('Next Month Projections', 'Growth Projections & Budget Allocations');
+                    const s20 = baseSlide(20, 'Next Month Projections', 'Growth Projections & Budget Allocations');
+                    accentBox(s20, 0.4, 1.2, 5.6, 5.5, CLR.border, 'plain');
+                    s20.addText('REVENUE TRAJECTORY TREND', { x: 0.65, y: 1.4, w: 5.1, h: 0.3, fontSize: 10.5, bold: true, color: CLR.dark, fontFace: FONT });
+                    (function trendChart() {
+                        const maxTrend = Math.max(...trendBars.map(b => b.value), 1);
+                        const chartX = 0.9, chartW = 4.7, chartY = 2.1, chartH = 3.9, barGap = chartW / trendBars.length, barW = barGap * 0.5;
+                        trendBars.forEach((b, i) => {
+                            const bh = Math.max(0.2, (b.value / maxTrend) * chartH);
+                            const bx = chartX + i * barGap + (barGap - barW) / 2, by = chartY + (chartH - bh);
+                            s20.addShape('rect', { x: bx, y: by, w: barW, h: bh, fill: { color: b.color } });
+                            s20.addText(curr(b.value), { x: bx - 0.35, y: by - 0.32, w: barW + 0.7, h: 0.28, align: 'center', fontSize: 9.5, bold: true, color: CLR.dark, fontFace: FONT });
+                            s20.addText(b.label, { x: bx - 0.35, y: chartY + chartH + 0.08, w: barW + 0.7, h: 0.28, align: 'center', fontSize: 8.5, color: CLR.mid, fontFace: FONT });
+                        });
+                    })();
                     statTiles(s20, [
-                        { label: 'Target Sales', value: curr(fcRevenue) },
-                        { label: 'Target Budget', value: curr(fcSpend) },
-                        { label: 'Target Orders', value: fcOrders.toLocaleString() },
-                        { label: 'Target ROAS', value: targetRoas.toFixed(2) + 'x' }
-                    ], 1.75);
+                        { label: 'Target Sales', value: curr(fcRevenue), note: `${pctText(Math.round(((fcRevenue - grossRevenue) / (grossRevenue || 1)) * 1000) / 10)} Growth Target`, accent: CLR.green },
+                        { label: 'Target Budget', value: curr(fcSpend), note: `${pctText(Math.round(((fcSpend - totals.spend) / (totals.spend || 1)) * 1000) / 10)} Spend Delta`, accent: CLR.primary },
+                        { label: 'Acquisitions', value: fcOrders.toLocaleString() + ' Orders', note: `Target ROAS: ${targetRoas.toFixed(2)}x`, accent: CLR.primary },
+                        { label: 'Target ROAS', value: targetRoas.toFixed(2) + 'x', note: 'Efficiency Target', accent: CLR.dark }
+                    ], 6.3, 1.2, 6.63, 2);
 
                     // Slide 21: Closing
                     const closing = pptx.addSlide();
-                    closing.background = { color: CLR.dark };
-                    closing.addText('Thank You!', { x: 0.8, y: 3.0, w: 11.7, h: 0.9, fontSize: 36, bold: true, color: CLR.white, fontFace: FONT });
-                    closing.addText("Let's scale brand performance next month.", { x: 0.8, y: 3.85, w: 11.7, h: 0.5, fontSize: 16, color: '93C5FD', fontFace: FONT });
-                    closing.addText('Digifyce Agency Partner   |   agent@digifyce.in   |   platform.digifyce.in', { x: 0.8, y: 6.6, w: 11.7, h: 0.4, fontSize: 11, color: 'CBD5E1', fontFace: FONT });
+                    closing.background = { color: CLR.white };
+                    const sidebarW = 3.9;
+                    closing.addShape('rect', { x: 0, y: 0, w: sidebarW, h: 7.5, fill: { color: CLR.dark } });
+                    closing.addShape('rect', { x: 0, y: 0, w: sidebarW, h: 0.07, fill: { color: CLR.primary } });
+                    closing.addText([{ text: 'DIGI', options: { color: CLR.white, bold: true } }, { text: 'FYCE', options: { color: '60A5FA', bold: true } }], { x: 0.4, y: 0.5, w: 3.1, h: 0.5, fontSize: 20, fontFace: FONT });
+                    closing.addShape('rect', { x: 0.4, y: 1.05, w: 0.55, h: 0.045, fill: { color: CLR.primary } });
+                    closing.addText('Accelerating\nDigital Growth', { x: 0.4, y: 3.0, w: 3.1, h: 1.15, fontSize: 21, bold: true, color: CLR.white, fontFace: FONT });
+                    closing.addText('Data-driven performance campaigns, automations, and strategic marketing intelligence.', { x: 0.4, y: 4.25, w: 3.1, h: 0.9, fontSize: 10.5, color: 'CBD5E1', fontFace: FONT });
+                    closing.addText('Digifyce Agency Partner', { x: 0.4, y: 6.9, w: 3.1, h: 0.4, fontSize: 9.5, color: '94A3B8', fontFace: FONT });
+                    const rx = sidebarW + 0.5;
+                    closing.addText('CLOSING REMARKS', { x: rx, y: 0.6, w: 8, h: 0.3, fontSize: 10, bold: true, color: CLR.mid, fontFace: FONT });
+                    closing.addText('Thank You!', { x: rx, y: 0.92, w: 8, h: 0.8, fontSize: 32, bold: true, color: CLR.dark, fontFace: FONT });
+                    closing.addText("Let's scale brand performance next month.", { x: rx, y: 1.7, w: 8, h: 0.4, fontSize: 14, color: CLR.mid, fontFace: FONT });
+                    const contactCards = [
+                        { title: 'ACCOUNT TEAM', lines: ['Email: agent@digifyce.in', 'Portal: platform.digifyce.in'], accent: CLR.dark },
+                        { title: 'SUPPORT DESK', lines: ['Help: support@digifyce.in', 'Ops: ops@digifyce.in'], accent: CLR.primary }
+                    ];
+                    const ccY = 3.2, ccW = 4.0, ccH = 1.3, ccGap = 0.3;
+                    contactCards.forEach((c, i) => {
+                        const x = rx + i * (ccW + ccGap);
+                        accentBox(closing, x, ccY, ccW, ccH, c.accent, 'left');
+                        closing.addText(c.title, { x: x + 0.25, y: ccY + 0.15, w: ccW - 0.5, h: 0.3, fontSize: 10, bold: true, color: CLR.dark, fontFace: FONT });
+                        closing.addText(c.lines.join('\n'), { x: x + 0.25, y: ccY + 0.48, w: ccW - 0.5, h: ccH - 0.6, fontSize: 9.5, color: CLR.mid, fontFace: FONT, valign: 'top' });
+                    });
+                    closing.addShape('line', { x: rx, y: 6.95, w: 8.4, h: 0, line: { color: CLR.border, width: 0.75 } });
+                    closing.addText(`${report.brand_name || 'Brand'} Monthly Analysis — ${mLabel}`, { x: rx, y: 7.02, w: 5, h: 0.3, fontSize: 9, color: CLR.mid, fontFace: FONT });
+                    closing.addText('Confidential @ Digifyce', { x: rx + 3.4, y: 7.02, w: 5, h: 0.3, align: 'right', fontSize: 9, color: CLR.mid, fontFace: FONT });
 
                     const safeBrand = (report.brand_name || 'Brand').replace(/[^a-z0-9]+/gi, '_');
                     await pptx.writeFile({ fileName: `${safeBrand}_Monthly_Report_${report.period_start || ''}.pptx` });
