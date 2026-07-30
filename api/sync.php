@@ -1072,9 +1072,12 @@ foreach ($dates as $date) {
     if ($dayRow) {
         dbRun('UPDATE budget_days SET channels_json=? WHERE id=?', [$chJson, $dayRow['id']]);
     } else {
+        // budget_days has no spend_real/sales_real/conversions_real columns (those don't exist —
+        // real per-channel numbers live entirely in channels_json, which is what aggregateStats()
+        // actually reads) and brand_id is NOT NULL with no default, so it must be supplied here.
         dbRun(
-            'INSERT INTO budget_days (id, month_id, day_number, day_date, spend_real, sales_real, conversions_real, posts_real, channels_json) VALUES (?,?,?,?,?,?,?,?,?)',
-            [uuid4(), $monthId, $dayNum, $date, 0.0, 0.0, 0, 0, $chJson]
+            'INSERT INTO budget_days (id, month_id, brand_id, day_number, day_date, channels_json) VALUES (?,?,?,?,?,?)',
+            [uuid4(), $monthId, $brand['id'], $dayNum, $date, $chJson]
         );
     }
 }
