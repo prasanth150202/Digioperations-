@@ -62,8 +62,9 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // ── Database connection (PDO) ────────────────────────────────
-function db(): PDO {
+function db(bool $forceReconnect = false): PDO {
     static $pdo = null;
+    if ($forceReconnect) $pdo = null;
     if ($pdo) return $pdo;
     try {
         $dsn = 'mysql:host='.DB_HOST.';dbname='.DB_NAME.';charset='.DB_CHARSET;
@@ -294,12 +295,35 @@ function db(): PDO {
     }
 }
 
+// Long-running requests (the monthly sync especially — Shopify pagination, Meta/Google/GA4/GSC
+// calls, plus a per-order ledger write for the cohort matrix) can go quiet on the DB side for long
+// enough that MySQL closes the connection as idle ("MySQL server has gone away" / error 2006, or
+// "Lost connection to MySQL server" / error 2013). Reconnect once and retry rather than failing
+// the whole sync outright when that happens.
+function isDisconnectError(PDOException $e): bool {
+    $msg = $e->getMessage();
+    return str_contains($msg, 'server has gone away')
+        || str_contains($msg, 'Lost connection')
+        || str_contains($msg, 'Error while sending')
+        || ($e->errorInfo[1] ?? null) === 2006
+        || ($e->errorInfo[1] ?? null) === 2013;
+}
+
 function dbAll(string $sql, array $p = []): array {
     try {
         $s = db()->prepare($sql);
         $s->execute($p);
         return $s->fetchAll();
     } catch (PDOException $e) {
+        if (isDisconnectError($e)) {
+            try {
+                $s = db(true)->prepare($sql);
+                $s->execute($p);
+                return $s->fetchAll();
+            } catch (PDOException $e2) {
+                json_err('Database error: ' . $e2->getMessage(), 500);
+            }
+        }
         json_err('Database error: ' . $e->getMessage(), 500);
     }
 }
@@ -310,6 +334,16 @@ function dbGet(string $sql, array $p = []): ?array {
         $r = $s->fetch();
         return $r ?: null;
     } catch (PDOException $e) {
+        if (isDisconnectError($e)) {
+            try {
+                $s = db(true)->prepare($sql);
+                $s->execute($p);
+                $r = $s->fetch();
+                return $r ?: null;
+            } catch (PDOException $e2) {
+                json_err('Database error: ' . $e2->getMessage(), 500);
+            }
+        }
         json_err('Database error: ' . $e->getMessage(), 500);
     }
 }
@@ -318,6 +352,15 @@ function dbRun(string $sql, array $p = []): void {
         $s = db()->prepare($sql);
         $s->execute($p);
     } catch (PDOException $e) {
+        if (isDisconnectError($e)) {
+            try {
+                $s = db(true)->prepare($sql);
+                $s->execute($p);
+                return;
+            } catch (PDOException $e2) {
+                json_err('Database error: ' . $e2->getMessage(), 500);
+            }
+        }
         json_err('Database error: ' . $e->getMessage(), 500);
     }
 }
