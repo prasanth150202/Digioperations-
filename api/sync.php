@@ -970,12 +970,22 @@ if ($gAccessToken && !empty($int['gsc_site_url'])) {
 }
 
 // ── SAVE DAY-LEVEL STATISTICS TO DATABASE ──
-// Retrieve brand active month
-$monthLabel = substr($startDate, 0, 7);
-$monthRow = dbGet('SELECT id FROM budget_months WHERE brand_id=? AND month_label=?', [$brand['id'], $monthLabel]);
+// Retrieve or create the brand's budget_months row for this period. The real schema
+// (see install.sql / api/budget.php) keys this by (brand_id, year, month) with a `label`
+// column — this previously queried a `month_label` column that doesn't exist and an INSERT
+// missing several NOT NULL columns (year, month, channels), which is why every sync failed
+// outright with "Unknown column 'month_label'" as soon as it reached this point.
+$startDt2 = new DateTime($startDate);
+$year = (int)$startDt2->format('Y');
+$month = (int)$startDt2->format('n');
+$monthLabel = $startDt2->format('F Y');
+$totalDays = (int)$startDt2->format('t');
+
+$monthRow = dbGet('SELECT id FROM budget_months WHERE brand_id=? AND year=? AND month=?', [$brand['id'], $year, $month]);
 if (!$monthRow) {
     $monthId = uuid4();
-    dbRun('INSERT INTO budget_months (id, brand_id, month_label, budget_allocated, target_roas, created_at) VALUES (?,?,?,?,?,NOW())', [$monthId, $brand['id'], $monthLabel, 0, 3.0]);
+    dbRun('INSERT INTO budget_months (id, brand_id, label, year, month, total_days, revenue_target, overall_roas, channels, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)',
+        [$monthId, $brand['id'], $monthLabel, $year, $month, $totalDays, 0, 3.0, '{}', 'auto-sync']);
 } else {
     $monthId = $monthRow['id'];
 }
