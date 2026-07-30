@@ -336,6 +336,198 @@
             text-align: center;
             font-weight: 600;
         }
+
+        /* Funnel v2 — a true tapering funnel shape (numbered stage, colored bar of
+           decreasing width, drop-off callout) instead of plain uniform progress bars */
+        .funnel-v2 {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 14px;
+            height: 100%;
+        }
+        .funnel-stage-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .funnel-badge {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 900;
+            color: #fff;
+            flex-shrink: 0;
+            font-family: var(--font-hd);
+        }
+        .funnel-shape-track {
+            width: 55%;
+            flex-shrink: 0;
+        }
+        .funnel-shape {
+            height: 34px;
+            border-radius: 5px;
+            width: 0%;
+            transition: width 0.8s ease-out;
+        }
+        .funnel-stage-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+        .funnel-stage-label {
+            font-size: 12.5px;
+            font-weight: 800;
+            color: #fff;
+        }
+        .funnel-stage-dropoff {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--red);
+        }
+        .funnel-stage-dropoff.baseline {
+            color: var(--gray);
+            font-weight: 600;
+        }
+
+        /* Ad structure audit — placeholder box for a pasted-in top-ad screenshot */
+        .ad-snip-box {
+            border: 1.5px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.015);
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            color: var(--gray);
+            font-size: 10.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .ad-snip-box img {
+            width: 100%;
+            height: 100%;
+            max-height: 160px;
+            object-fit: cover;
+        }
+        .ad-snip-badge {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        /* Social ad mockup cards — Best Performing Creatives */
+        .ad-mock-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .ad-mock-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .ad-mock-avatar {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: var(--blue-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 900;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .ad-mock-brand {
+            font-size: 11.5px;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1.2;
+        }
+        .ad-mock-sponsored {
+            font-size: 9px;
+            color: var(--gray);
+        }
+        .ad-mock-copy {
+            font-size: 10.5px;
+            color: #cbd5e1;
+            line-height: 1.4;
+            max-height: 43px;
+            overflow: hidden;
+        }
+        .ad-mock-media {
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            height: 110px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray);
+            font-size: 10px;
+            font-weight: 700;
+            overflow: hidden;
+            text-align: center;
+            padding: 8px;
+        }
+        .ad-mock-media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .ad-mock-cta-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .ad-mock-cta-btn {
+            background: var(--blue);
+            color: #fff;
+            font-size: 9.5px;
+            font-weight: 800;
+            padding: 5px 10px;
+            border-radius: 6px;
+            white-space: nowrap;
+        }
+        .ad-mock-stats {
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 8px;
+            font-size: 10.5px;
+            color: var(--gray);
+        }
+        .ad-mock-stats strong {
+            color: #fff;
+        }
+        .ad-mock-card.placeholder {
+            align-items: center;
+            justify-content: center;
+            color: var(--gray);
+            font-size: 11px;
+            text-align: center;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 </head>
@@ -421,30 +613,42 @@
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
             <div class="grid-2">
-                <div class="funnel-container">
-                    <div class="funnel-bar-wrapper">
-                        <div class="funnel-label">Sessions</div>
-                        <div class="funnel-bar-outer"><div class="funnel-bar-inner" id="funnel-bar-sessions" style="width:100%"></div><div class="funnel-value" id="funnel-val-sessions">0</div></div>
-                        <div class="funnel-conv">Baseline</div>
+                <div class="funnel-v2">
+                    <div class="funnel-stage-row">
+                        <div class="funnel-badge" style="background:#1e3a5f">1</div>
+                        <div class="funnel-shape-track"><div class="funnel-shape" id="funnel-bar-sessions" style="width:100%;background:#1e3a5f"></div></div>
+                        <div class="funnel-stage-info">
+                            <div class="funnel-stage-label">Sessions: <span id="funnel-val-sessions">0</span></div>
+                            <div class="funnel-stage-dropoff baseline">Baseline</div>
+                        </div>
                     </div>
-                    <div class="funnel-bar-wrapper">
-                        <div class="funnel-label">Add to Cart</div>
-                        <div class="funnel-bar-outer"><div class="funnel-bar-inner" id="funnel-bar-cart"></div><div class="funnel-value" id="funnel-val-cart">0</div></div>
-                        <div class="funnel-conv" id="funnel-conv-cart">0%</div>
+                    <div class="funnel-stage-row">
+                        <div class="funnel-badge" style="background:#3b82f6">2</div>
+                        <div class="funnel-shape-track"><div class="funnel-shape" id="funnel-bar-cart" style="background:#3b82f6"></div></div>
+                        <div class="funnel-stage-info">
+                            <div class="funnel-stage-label">Add to Cart: <span id="funnel-val-cart">0</span> (<span id="funnel-conv-cart">0%</span>)</div>
+                            <div class="funnel-stage-dropoff" id="funnel-drop-cart">—% drop-off from session</div>
+                        </div>
                     </div>
-                    <div class="funnel-bar-wrapper">
-                        <div class="funnel-label">Checkout</div>
-                        <div class="funnel-bar-outer"><div class="funnel-bar-inner" id="funnel-bar-checkout"></div><div class="funnel-value" id="funnel-val-checkout">0</div></div>
-                        <div class="funnel-conv" id="funnel-conv-checkout">0%</div>
+                    <div class="funnel-stage-row">
+                        <div class="funnel-badge" style="background:#38bdf8">3</div>
+                        <div class="funnel-shape-track"><div class="funnel-shape" id="funnel-bar-checkout" style="background:#38bdf8"></div></div>
+                        <div class="funnel-stage-info">
+                            <div class="funnel-stage-label">Checkout: <span id="funnel-val-checkout">0</span> (<span id="funnel-conv-checkout">0%</span>)</div>
+                            <div class="funnel-stage-dropoff" id="funnel-drop-checkout">—% drop-off from cart</div>
+                        </div>
                     </div>
-                    <div class="funnel-bar-wrapper">
-                        <div class="funnel-label">Purchase</div>
-                        <div class="funnel-bar-outer"><div class="funnel-bar-inner" id="funnel-bar-purchase"></div><div class="funnel-value" id="funnel-val-purchase">0</div></div>
-                        <div class="funnel-conv" id="funnel-conv-purchase">0%</div>
+                    <div class="funnel-stage-row">
+                        <div class="funnel-badge" style="background:#10b981">4</div>
+                        <div class="funnel-shape-track"><div class="funnel-shape" id="funnel-bar-purchase" style="background:#10b981"></div></div>
+                        <div class="funnel-stage-info">
+                            <div class="funnel-stage-label">Purchase: <span id="funnel-val-purchase">0</span> (<span id="funnel-conv-purchase">0%</span>)</div>
+                            <div class="funnel-stage-dropoff" id="funnel-drop-purchase">—% drop-off from checkout</div>
+                        </div>
                     </div>
                 </div>
                 <div style="background:rgba(255,255,255,0.02); padding:24px; border-radius:12px; display:flex; flex-direction:column; justify-content:center">
-                    <h3 style="font-size:14px; margin-bottom:12px; color:var(--blue)">Conversion Rates Summary</h3>
+                    <h3 style="font-size:14px; margin-bottom:12px; color:var(--blue)">Funnel Stage Diagnostics</h3>
                     <p style="font-size:12px; color:#cbd5e1; line-height:1.6; margin-bottom:8px" id="funnel-inferences-text">
                         The overall website conversion rate is tracked at 0.00%.
                     </p>
@@ -514,8 +718,12 @@
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
             <div class="grid-2">
-                <div class="narrative-box" style="display:flex;flex-direction:column;gap:12px;justify-content:center">
+                <div class="narrative-box" style="display:flex;flex-direction:column;gap:10px">
                     <div style="font-size:11px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.05em">Ad Structure Audit</div>
+                    <div class="ad-snip-box" id="meta-audit-snip">
+                        <div class="ad-snip-badge">🔑</div>
+                        <div>Snip of Top Ad</div>
+                    </div>
                     <div><span style="color:var(--gray);font-size:11px">Creatives Tested:</span> <strong id="meta-audit-angles">—</strong></div>
                     <div><span style="color:var(--gray);font-size:11px">Winning Placement:</span> <strong id="meta-audit-placement">—</strong></div>
                     <div><span style="color:var(--gray);font-size:11px">Winning Creative:</span> <strong id="meta-audit-angle">—</strong></div>
@@ -999,8 +1207,11 @@
 
                 const rCart = shopifySessions > 0 ? ((shopifyCart / shopifySessions) * 100).toFixed(1) : 0;
                 const rCheck = shopifyCart > 0 ? ((shopifyCheckout / shopifyCart) * 100).toFixed(1) : 0;
+                const rPurchOfCheckout = shopifyCheckout > 0 ? ((shopifyPurchases / shopifyCheckout) * 100).toFixed(1) : 0;
                 const rPurch = shopifySessions > 0 ? ((shopifyPurchases / shopifySessions) * 100).toFixed(2) : 0;
 
+                // Bar widths are relative to Sessions (the funnel's baseline), scaled within the
+                // fixed-width track so the shape visibly tapers stage over stage.
                 document.getElementById('funnel-bar-cart').style.width = rCart + '%';
                 document.getElementById('funnel-bar-checkout').style.width = (shopifySessions > 0 ? (shopifyCheckout / shopifySessions * 100) : 0) + '%';
                 document.getElementById('funnel-bar-purchase').style.width = (shopifySessions > 0 ? (shopifyPurchases / shopifySessions * 100) : 0) + '%';
@@ -1008,6 +1219,11 @@
                 document.getElementById('funnel-conv-cart').textContent = rCart + '%';
                 document.getElementById('funnel-conv-checkout').textContent = rCheck + '%';
                 document.getElementById('funnel-conv-purchase').textContent = rPurch + '%';
+
+                document.getElementById('funnel-drop-cart').textContent = `${(100 - rCart).toFixed(1)}% drop-off from session`;
+                document.getElementById('funnel-drop-checkout').textContent = `${(100 - rCheck).toFixed(1)}% drop-off from cart`;
+                document.getElementById('funnel-drop-purchase').textContent = `${(100 - rPurchOfCheckout).toFixed(1)}% drop-off from checkout`;
+
                 document.getElementById('funnel-inferences-text').innerHTML = ai.funnel_diagnostics
                     || `The overall website conversion rate is tracked at <strong>${rPurch}%</strong> over ${shopifySessions.toLocaleString()} sessions. Checkout dropoff from Add to Cart is <strong>${(100 - rCheck).toFixed(1)}%</strong>.`;
             } else {
@@ -1018,6 +1234,7 @@
                 ['cart', 'checkout', 'purchase'].forEach(k => {
                     document.getElementById(`funnel-bar-${k}`).style.width = '0%';
                     document.getElementById(`funnel-conv-${k}`).textContent = '—';
+                    document.getElementById(`funnel-drop-${k}`).textContent = '—';
                 });
                 document.getElementById('funnel-inferences-text').innerHTML = `GA4 ecommerce event tracking (session_start / add_to_cart / begin_checkout) is not connected or has no recorded events for this period, so session and drop-off figures cannot be shown. Only confirmed Shopify purchases (<strong>${shopifyPurchases.toLocaleString()}</strong>) are known for this period.`;
             }
@@ -1075,6 +1292,11 @@
 
             // ── SLIDE 7: META CAMPAIGNS DEEP-DIVE ──
             const metaAudit = data.meta_ad_audit || {};
+            const metaCreativesForSnip = data.meta_creatives || [];
+            const topCreativeImg = metaCreativesForSnip[0]?.image_url;
+            document.getElementById('meta-audit-snip').innerHTML = topCreativeImg
+                ? `<img src="${topCreativeImg}" alt="Top ad creative" onerror="this.parentElement.innerHTML='<div class=\\'ad-snip-badge\\'>🔑</div><div>Snip of Top Ad</div>'">`
+                : `<div class="ad-snip-badge">🔑</div><div>Snip of Top Ad</div>`;
             document.getElementById('meta-audit-angles').textContent = metaAudit.angles_tested ? metaAudit.angles_tested + ' creatives' : '—';
             document.getElementById('meta-audit-placement').textContent = metaAudit.winning_placement
                 ? `${metaAudit.winning_placement} (${(metaAudit.winning_placement_roas || 0).toFixed(2)}x ROAS)` : '—';
@@ -1092,21 +1314,41 @@
                     <td style="font-weight:700;color:var(--blue)">${c.roas}</td>
                 </tr>`).join('');
 
-            // ── SLIDE 8: META CREATIVES ──
+            // ── SLIDE 8: META CREATIVES ── always render 3 ad-mockup slots, padding with
+            // placeholders when fewer than 3 creatives had purchase data this period.
             const metaCreativesBox = document.getElementById('meta-creatives-grid');
             const crList = data.meta_creatives || [];
-            metaCreativesBox.innerHTML = crList.length === 0
-                ? `<div style="grid-column:span 3;text-align:center;color:var(--gray);padding:40px 0">No active Meta creative audits found.</div>`
-                : crList.map((cr, idx) => `
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:16px; border-radius:12px; display:flex; flex-direction:column; gap:10px">
-                        <div style="width:28px;height:28px;background:var(--blue-gradient);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff">#${idx + 1}</div>
-                        ${cr.image_url ? `<img src="${cr.image_url}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;background:#111" onerror="this.style.display='none'">` : `<div style="width:100%;height:110px;border-radius:8px;background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:11px">No preview available</div>`}
-                        <h4 style="font-size:12px;color:#fff">${cr.name}</h4>
-                        ${cr.body ? `<div style="font-size:10.5px;color:var(--gray);line-height:1.4">${stripHtml(cr.body).slice(0, 110)}${cr.body.length > 110 ? '…' : ''}</div>` : ''}
-                        <div style="font-size:11px;color:var(--gray)">Revenue: <strong style="color:#fff">${curr(cr.revenue)}</strong></div>
-                        <div style="font-size:11px;color:var(--gray)">CTR: <strong style="color:#fff">${cr.ctr}</strong> &nbsp;|&nbsp; CPA: <strong style="color:#fff">${cr.cpa}</strong></div>
+            const rankTags = ['TOP PERFORMER', 'RUNNER UP', 'RISING STAR'];
+            const brandInitials = (report.brand_name || 'BR').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+            metaCreativesBox.innerHTML = [0, 1, 2].map(idx => {
+                const cr = crList[idx];
+                if (!cr) {
+                    return `<div class="ad-mock-card placeholder">No additional creative<br>had purchase data<br>this period</div>`;
+                }
+                const mediaHtml = cr.image_url
+                    ? `<img src="${cr.image_url}" alt="${cr.name}" onerror="this.parentElement.textContent='Preview unavailable'">`
+                    : `Preview unavailable`;
+                return `<div class="ad-mock-card">
+                    <div style="font-size:9.5px;font-weight:800;color:var(--blue);letter-spacing:.05em">#${idx + 1} ${rankTags[idx]}</div>
+                    <div class="ad-mock-header">
+                        <div class="ad-mock-avatar">${brandInitials}</div>
+                        <div>
+                            <div class="ad-mock-brand">${report.brand_name || 'Brand'}</div>
+                            <div class="ad-mock-sponsored">Sponsored</div>
+                        </div>
                     </div>
-                `).join('');
+                    ${cr.body ? `<div class="ad-mock-copy">${stripHtml(cr.body).slice(0, 110)}${cr.body.length > 110 ? '…' : ''}</div>` : ''}
+                    <div class="ad-mock-media">${mediaHtml}</div>
+                    <div class="ad-mock-cta-row">
+                        <div style="font-size:10.5px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cr.name}</div>
+                        <div class="ad-mock-cta-btn">${cr.cta || 'SHOP NOW'}</div>
+                    </div>
+                    <div class="ad-mock-stats">
+                        <div>CTR <strong>${cr.ctr}</strong></div>
+                        <div>CPA <strong>${cr.cpa}</strong></div>
+                    </div>
+                </div>`;
+            }).join('');
 
             // ── SLIDE 9: GOOGLE CAMPAIGNS DEEP-DIVE ──
             const googleAudit = data.google_ad_audit || {};
