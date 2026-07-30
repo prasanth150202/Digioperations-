@@ -7145,13 +7145,18 @@ async function triggerMonthlySync() {
   }
   
   const btn = document.getElementById('btn-sync-monthly');
+  const btnSpinner = document.getElementById('sync-btn-spinner');
+  const btnLabel = document.getElementById('sync-btn-label');
+  const statusSpinner = document.getElementById('monthly-sync-spinner');
   const statusEl = document.getElementById('monthly-sync-status');
-  
+
   btn.disabled = true;
-  btn.textContent = 'Syncing...';
-  statusEl.textContent = 'Contacting integrations, downloading storefront & ad campaign metrics...';
+  btnSpinner.style.display = 'inline-block';
+  btnLabel.textContent = 'Syncing…';
+  statusSpinner.style.display = 'inline-block';
+  statusEl.textContent = 'Contacting integrations, downloading storefront & ad campaign metrics — this can take up to a minute...';
   statusEl.style.color = '#d97706';
-  
+
   try {
     const r = await api(`/api/sync.php?brand_id=${activeBrand.id}&start_date=${start}&end_date=${end}`);
     if (r && r.ok) {
@@ -7159,15 +7164,19 @@ async function triggerMonthlySync() {
       statusEl.textContent = `Sync completed successfully! Shopify items: ${r.sync_shopify}, Meta: ${r.sync_meta}, Google Ads: ${r.sync_google_ads}, GA4: ${r.sync_ga4}, GSC: ${r.sync_gsc}.`;
       statusEl.style.color = '#10B981';
     } else {
+      syncedMonthlyData = null;
       statusEl.textContent = 'Sync encountered errors: ' + (r?.error || 'unreachable');
       statusEl.style.color = '#ef4444';
     }
   } catch(e) {
+    syncedMonthlyData = null;
     statusEl.textContent = 'Sync failed: ' + e.message;
     statusEl.style.color = '#ef4444';
   } finally {
     btn.disabled = false;
-    btn.textContent = '⚡ Sync API Data';
+    btnSpinner.style.display = 'none';
+    btnLabel.textContent = '⚡ Sync API Data';
+    statusSpinner.style.display = 'none';
   }
 }
 
@@ -7180,7 +7189,21 @@ async function submitGenerateMonthlyReport() {
     alert('Please select a target month first.');
     return;
   }
-  
+
+  // Most of the deck's content (campaigns, funnel, cohort matrix, GSC, etc.) comes entirely
+  // from the synced API data, not from anything typed on this form — generating without a
+  // successful sync produces a deck that's empty everywhere except the manual Owned Media
+  // fields, which isn't obvious just from looking at this screen.
+  if (!syncedMonthlyData) {
+    const proceed = confirm(
+      "You haven't run a successful \"Sync API Data\" for this period yet.\n\n" +
+      'The deck will generate with Shopify, Meta, Google, GA4, and Search Console sections ' +
+      'empty — only the manually-entered Owned Media numbers will show real data.\n\n' +
+      'Generate anyway?'
+    );
+    if (!proceed) return;
+  }
+
   const btn = document.getElementById('btn-generate-monthly-report');
   btn.disabled = true;
   btn.textContent = 'Compiling Deck...';
