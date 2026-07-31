@@ -221,6 +221,48 @@
             border-color: rgba(59, 130, 246, 0.4);
         }
 
+        /* Owned-media summary cards (Email/WhatsApp/Push) — a dedicated variant rather than
+           reusing .metric-card's justify-content:center, which left a big empty gap above and
+           below the short content once the card stretched to fill the grid row. Here the icon
+           badge anchors the top and justify-content:space-between spreads the stat rows across
+           the full stretched height instead of leaving them clumped in the middle. */
+        .media-card {
+            background: #f8fafc;
+            border: 1px solid var(--border-dark);
+            border-radius: 12px;
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            text-align: left;
+        }
+        .media-card-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 21px;
+            margin-bottom: 12px;
+        }
+        .media-card-title {
+            font-weight: 800;
+            font-size: 13.5px;
+            color: var(--text-dark);
+        }
+        .media-card-stat-label {
+            font-size: 11px;
+            color: var(--gray);
+            margin-bottom: 4px;
+        }
+        .media-card-stat-value {
+            font-family: var(--font-hd);
+            font-weight: 800;
+            font-size: 18px;
+            color: var(--text-dark);
+        }
+
         .metric-label {
             font-size: 10.5px;
             font-weight: 700;
@@ -1570,23 +1612,59 @@
             const wa = owned.whatsapp || { spend: 0, revenue: 0, orders: 0, sent: 0 };
             const push = owned.push || { revenue: 0, sent: 0, open_rate: 0, click_rate: 0 };
             document.getElementById('owned-media-cards').innerHTML = `
-                <div class="metric-card" style="text-align:left">
-                    <div style="font-weight:800;font-size:12.5px;margin-bottom:10px">✉ Email Marketing</div>
-                    <div style="font-size:11px;color:var(--gray)">Sent</div><div style="font-weight:700;margin-bottom:6px">${(eMail.sent || 0).toLocaleString()}</div>
-                    <div style="font-size:11px;color:var(--gray)">Open / Click Rate</div><div style="font-weight:700;margin-bottom:6px">${eMail.open_rate}% / ${eMail.click_rate}%</div>
-                    <div style="font-size:11px;color:var(--gray)">Revenue</div><div style="font-weight:800;color:var(--green)">${curr(eMail.revenue)}</div>
+                <div class="media-card">
+                    <div>
+                        <div class="media-card-icon" style="background:#dbeafe">✉️</div>
+                        <div class="media-card-title">Email Marketing</div>
+                    </div>
+                    <div>
+                        <div class="media-card-stat-label">Sent</div>
+                        <div class="media-card-stat-value">${(eMail.sent || 0).toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <div class="media-card-stat-label">Open / Click Rate</div>
+                        <div class="media-card-stat-value">${eMail.open_rate}% / ${eMail.click_rate}%</div>
+                    </div>
+                    <div>
+                        <div class="media-card-stat-label">Revenue</div>
+                        <div class="media-card-stat-value" style="color:var(--green)">${curr(eMail.revenue)}</div>
+                    </div>
                 </div>
-                <div class="metric-card" style="text-align:left">
-                    <div style="font-weight:800;font-size:12.5px;margin-bottom:10px">💬 WhatsApp</div>
-                    <div style="font-size:11px;color:var(--gray)">Sent</div><div style="font-weight:700;margin-bottom:6px">${(wa.sent || 0).toLocaleString()}</div>
-                    <div style="font-size:11px;color:var(--gray)">Orders</div><div style="font-weight:700;margin-bottom:6px">${wa.orders || 0}</div>
-                    <div style="font-size:11px;color:var(--gray)">Revenue</div><div style="font-weight:800;color:var(--green)">${curr(wa.revenue)}</div>
+                <div class="media-card">
+                    <div>
+                        <div class="media-card-icon" style="background:#d1fae5">💬</div>
+                        <div class="media-card-title">WhatsApp</div>
+                    </div>
+                    <div>
+                        <div class="media-card-stat-label">Sent</div>
+                        <div class="media-card-stat-value">${(wa.sent || 0).toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <div class="media-card-stat-label">Orders</div>
+                        <div class="media-card-stat-value">${wa.orders || 0}</div>
+                    </div>
+                    <div>
+                        <div class="media-card-stat-label">Revenue</div>
+                        <div class="media-card-stat-value" style="color:var(--green)">${curr(wa.revenue)}</div>
+                    </div>
                 </div>
-                <div class="metric-card" style="text-align:left">
-                    <div style="font-weight:800;font-size:12.5px;margin-bottom:10px">🔔 Push Notifications</div>
-                    <div style="font-size:11px;color:var(--gray)">Sent</div><div style="font-weight:700;margin-bottom:6px">${(push.sent || 0).toLocaleString()}</div>
-                    <div style="font-size:11px;color:var(--gray)">Open / Click Rate</div><div style="font-weight:700;margin-bottom:6px">${push.open_rate}% / ${push.click_rate}%</div>
-                    <div style="font-size:11px;color:var(--gray)">Revenue (assist)</div><div style="font-weight:800;color:var(--green)">${curr(push.revenue)}</div>
+                <div class="media-card">
+                    <div>
+                        <div class="media-card-icon" style="background:#fef3c7">🔔</div>
+                        <div class="media-card-title">Push Notifications</div>
+                    </div>
+                    <div>
+                        <div class="media-card-stat-label">Sent</div>
+                        <div class="media-card-stat-value">${(push.sent || 0).toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <div class="media-card-stat-label">Open / Click Rate</div>
+                        <div class="media-card-stat-value">${push.open_rate}% / ${push.click_rate}%</div>
+                    </div>
+                    <div>
+                        <div class="media-card-stat-label">Revenue (assist)</div>
+                        <div class="media-card-stat-value" style="color:var(--green)">${curr(push.revenue)}</div>
+                    </div>
                 </div>
             `;
 
