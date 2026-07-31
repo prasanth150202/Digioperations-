@@ -15,6 +15,18 @@ Options -MultiViews
   Deny from all
 </FilesMatch>
 
+# ── Never cache the client-facing deck templates ──────────────
+# monthly-report.html and report.html have no ?v= cache-busting (their URL is a fixed
+# share-link token/id), so a browser or CDN caching them by path made template/design
+# changes here invisible on already-bookmarked report links even after redeploying.
+<IfModule mod_headers.c>
+  <FilesMatch "^(monthly-report|report)\.html$">
+    Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+</IfModule>
+
 # ── PHP settings ─────────────────────────────────────────────
 <IfModule mod_php.c>
   php_value upload_max_filesize 32M

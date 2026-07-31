@@ -129,6 +129,19 @@
             font-weight: 600;
         }
 
+        /* "Confidential @ Digifyce" on every slide footer, injected once here instead of by
+           hand on all 21 slides. ::after becomes a real flex item (parent is display:flex), so
+           `order` places it between the two existing footer divs (label + page number). */
+        .slide-footer::after {
+            content: "Confidential @ Digifyce";
+            order: 1;
+            text-align: center;
+            flex: 1;
+        }
+        .slide-footer > div:last-child {
+            order: 2;
+        }
+
         /* Grid Layouts */
         .grid-2 {
             display: grid;
@@ -701,7 +714,7 @@
             <div style="flex:1; overflow:auto">
                 <table class="slide-table" id="table-attribution">
                     <thead>
-                        <tr><th>Channel</th><th>Sessions</th><th>Orders</th><th>Revenue</th><th>Revenue Share</th><th>ROAS</th></tr>
+                        <tr><th>Traffic Source</th><th>Campaign</th><th>Orders</th><th>Gross Sales</th><th>Revenue Share</th></tr>
                     </thead>
                     <tbody></tbody>
                 </table>
@@ -772,8 +785,12 @@
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
             <div class="grid-2">
-                <div class="narrative-box" style="display:flex;flex-direction:column;gap:12px;justify-content:center">
+                <div class="narrative-box" style="display:flex;flex-direction:column;gap:10px">
                     <div style="font-size:11px;font-weight:800;color:var(--purple);text-transform:uppercase;letter-spacing:.05em">Ad Structure Audit</div>
+                    <div class="ad-snip-box" id="google-audit-snip">
+                        <div class="ad-snip-badge">🔑</div>
+                        <div>Snip of Top Ad</div>
+                    </div>
                     <div><span style="color:var(--gray);font-size:11px">Networks Tested:</span> <strong id="google-audit-networks">—</strong></div>
                     <div><span style="color:var(--gray);font-size:11px">Winning Network:</span> <strong id="google-audit-network">—</strong></div>
                     <div><span style="color:var(--gray);font-size:11px">Winning ROAS:</span> <strong id="google-audit-roas">—</strong></div>
@@ -1264,32 +1281,30 @@
                     `${top.primary_region || 'Unknown region'} is the leading shipping destination for your top product (${top.name}), representing ${top.revenue_share || 0}% of top-product revenue.`;
             }
 
-            // ── SLIDE 6: ATTRIBUTION MAP ──
+            // ── SLIDE 6: ATTRIBUTION MAP ── uses real Shopify order-level UTM attribution
+            // (data.shopify_campaigns, parsed from each order's landing_site/referring_site in
+            // sync.php) instead of blending self-reported ad-platform totals with GA4 channel
+            // groupings — those are two different tracking systems with different channel
+            // definitions, and merging them produced a table that wasn't really "attribution",
+            // just a mixed bag of whatever data happened to be available.
             const attTbody = document.querySelector('#table-attribution tbody');
             const ga4Chs = data.ga4_channels || {};
-            const paidKeys = ['meta', 'google', 'marketplace'];
-            const attRows = [];
-            Object.entries(channels).forEach(([ch, m]) => {
-                if (ch === 'push') return; // not an attribution channel — see api/reports.php note
-                attRows.push({ label: ch.toUpperCase().replace(/_/g, ' '), sessions: null, orders: m.conversions || 0, revenue: m.revenue || 0, roas: m.roas || 0, paid: paidKeys.includes(ch) });
-            });
-            Object.entries(ga4Chs).forEach(([name, m]) => {
-                attRows.push({ label: name, sessions: m.sessions || 0, orders: null, revenue: m.revenue || 0, roas: null, paid: false });
-            });
-            const attTotalRevenue = attRows.reduce((s, r) => s + (r.revenue || 0), 0);
-            if (attRows.length === 0) {
-                attTbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--gray)">No channel attribution data found.</td></tr>`;
+            const utmRows = data.shopify_campaigns || [];
+            const PAID_HINTS = ['facebook', 'instagram', 'meta', 'google ads', 'paid', 'cpc', 'ppc', 'advantage'];
+            const isPaidSource = (source) => PAID_HINTS.some(h => (source || '').toLowerCase().includes(h));
+            const attTotalRevenue = utmRows.reduce((s, r) => s + (r.revenue || 0), 0);
+            if (utmRows.length === 0) {
+                attTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No Shopify order attribution (UTM/referrer) data found for this period.</td></tr>`;
                 document.getElementById('attribution-split-callout').textContent = 'No attribution data available for this period.';
             } else {
-                attTbody.innerHTML = attRows.map(r => `<tr>
-                    <td style="font-weight:700">${r.label}</td>
-                    <td>${r.sessions === null ? '—' : r.sessions.toLocaleString()}</td>
-                    <td>${r.orders === null ? '—' : r.orders}</td>
+                attTbody.innerHTML = utmRows.map(r => `<tr>
+                    <td style="font-weight:700">${r.source}</td>
+                    <td>${r.campaign}</td>
+                    <td>${r.orders}</td>
                     <td>${curr(r.revenue)}</td>
-                    <td>${attTotalRevenue > 0 ? (r.revenue / attTotalRevenue * 100).toFixed(1) : '0.0'}%</td>
-                    <td style="font-weight:700;color:var(--green)">${r.roas === null ? '—' : r.roas.toFixed(2) + 'x'}</td>
+                    <td style="font-weight:700;color:var(--green)">${attTotalRevenue > 0 ? (r.revenue / attTotalRevenue * 100).toFixed(1) : '0.0'}%</td>
                 </tr>`).join('');
-                const paidRevenue = attRows.filter(r => r.paid).reduce((s, r) => s + (r.revenue || 0), 0);
+                const paidRevenue = utmRows.filter(r => isPaidSource(r.source)).reduce((s, r) => s + (r.revenue || 0), 0);
                 const nonPaidRevenue = attTotalRevenue - paidRevenue;
                 document.getElementById('attribution-split-callout').textContent =
                     `Paid Acquisition: ${attTotalRevenue > 0 ? (paidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(paidRevenue)}) | Non-Paid / Owned: ${attTotalRevenue > 0 ? (nonPaidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(nonPaidRevenue)})`;
@@ -1307,11 +1322,24 @@
                 ? `${metaAudit.winning_placement} (${(metaAudit.winning_placement_roas || 0).toFixed(2)}x ROAS)` : '—';
             document.getElementById('meta-audit-angle').textContent = metaAudit.winning_angle || '—';
 
+            // Only the top 4 campaigns by spend make the deck (matching the reference), plus a
+            // TOTAL row summarizing every campaign that ran — not just the four shown.
+            function topCampaignsWithTotal(list, n, totalLabel) {
+                if (!list.length) return [];
+                const top = [...list].sort((a, b) => (b.spent || 0) - (a.spent || 0)).slice(0, n);
+                const totalSpend = list.reduce((s, c) => s + (c.spent || 0), 0);
+                const totalSales = list.reduce((s, c) => s + (c.sales || 0), 0);
+                const totalOrders = list.reduce((s, c) => s + (c.orders || 0), 0);
+                const totalRoas = totalSpend > 0 ? (totalSales / totalSpend).toFixed(1) + 'x' : '—';
+                return [...top, { name: totalLabel, spent: totalSpend, orders: totalOrders, sales: totalSales, roas: totalRoas, isTotal: true }];
+            }
+
             const mcTbody = document.querySelector('#table-meta-campaigns tbody');
             const mcList = data.meta_campaigns || [];
-            mcTbody.innerHTML = mcList.length === 0
+            const mcTop = topCampaignsWithTotal(mcList, 4, 'TOTAL META ADS');
+            mcTbody.innerHTML = mcTop.length === 0
                 ? `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No campaign data synced for this month.</td></tr>`
-                : mcList.map(c => `<tr>
+                : mcTop.map(c => `<tr${c.isTotal ? ' style="font-weight:800;background:#f8fafc"' : ''}>
                     <td style="font-weight:700">${c.name}</td>
                     <td>${curr(c.spent)}</td>
                     <td>${c.orders}</td>
@@ -1363,29 +1391,48 @@
 
             const gcTbody = document.querySelector('#table-google-campaigns tbody');
             const gcList = data.google_campaigns || [];
-            gcTbody.innerHTML = gcList.length === 0
-                ? `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No Google campaigns synced for this month.</td></tr>`
-                : gcList.map(c => `<tr>
+            // Google Ads isn't always connected yet — build the same template the Meta table
+            // uses either way, with clearly-marked "XX" placeholder rows to replace by hand
+            // once Google Ads is connected, instead of a plain "no data" message.
+            const gcTop = gcList.length ? topCampaignsWithTotal(gcList, 4, 'TOTAL GOOGLE ADS') : [
+                { name: 'Campaign XX', spent: 'XX,XXX', orders: 'XX', sales: 'XX,XXX', roas: 'X.Xx', placeholder: true },
+                { name: 'Campaign XX', spent: 'XX,XXX', orders: 'XX', sales: 'XX,XXX', roas: 'X.Xx', placeholder: true },
+                { name: 'Campaign XX', spent: 'XX,XXX', orders: 'XX', sales: 'XX,XXX', roas: 'X.Xx', placeholder: true },
+                { name: 'Campaign XX', spent: 'XX,XXX', orders: 'XX', sales: 'XX,XXX', roas: 'X.Xx', placeholder: true },
+                { name: 'TOTAL GOOGLE ADS', spent: 'XX,XXX', orders: 'XX', sales: 'XX,XXX', roas: 'X.Xx', isTotal: true, placeholder: true }
+            ];
+            gcTbody.innerHTML = gcTop.map(c => `<tr${c.isTotal ? ' style="font-weight:800;background:#f8fafc"' : ''}${c.placeholder ? ' style="color:var(--gray);font-style:italic"' : ''}>
                     <td style="font-weight:700">${c.name}</td>
-                    <td>${curr(c.spent)}</td>
+                    <td>${c.placeholder ? '₹' + c.spent : curr(c.spent)}</td>
                     <td>${c.orders}</td>
-                    <td>${curr(c.sales)}</td>
+                    <td>${c.placeholder ? '₹' + c.sales : curr(c.sales)}</td>
                     <td style="font-weight:700;color:var(--purple)">${c.roas}</td>
                 </tr>`).join('');
 
-            // ── SLIDE 10: GOOGLE SEARCH AD CREATIVES ──
+            // ── SLIDE 10: GOOGLE SEARCH AD CREATIVES ── always 3 slots, like Meta's creative
+            // grid — placeholder "XX" template cards when Google Ads isn't connected yet, to
+            // replace by hand rather than an empty "no data" slide.
             const googleCreativesBox = document.getElementById('google-creatives-grid');
             const gsAds = data.google_search_ads || [];
-            googleCreativesBox.innerHTML = gsAds.length === 0
-                ? `<div style="grid-column:span 3;text-align:center;color:var(--gray);padding:40px 0">No Google Search ad copy synced for this month.</div>`
-                : gsAds.map((a, idx) => `
-                    <div style="background:#f8fafc; border:1px solid var(--border-dark); padding:16px; border-radius:12px; display:flex; flex-direction:column; gap:8px">
+            const gsAdsTags = ['TOP PERFORMER (SEARCH)', 'RUNNER UP (PMAX)', 'RISING STAR (BRAND)'];
+            googleCreativesBox.innerHTML = [0, 1, 2].map(idx => {
+                const a = gsAds[idx];
+                const isPlaceholder = !a;
+                const headline = a ? a.headline : 'Headline Copy XX | Placeholder';
+                const description = a ? a.description : 'Placeholder description copy — replace with the real Google Ads text once connected.';
+                const clicks = a ? (a.clicks || 0).toLocaleString() : 'XX';
+                const roas = a ? (a.roas || 0).toFixed(2) + 'x' : 'X.Xx';
+                return `<div style="background:#f8fafc; border:1px solid var(--border-dark); padding:16px; border-radius:12px; display:flex; flex-direction:column; gap:8px${isPlaceholder ? ';opacity:0.6' : ''}">
+                        <div style="font-size:9.5px;font-weight:800;color:var(--purple);letter-spacing:.05em">#${idx + 1} ${gsAdsTags[idx]}</div>
                         <div style="font-size:10px;color:var(--green);font-weight:700">Ad · Sponsored</div>
-                        <div style="font-size:13px;color:var(--blue);font-weight:700">${a.headline}</div>
-                        <div style="font-size:11px;color:var(--text-body);line-height:1.4">${a.description}</div>
-                        <div style="font-size:11px;color:var(--gray);margin-top:auto">Clicks: <strong style="color:var(--text-dark)">${(a.clicks || 0).toLocaleString()}</strong> &nbsp;|&nbsp; ROAS: <strong style="color:var(--text-dark)">${(a.roas || 0).toFixed(2)}x</strong></div>
-                    </div>
-                `).join('');
+                        <div style="font-size:13px;color:var(--blue);font-weight:700">${headline}</div>
+                        <div style="font-size:11px;color:var(--text-body);line-height:1.4">${description}</div>
+                        <div class="ad-snip-box" style="min-height:70px;margin:2px 0">
+                            <div>${idx === 1 ? 'Shopping Card Image XX' : 'Snip of Top Ad'}</div>
+                        </div>
+                        <div style="font-size:11px;color:var(--gray);margin-top:auto">Clicks: <strong style="color:var(--text-dark)">${clicks}</strong> &nbsp;|&nbsp; ROAS: <strong style="color:var(--text-dark)">${roas}</strong></div>
+                    </div>`;
+            }).join('');
 
             // ── SLIDE 11: ORGANIC & NON-PAID TRAFFIC (3 cards) ──
             const organicBox = document.getElementById('organic-cards');
@@ -1491,7 +1538,7 @@
             const sdd = ai.strategy_deep_dive || {};
             document.getElementById('strategy-deepdive-title').textContent = sdd.initiative_name || 'No strategy deep-dive available for this period.';
             const sddSteps = [
-                ['1', 'Hypothesis Formulation', sdd.hypothesis],
+                ['1', 'Strategic Approach', sdd.hypothesis],
                 ['2', 'Creative Campaign Deployment', sdd.creative_deployment],
                 ['3', 'Broadcast Execution', sdd.broadcast_execution],
                 ['4', 'Outcome Measurement', sdd.outcome]
@@ -1602,7 +1649,8 @@
 
                     function footer(s, pageNum) {
                         s.addShape('line', { x: 0.4, y: 7.05, w: 12.53, h: 0, line: { color: CLR.border, width: 0.75 } });
-                        s.addText(`${report.brand_name || 'Brand'} Report — ${mLabel}`, { x: 0.4, y: 7.1, w: 8, h: 0.3, fontSize: 9, color: CLR.mid, fontFace: FONT });
+                        s.addText(`${report.brand_name || 'Brand'} Report — ${mLabel}`, { x: 0.4, y: 7.1, w: 4.2, h: 0.3, fontSize: 9, color: CLR.mid, fontFace: FONT });
+                        s.addText('Confidential @ Digifyce', { x: 4.6, y: 7.1, w: 4.13, h: 0.3, align: 'center', fontSize: 9, color: CLR.mid, fontFace: FONT });
                         s.addText(`Page ${pageNum} of ${TOTAL_PAGES}`, { x: 9.53, y: 7.1, w: 3.4, h: 0.3, align: 'right', fontSize: 9, color: CLR.mid, fontFace: FONT });
                     }
 
@@ -1764,6 +1812,7 @@
                     cover.addText(report.brand_name || 'Brand', { x: 0.8, y: badgeY + badgeSize + 0.3, w: 11.73, h: 0.75, align: 'center', fontSize: 32, bold: true, color: CLR.dark, fontFace: FONT });
                     cover.addText(`Marketing Performance Report — ${mLabel}`, { x: 0.8, y: badgeY + badgeSize + 1.1, w: 11.73, h: 0.5, align: 'center', fontSize: 16, color: CLR.mid, fontFace: FONT });
                     cover.addText('Agency: Digifyce Team   |   Contact: agent@digifyce.in   |   Portal: platform.digifyce.in', { x: 0.8, y: 6.55, w: 11.73, h: 0.4, align: 'center', fontSize: 11, color: CLR.mid, fontFace: FONT });
+                    cover.addText('Confidential @ Digifyce', { x: 0.8, y: 6.95, w: 11.73, h: 0.3, align: 'center', fontSize: 9, color: CLR.mid, fontFace: FONT });
 
                     // Slide 2: High Level Overview
                     const s2 = baseSlide(2, 'Shopify, Marketplace & Ad Networks Consolidated Summary', 'High Level Overview');
@@ -1840,16 +1889,16 @@
                             calloutText: products.length ? `${products[0].primary_region || 'Unknown region'} is the leading shipping destination for your top product (${products[0].name}), representing ${products[0].revenue_share || 0}% of top-product revenue.` : null
                         });
 
-                    // Slide 6: Attribution Map
-                    const paidRevenue = attRows.filter(r => r.paid).reduce((s, r) => s + (r.revenue || 0), 0);
+                    // Slide 6: Attribution Map (real Shopify UTM attribution — see the matching
+                    // note in bindReportData's slide 6 section)
+                    const paidRevenue = utmRows.filter(r => isPaidSource(r.source)).reduce((s, r) => s + (r.revenue || 0), 0);
                     const nonPaidRevenue = attTotalRevenue - paidRevenue;
                     tableSlide(6, 'Shopify Campaign Attribution Metrics', 'Attribution Map: Revenue Origins & Channels',
-                        ['Channel', 'Sessions', 'Orders', 'Revenue', 'Revenue Share', 'ROAS'],
-                        attRows.map(r => [r.label, r.sessions === null ? '—' : r.sessions.toLocaleString(), r.orders === null ? '—' : r.orders, curr(r.revenue), (attTotalRevenue > 0 ? (r.revenue / attTotalRevenue * 100).toFixed(1) : '0.0') + '%', r.roas === null ? '—' : r.roas.toFixed(2) + 'x']),
+                        ['Traffic Source', 'Campaign', 'Orders', 'Gross Sales', 'Revenue Share'],
+                        utmRows.map(r => [r.source, r.campaign, r.orders, curr(r.revenue), (attTotalRevenue > 0 ? (r.revenue / attTotalRevenue * 100).toFixed(1) : '0.0') + '%']),
                         {
-                            emptyMsg: 'No channel attribution data found.',
-                            cellStyle: (ri, ci, v) => ci === 5 ? roasCellStyle(v) : null,
-                            calloutText: attRows.length ? `Paid Acquisition: ${attTotalRevenue > 0 ? (paidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(paidRevenue)}) | Non-Paid / Owned: ${attTotalRevenue > 0 ? (nonPaidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(nonPaidRevenue)})` : null
+                            emptyMsg: 'No Shopify order attribution (UTM/referrer) data found for this period.',
+                            calloutText: utmRows.length ? `Paid Acquisition: ${attTotalRevenue > 0 ? (paidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(paidRevenue)}) | Non-Paid / Owned: ${attTotalRevenue > 0 ? (nonPaidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(nonPaidRevenue)})` : null
                         });
 
                     // Slide 7: Meta Campaigns Deep-Dive
@@ -1862,12 +1911,17 @@
                         { text: 'Winning Angle: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
                         { text: metaAudit.winning_angle || '—', options: { color: CLR.mid, fontSize: 10, breakLine: true } }
                     ]);
-                    if (mcList.length) renderTable(s7, 6.3, 1.2, 6.63, ['Campaign', 'Spend', 'Orders', 'Sales', 'ROAS'], mcList.map(c => [c.name, curr(c.spent), c.orders, curr(c.sales), c.roas]), (ri, ci, v) => ci === 4 ? roasCellStyle(v) : null);
+                    if (mcTop.length) renderTable(s7, 6.3, 1.2, 6.63, ['Campaign', 'Spend', 'Orders', 'Sales', 'ROAS'], mcTop.map(c => [c.name, curr(c.spent), c.orders, curr(c.sales), c.roas]), (ri, ci, v) => ci === 4 ? roasCellStyle(v) : null);
                     else s7.addText('No Meta campaign data synced for this month.', { x: 6.3, y: 1.5, w: 6.63, h: 0.5, fontSize: 11, color: CLR.mid, fontFace: FONT, italic: true });
 
-                    // Slide 8: Meta Creatives
+                    // Slide 8: Meta Creatives — always 3 slots, matching the HTML deck
+                    const rankTagsPptx = ['TOP PERFORMER', 'RUNNER UP', 'RISING STAR'];
                     narrativeCardsSlide(8, 'Creative Performance Audit & Visual Previews', 'Best Performing Creatives (Meta Ads)',
-                        crList.map((cr, i) => ({ title: `#${i + 1}  ${cr.name}`, body: `${stripHtmlPptx(cr.body || '').slice(0, 140)}\n\nRevenue: ${curr(cr.revenue)}   CTR: ${cr.ctr}   CPA: ${cr.cpa}` })));
+                        [0, 1, 2].map(i => {
+                            const cr = crList[i];
+                            if (!cr) return { title: `#${i + 1}  ${rankTagsPptx[i]}`, body: 'No additional creative had purchase data this period.' };
+                            return { title: `#${i + 1}  ${cr.name}`, body: `${stripHtmlPptx(cr.body || '').slice(0, 140)}\n\nRevenue: ${curr(cr.revenue)}   CTR: ${cr.ctr}   CPA: ${cr.cpa}` };
+                        }));
 
                     // Slide 9: Google Campaigns Deep-Dive
                     const s9 = baseSlide(9, 'Google Ads Manager Structure & Placement Performance', 'Paid Ads: Google Campaigns Deep-Dive');
@@ -1877,12 +1931,22 @@
                         { text: 'Winning Placement: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
                         { text: `${googleAudit.winning_network ? `${googleAudit.winning_network} (${(googleAudit.winning_network_roas || 0).toFixed(2)}x ROAS)` : '—'}`, options: { color: CLR.mid, fontSize: 10, breakLine: true } }
                     ]);
-                    if (gcList.length) renderTable(s9, 6.3, 1.2, 6.63, ['Campaign', 'Spend', 'Orders', 'Sales', 'ROAS'], gcList.map(c => [c.name, curr(c.spent), c.orders, curr(c.sales), c.roas]), (ri, ci, v) => ci === 4 ? roasCellStyle(v) : null);
-                    else s9.addText('No Google campaign data synced for this month.', { x: 6.3, y: 1.5, w: 6.63, h: 0.5, fontSize: 11, color: CLR.mid, fontFace: FONT, italic: true });
+                    // gcTop is always populated (real top-4+total, or an "XX" placeholder
+                    // template) — see the matching note in bindReportData's slide 9 section.
+                    renderTable(s9, 6.3, 1.2, 6.63, ['Campaign', 'Spend', 'Orders', 'Sales', 'ROAS'], gcTop.map(c => [c.name, c.placeholder ? '₹' + c.spent : curr(c.spent), c.orders, c.placeholder ? '₹' + c.sales : curr(c.sales), c.roas]), (ri, ci, v) => ci === 4 && !gcTop[ri]?.placeholder ? roasCellStyle(v) : null);
 
-                    // Slide 10: Google Search Ad Creatives
+                    // Slide 10: Google Search Ad Creatives — always 3 slots (real data or an
+                    // "XX" placeholder template), matching the Meta creatives slide.
+                    const gsAdsTagsPptx = ['TOP PERFORMER (SEARCH)', 'RUNNER UP (PMAX)', 'RISING STAR (BRAND)'];
                     narrativeCardsSlide(10, 'Creative Search Text Copy & Shopping Card Previews', 'Best Performing Creatives (Google Ads)',
-                        gsAds.map((a, i) => ({ title: `#${i + 1}  ${a.headline}`, body: `${a.description}\n\nClicks: ${(a.clicks || 0).toLocaleString()}   ROAS: ${(a.roas || 0).toFixed(2)}x` })));
+                        [0, 1, 2].map(i => {
+                            const a = gsAds[i];
+                            const headline = a ? a.headline : 'Headline Copy XX | Placeholder';
+                            const description = a ? a.description : 'Placeholder description copy — replace with the real Google Ads text once connected.';
+                            const clicks = a ? (a.clicks || 0).toLocaleString() : 'XX';
+                            const roas = a ? (a.roas || 0).toFixed(2) + 'x' : 'X.Xx';
+                            return { title: `#${i + 1}  ${gsAdsTagsPptx[i]}`, body: `${headline}\n${description}\n\nClicks: ${clicks}   ROAS: ${roas}` };
+                        }));
 
                     // Slide 11: Organic & Non-Paid Traffic
                     metricCardsSlide(11, 'Earned Channels Session Performance', 'Organic & Non-Paid Traffic Channels Breakdown',
@@ -1932,7 +1996,7 @@
                     // Slide 17: Strategy Deep-Dive
                     narrativeCardsSlide(17, 'Strategic Initiative Breakdown', `Strategy Deep-Dive: ${sdd.initiative_name || 'No strategy deep-dive available'}`,
                         [
-                            { title: 'Hypothesis Formulation', body: sdd.hypothesis || '—' },
+                            { title: 'Strategic Approach', body: sdd.hypothesis || '—' },
                             { title: 'Creative Campaign Deployment', body: sdd.creative_deployment || '—' },
                             { title: 'Broadcast Execution', body: sdd.broadcast_execution || '—' },
                             { title: 'Outcome Measurement', body: sdd.outcome || '—' }

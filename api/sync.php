@@ -473,6 +473,45 @@ if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !emp
     usort($utmAgg, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
     $shopifyCampaigns = array_slice($utmAgg, 0, 10);
 
+    // ── BACKFILL THE COHORT LEDGER WITH A TRAILING HISTORICAL WINDOW ──
+    // The ledger otherwise only grows from orders inside each report's own date range, so the
+    // cohort matrix would only reach real multi-month depth after several months of syncing.
+    // Pull an extra ~4 months of order history (customer id + date + value only, via `fields=`
+    // to keep the payload light) purely to seed the ledger, before computing the matrix below —
+    // this doesn't touch $shopifyDaily/day-level revenue, only the ledger table.
+    try {
+        $backfillStart = date('Y-m-01', strtotime($startDate . ' -4 months'));
+        $backfillEnd = date('Y-m-d', strtotime($startDate . ' -1 day'));
+        if (strtotime($backfillStart) < strtotime($backfillEnd)) {
+            $bfUrl = "https://{$sub}.myshopify.com/admin/api/2025-01/orders.json?status=any&fields=id,customer,created_at,subtotal_price,cancelled_at&created_at_min={$backfillStart}T00:00:00%2B05:30&created_at_max={$backfillEnd}T23:59:59%2B05:30&limit=250";
+            while ($bfUrl) {
+                $ch = curl_init($bfUrl);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-Shopify-Access-Token: {$shopifyToken}"]);
+                $bfHeaderText = '';
+                curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, $header) use (&$bfHeaderText) { $bfHeaderText .= $header; return strlen($header); });
+                $bfResp = curl_exec($ch);
+                $bfStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if ($bfStatus !== 200) break;
+
+                $bfData = json_decode($bfResp, true);
+                foreach ($bfData['orders'] ?? [] as $bfOrder) {
+                    if (!empty($bfOrder['cancelled_at']) || empty($bfOrder['customer']['id']) || empty($bfOrder['id'])) continue;
+                    try {
+                        dbRun('INSERT INTO shopify_customer_orders (id, brand_id, shopify_order_id, shopify_customer_id, order_date, order_value) VALUES (?,?,?,?,?,?)
+                               ON DUPLICATE KEY UPDATE order_value = VALUES(order_value)',
+                            [uuid4(), $brand['id'], (string)$bfOrder['id'], (string)$bfOrder['customer']['id'], substr($bfOrder['created_at'], 0, 10), (float)($bfOrder['subtotal_price'] ?? 0)]);
+                    } catch (Throwable $e) {}
+                }
+
+                $bfUrl = null;
+                if (preg_match('/<([^>]+)>;\s*rel="next"/', $bfHeaderText, $bfMatch)) $bfUrl = $bfMatch[1];
+            }
+        }
+    } catch (Throwable $e) {}
+
     // ── REPEAT-PURCHASE COHORT MATRIX (from the persistent ledger, not just this period) ──
     try {
         $firstOrders = dbAll('SELECT shopify_customer_id, MIN(order_date) AS first_date FROM shopify_customer_orders WHERE brand_id=? GROUP BY shopify_customer_id', [$brand['id']]);
@@ -998,7 +1037,16 @@ foreach ($dates as $date) {
     if ($dayRow && !empty($dayRow['channels_json'])) {
         $existingChannels = json_decode($dayRow['channels_json'], true) ?: [];
     }
-    
+
+    // Clear any channel that isn't currently enabled/configured for this brand. Without this,
+    // a channel that was ever synced once (or manually entered, or connected and later
+    // disconnected) keeps showing its last real numbers forever — every subsequent report for
+    // this brand would silently display stale spend/ROAS for an integration that's now off,
+    // with no way to tell from the deck that it's not actually connected.
+    if (empty($int['shopify_enabled']) || empty($int['shopify_subdomain'])) unset($existingChannels['shopify']);
+    if (empty($int['meta_ad_account_ids'])) unset($existingChannels['meta']);
+    if (empty($int['google_ads_enabled']) || empty($int['google_ads_customer_id'])) unset($existingChannels['google']);
+
     // Shopify storefront values
     $shopifySales = 0.0;
     $shopifyOrders = 0;
