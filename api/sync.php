@@ -424,30 +424,38 @@ if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !emp
             } catch (Throwable $e) {}
         }
 
-        // UTM campaign mapping (referral, search)
+        // UTM campaign mapping — classified straight into report-ready channel buckets
+        // (Meta/Google split into Paid vs Organic, WhatsApp broadcast traffic, and a catch-all
+        // "Others" bucket for Direct/email/everything-low-traffic) instead of one row per raw
+        // source+campaign pair, since the attribution slide reports channel-level totals.
         $landing = $order['landing_site'] ?? '';
         $referring = $order['referring_site'] ?? '';
-        
-        $utmSource = 'Direct';
-        $utmCampaign = 'Direct / Organic';
-        
-        if (preg_match('/utm_source=([^&]+)/', $landing, $m)) $utmSource = urldecode($m[1]);
-        if (preg_match('/utm_campaign=([^&]+)/', $landing, $m)) $utmCampaign = urldecode($m[1]);
-        
-        if ($utmSource === 'Direct' && !empty($referring)) {
+
+        $rawSource = '';
+        $rawCampaign = '';
+        if (preg_match('/utm_source=([^&]+)/', $landing, $m)) $rawSource = strtolower(urldecode($m[1]));
+        if (preg_match('/utm_campaign=([^&]+)/', $landing, $m)) $rawCampaign = strtolower(urldecode($m[1]));
+
+        $channel = 'Others';
+        if ($rawSource !== '') {
+            if (preg_match('/zingbot|whatsapp/', $rawSource)) {
+                $channel = 'WhatsApp';
+            } elseif (preg_match('/facebook|instagram|^fb$|^ig$|meta/', $rawSource)) {
+                $channel = 'Meta Paid';
+            } elseif (preg_match('/google/', $rawSource)) {
+                $channel = strpos($rawCampaign, 'organic') !== false ? 'Google Organic' : 'Google Paid';
+            }
+        } elseif (!empty($referring)) {
             if (preg_match('/instagram\.com|facebook\.com/i', $referring)) {
-                $utmSource = 'Social Organic';
-                $utmCampaign = 'Referral';
-            } else if (preg_match('/google\./i', $referring)) {
-                $utmSource = 'Google Organic';
-                $utmCampaign = 'Search';
+                $channel = 'Meta Organic';
+            } elseif (preg_match('/google\./i', $referring)) {
+                $channel = 'Google Organic';
             }
         }
-        
-        $key = $utmSource . ' / ' . $utmCampaign;
-        if (!isset($utmAgg[$key])) $utmAgg[$key] = ['source' => $utmSource, 'campaign' => $utmCampaign, 'orders' => 0, 'revenue' => 0];
-        $utmAgg[$key]['orders'] += 1;
-        $utmAgg[$key]['revenue'] += $subtotal;
+
+        if (!isset($utmAgg[$channel])) $utmAgg[$channel] = ['channel' => $channel, 'orders' => 0, 'revenue' => 0];
+        $utmAgg[$channel]['orders'] += 1;
+        $utmAgg[$channel]['revenue'] += $subtotal;
     }
     
     // Sort and slice top products, then attach each product's primary shipping region
@@ -471,7 +479,7 @@ if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !emp
     $shopifyLocations = array_slice($cityAgg, 0, 8);
 
     usort($utmAgg, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
-    $shopifyCampaigns = array_slice($utmAgg, 0, 10);
+    $shopifyCampaigns = $utmAgg; // at most 6 channel buckets now, nothing to slice
 
     // ── BACKFILL THE COHORT LEDGER WITH A TRAILING HISTORICAL WINDOW ──
     // The ledger otherwise only grows from orders inside each report's own date range, so the

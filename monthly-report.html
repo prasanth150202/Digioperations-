@@ -813,7 +813,7 @@
             <div style="flex:1; overflow:auto">
                 <table class="slide-table" id="table-attribution">
                     <thead>
-                        <tr><th>Traffic Source</th><th>Campaign</th><th>Orders</th><th>Gross Sales</th><th>Revenue Share</th></tr>
+                        <tr><th>Channel</th><th>Orders</th><th>Gross Sales</th><th>Revenue Share</th></tr>
                     </thead>
                     <tbody></tbody>
                 </table>
@@ -1401,22 +1401,22 @@
             // just a mixed bag of whatever data happened to be available.
             const attTbody = document.querySelector('#table-attribution tbody');
             const ga4Chs = data.ga4_channels || {};
+            // Pre-bucketed into channels server-side (sync.php): Meta Organic/Paid, Google
+            // Organic/Paid, WhatsApp, and an Others catch-all — not raw per-campaign rows.
             const utmRows = data.shopify_campaigns || [];
-            const PAID_HINTS = ['facebook', 'instagram', 'meta', 'google ads', 'paid', 'cpc', 'ppc', 'advantage'];
-            const isPaidSource = (source) => PAID_HINTS.some(h => (source || '').toLowerCase().includes(h));
+            const isPaidChannel = (channel) => channel === 'Meta Paid' || channel === 'Google Paid';
             const attTotalRevenue = utmRows.reduce((s, r) => s + (r.revenue || 0), 0);
             if (utmRows.length === 0) {
-                attTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gray)">No Shopify order attribution (UTM/referrer) data found for this period.</td></tr>`;
+                attTbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gray)">No Shopify order attribution (UTM/referrer) data found for this period.</td></tr>`;
                 document.getElementById('attribution-split-callout').textContent = 'No attribution data available for this period.';
             } else {
                 attTbody.innerHTML = utmRows.map(r => `<tr>
-                    <td style="font-weight:700">${r.source}</td>
-                    <td>${r.campaign}</td>
+                    <td style="font-weight:700">${r.channel}</td>
                     <td>${r.orders}</td>
                     <td>${curr(r.revenue)}</td>
                     <td style="font-weight:700;color:var(--green)">${attTotalRevenue > 0 ? (r.revenue / attTotalRevenue * 100).toFixed(1) : '0.0'}%</td>
                 </tr>`).join('');
-                const paidRevenue = utmRows.filter(r => isPaidSource(r.source)).reduce((s, r) => s + (r.revenue || 0), 0);
+                const paidRevenue = utmRows.filter(r => isPaidChannel(r.channel)).reduce((s, r) => s + (r.revenue || 0), 0);
                 const nonPaidRevenue = attTotalRevenue - paidRevenue;
                 document.getElementById('attribution-split-callout').textContent =
                     `Paid Acquisition: ${attTotalRevenue > 0 ? (paidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(paidRevenue)}) | Non-Paid / Owned: ${attTotalRevenue > 0 ? (nonPaidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(nonPaidRevenue)})`;
@@ -2132,13 +2132,14 @@
                             calloutText: products.length ? `${products[0].primary_region || 'Unknown region'} is the leading shipping destination for your top product (${products[0].name}), representing ${products[0].revenue_share || 0}% of top-product revenue.` : null
                         });
 
-                    // Slide 6: Attribution Map (real Shopify UTM attribution — see the matching
-                    // note in bindReportData's slide 6 section)
-                    const paidRevenue = utmRows.filter(r => isPaidSource(r.source)).reduce((s, r) => s + (r.revenue || 0), 0);
+                    // Slide 6: Attribution Map (real Shopify UTM attribution, pre-bucketed into
+                    // channels server-side — see the matching note in bindReportData's slide 6
+                    // section)
+                    const paidRevenue = utmRows.filter(r => isPaidChannel(r.channel)).reduce((s, r) => s + (r.revenue || 0), 0);
                     const nonPaidRevenue = attTotalRevenue - paidRevenue;
                     tableSlide(6, 'Shopify Campaign Attribution Metrics', 'Attribution Map: Revenue Origins & Channels',
-                        ['Traffic Source', 'Campaign', 'Orders', 'Gross Sales', 'Revenue Share'],
-                        utmRows.map(r => [r.source, r.campaign, r.orders, curr(r.revenue), (attTotalRevenue > 0 ? (r.revenue / attTotalRevenue * 100).toFixed(1) : '0.0') + '%']),
+                        ['Channel', 'Orders', 'Gross Sales', 'Revenue Share'],
+                        utmRows.map(r => [r.channel, r.orders, curr(r.revenue), (attTotalRevenue > 0 ? (r.revenue / attTotalRevenue * 100).toFixed(1) : '0.0') + '%']),
                         {
                             emptyMsg: 'No Shopify order attribution (UTM/referrer) data found for this period.',
                             calloutText: utmRows.length ? `Paid Acquisition: ${attTotalRevenue > 0 ? (paidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(paidRevenue)}) | Non-Paid / Owned: ${attTotalRevenue > 0 ? (nonPaidRevenue / attTotalRevenue * 100).toFixed(1) : '0.0'}% Revenue Share (${curr(nonPaidRevenue)})` : null
