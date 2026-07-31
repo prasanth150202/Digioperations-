@@ -497,7 +497,8 @@
         .ad-mock-media {
             border-radius: 8px;
             background: #eef2f6;
-            height: 110px;
+            flex: 1;
+            min-height: 110px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1799,6 +1800,79 @@
                         return s;
                     }
 
+                    // A single social-ad mockup card, matching the reference deck exactly: ONE
+                    // solid-bordered card contains everything — rank tag, filename, avatar/brand
+                    // row, optional ad copy, product/CTA row, a divider, and CTR/CPA stat rows.
+                    // The dashed border is reserved for the media pane alone — that's the only
+                    // placeholder; every other element here is fixed template chrome.
+                    // c: { rankLabel, name, brandInitials, brandName, body, cta, ctr, cpa, placeholder }
+                    function creativeCard(s, x, y, w, h, c) {
+                        accentBox(s, x, y, w, h, CLR.border, 'plain');
+                        const pad = 0.22, ix = x + pad, iw = w - pad * 2;
+                        let cy = y + pad;
+
+                        s.addText(c.rankLabel, { x: ix, y: cy, w: iw, h: 0.2, fontSize: 9.5, bold: true, color: CLR.primary, fontFace: FONT });
+                        cy += 0.24;
+
+                        if (c.placeholder) {
+                            s.addText(c.name, { x: ix, y: cy, w: iw, h: (y + h - pad) - cy, align: 'center', valign: 'middle', fontSize: 10.5, italic: true, color: CLR.mid, fontFace: FONT });
+                            return;
+                        }
+
+                        s.addText(c.name, { x: ix, y: cy, w: iw, h: 0.4, fontSize: 12.5, bold: true, color: CLR.dark, fontFace: FONT, valign: 'top' });
+                        cy += 0.46;
+
+                        const avatarSize = 0.32;
+                        s.addShape('ellipse', { x: ix, y: cy, w: avatarSize, h: avatarSize, fill: { color: CLR.dark } });
+                        s.addText(c.brandInitials, { x: ix, y: cy, w: avatarSize, h: avatarSize, align: 'center', valign: 'middle', fontSize: 9, bold: true, color: CLR.white, fontFace: FONT });
+                        s.addText(c.brandName, { x: ix + avatarSize + 0.12, y: cy - 0.02, w: iw - avatarSize - 0.12, h: 0.22, fontSize: 10, bold: true, color: CLR.dark, fontFace: FONT });
+                        s.addText('Sponsored', { x: ix + avatarSize + 0.12, y: cy + 0.16, w: iw - avatarSize - 0.12, h: 0.18, fontSize: 8, color: CLR.mid, fontFace: FONT });
+                        cy += avatarSize + 0.16;
+
+                        if (c.body) {
+                            s.addText(c.body, { x: ix, y: cy, w: iw, h: 0.5, fontSize: 9, color: CLR.mid, fontFace: FONT, valign: 'top', lineSpacingMultiple: 1.25 });
+                            cy += 0.56;
+                        }
+
+                        // Build the footer (stats + divider + product/CTA row) bottom-up so the
+                        // media placeholder above it always inherits whatever room is left.
+                        const boxBottom = y + h - pad;
+                        const statH = 0.24;
+                        let by = boxBottom - statH;
+                        [['CPA', c.cpa], ['CTR', c.ctr]].forEach(([label, val]) => {
+                            s.addText(label, { x: ix, y: by, w: iw * 0.5, h: statH, fontSize: 9.5, color: CLR.mid, fontFace: FONT, valign: 'middle' });
+                            s.addText(String(val), { x: ix + iw * 0.5, y: by, w: iw * 0.5, h: statH, align: 'right', fontSize: 10.5, bold: true, color: CLR.dark, fontFace: FONT, valign: 'middle' });
+                            by -= statH;
+                        });
+                        s.addShape('line', { x: ix, y: by + 0.08, w: iw, h: 0, line: { color: CLR.border, width: 0.75 } });
+
+                        const ctaH = 0.32, ctaW = 1.05;
+                        const ctaY = by - 0.06 - ctaH;
+                        s.addShape('roundRect', { x: ix + iw - ctaW, y: ctaY, w: ctaW, h: ctaH, rectRadius: 0.06, fill: { color: CLR.primary } });
+                        s.addText(c.cta || 'SHOP NOW', { x: ix + iw - ctaW, y: ctaY, w: ctaW, h: ctaH, align: 'center', valign: 'middle', fontSize: 8.5, bold: true, color: CLR.white, fontFace: FONT });
+                        s.addText(c.name, { x: ix, y: ctaY, w: iw - ctaW - 0.15, h: ctaH, valign: 'middle', fontSize: 9.5, bold: true, color: CLR.dark, fontFace: FONT });
+
+                        // The one placeholder element in the whole card — everything above and
+                        // below it is fixed template, only this pane is meant to be filled in.
+                        const mediaH = ctaY - 0.15 - cy;
+                        if (mediaH > 0.3) {
+                            s.addShape('rect', { x: ix, y: cy, w: iw, h: mediaH, fill: { color: CLR.bg }, line: { color: CLR.border, width: 1, dashType: 'dash' } });
+                            s.addText('[ Creative Preview ]\nPaste the ad snapshot here', { x: ix, y: cy, w: iw, h: mediaH, align: 'center', valign: 'middle', fontSize: 9.5, italic: true, color: CLR.mid, fontFace: FONT, lineSpacingMultiple: 1.3 });
+                        }
+                    }
+
+                    // cards: [{rankLabel, name, body, cta, ctr, cpa, placeholder}] — always laid
+                    // out in as many equal-width columns as there are cards (fixed 3-across for
+                    // creative slots, unlike the generic narrativeCardsSlide 2/3-col heuristic).
+                    function creativeCardsSlide(pageNum, group, title, cards) {
+                        const s = baseSlide(pageNum, group, title);
+                        const n = cards.length, gap = 0.3, startX = 0.4, startY = 1.2, cardH = 5.55;
+                        const cardW = (12.53 - gap * (n - 1)) / n;
+                        const brandInitials = initialsOf(report.brand_name), brandName = report.brand_name || 'Brand';
+                        cards.forEach((c, i) => creativeCard(s, startX + i * (cardW + gap), startY, cardW, cardH, Object.assign({ brandInitials, brandName }, c)));
+                        return s;
+                    }
+
                     const stripHtmlPptx = (html) => (html || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
 
                     // Slide 1: Cover
@@ -1852,25 +1926,47 @@
                             { label: 'Checkout', count: checkout, pct: pctOf(checkout), drop: dropFrom(checkout, cart), dropFromLabel: 'cart' },
                             { label: 'Purchase', count: purchase, pct: pctOf(purchase), drop: dropFrom(purchase, checkout), dropFromLabel: 'checkout' }
                         ];
-                        diagnosticsCard(s4, 0.4, 1.2, 5.6, 5.5, 'FUNNEL STAGE DIAGNOSTICS', [
+                        diagnosticsCard(s4, 0.4, 1.2, 5.6, 2.7, 'FUNNEL STAGE DIAGNOSTICS', [
                             { text: `Session-to-Cart (${pctOf(cart).toFixed(1)}% CVR): `, options: { bold: true, color: CLR.dark, fontSize: 10 } },
                             { text: 'Healthy benchmark for catalog engagement.\n\n', options: { color: CLR.mid, fontSize: 10, breakLine: true } },
-                            { text: `Cart-to-Checkout (${dropFrom(checkout, cart).toFixed(1)}% Drop-off): `, options: { bold: true, color: CLR.dark, fontSize: 10 } },
+                            { text: `Cart-to-Checkout (${dropFrom(checkout, cart).toFixed(1)}% Drop-off): `, options: { bold: true, color: CLR.orange, fontSize: 10 } },
                             { text: `${(cart - checkout).toLocaleString()} users added to cart but did not check out.\n\n`, options: { color: CLR.mid, fontSize: 10, breakLine: true } },
-                            { text: `Checkout-to-Purchase (${dropFrom(purchase, checkout).toFixed(1)}% Drop-off): `, options: { bold: true, color: CLR.dark, fontSize: 10 } },
+                            { text: `Checkout-to-Purchase (${dropFrom(purchase, checkout).toFixed(1)}% Drop-off): `, options: { bold: true, color: CLR.red, fontSize: 10 } },
                             { text: `${(checkout - purchase).toLocaleString()} abandoned checkouts remain a recovery opportunity.`, options: { color: CLR.mid, fontSize: 10, breakLine: true } }
                         ]);
+
+                        // Continuous, seamlessly-tapering funnel: each band is a custom quad whose
+                        // top width equals the previous band's bottom width, so there are no gaps
+                        // or misaligned edges between stages (unlike the stock 'trapezoid' autoshape,
+                        // which tapers each row in isolation and can't be chained to its neighbors).
                         const stageColors = [CLR.dark, CLR.primary, CLR.cyan, CLR.green];
-                        const fx = 6.3, fw = 3.1, fy = 1.5, rowH = 1.15, rowGap = 0.15;
-                        const labelX = fx + fw + 0.25, labelW = 12.93 - labelX;
+                        const contX = 6.3, contY = 1.2, contW = 6.63, contH = 5.1, pad = 0.35;
+                        s4.addShape('rect', { x: contX, y: contY, w: contW, h: contH, fill: { color: CLR.white }, line: { color: CLR.border, width: 1, dashType: 'dash' } });
+                        const fx = contX + pad, fy = contY + pad, fw = 1.7, rowH = (contH - pad * 2) / 4;
+                        const labelX = fx + fw + 0.35, labelW = (contX + contW - pad) - labelX;
+                        const taper = [1, 0.8, 0.62, 0.46, 0.32];
+                        const boundaryW = taper.map(t => fw * t);
                         stages.forEach((st, i) => {
-                            const y = fy + i * (rowH + rowGap);
-                            const widthFactor = 1 - i * 0.15;
-                            const segW = fw * widthFactor, segX = fx + (fw - segW) / 2, segH = 0.62;
-                            s4.addShape('trapezoid', { x: segX, y, w: segW, h: segH, fill: { color: stageColors[i] } });
-                            s4.addText(String(i + 1), { x: segX, y, w: segW, h: segH, align: 'center', valign: 'middle', fontSize: 14, bold: true, color: CLR.white, fontFace: FONT });
-                            s4.addText(`${st.label}: ${st.count.toLocaleString()} (${st.pct.toFixed(1)}%)`, { x: labelX, y: y - 0.02, w: labelW, h: 0.32, fontSize: 11, bold: true, color: CLR.dark, fontFace: FONT });
-                            if (st.drop !== null) s4.addText(`${st.drop.toFixed(0)}% drop-off from ${st.dropFromLabel}`, { x: labelX, y: y + 0.28, w: labelW, h: 0.3, fontSize: 9, bold: true, color: CLR.red, fontFace: FONT });
+                            const y = fy + i * rowH;
+                            const topW = boundaryW[i], botW = boundaryW[i + 1];
+                            s4.addShape('custGeom', {
+                                x: fx, y, w: fw, h: rowH, fill: { color: stageColors[i] },
+                                points: [
+                                    { x: (fw - topW) / 2, y: 0, moveTo: true },
+                                    { x: (fw + topW) / 2, y: 0 },
+                                    { x: (fw + botW) / 2, y: rowH },
+                                    { x: (fw - botW) / 2, y: rowH },
+                                    { close: true }
+                                ]
+                            });
+                            s4.addText(String(i + 1), { x: fx, y, w: fw, h: rowH, align: 'center', valign: 'middle', fontSize: 14, bold: true, color: CLR.white, fontFace: FONT });
+
+                            const midRightX = fx + (fw + (topW + botW) / 2) / 2;
+                            s4.addShape('line', { x: midRightX, y: y + rowH / 2, w: labelX - 0.08 - midRightX, h: 0, line: { color: CLR.border, width: 1, dashType: 'dash' } });
+
+                            const labelY = y + rowH / 2 - 0.28;
+                            s4.addText(`${st.label}: ${st.count.toLocaleString()} (${st.pct.toFixed(1)}%)`, { x: labelX, y: labelY, w: labelW, h: 0.32, fontSize: 11, bold: true, color: CLR.dark, fontFace: FONT });
+                            if (st.drop !== null) s4.addText(`${st.drop.toFixed(0)}% drop-off from ${st.dropFromLabel}`, { x: labelX, y: labelY + 0.3, w: labelW, h: 0.3, fontSize: 9, bold: true, color: CLR.red, fontFace: FONT });
                         });
                     } else {
                         diagnosticsCard(s4, 0.4, 1.2, 12.53, 2.0, 'FUNNEL STAGE DIAGNOSTICS', [
@@ -1916,11 +2012,12 @@
 
                     // Slide 8: Meta Creatives — always 3 slots, matching the HTML deck
                     const rankTagsPptx = ['TOP PERFORMER', 'RUNNER UP', 'RISING STAR'];
-                    narrativeCardsSlide(8, 'Creative Performance Audit & Visual Previews', 'Best Performing Creatives (Meta Ads)',
+                    creativeCardsSlide(8, 'Creative Performance Audit & Visual Previews', 'Best Performing Creatives (Meta Ads)',
                         [0, 1, 2].map(i => {
                             const cr = crList[i];
-                            if (!cr) return { title: `#${i + 1}  ${rankTagsPptx[i]}`, body: 'No additional creative had purchase data this period.' };
-                            return { title: `#${i + 1}  ${cr.name}`, body: `${stripHtmlPptx(cr.body || '').slice(0, 140)}\n\nRevenue: ${curr(cr.revenue)}   CTR: ${cr.ctr}   CPA: ${cr.cpa}` };
+                            const rankLabel = `#${i + 1} ${rankTagsPptx[i]}`;
+                            if (!cr) return { rankLabel, name: 'No additional creative had purchase data this period.', placeholder: true };
+                            return { rankLabel, name: cr.name, body: stripHtmlPptx(cr.body || '').slice(0, 130), cta: cr.cta, ctr: cr.ctr, cpa: cr.cpa };
                         }));
 
                     // Slide 9: Google Campaigns Deep-Dive
