@@ -1018,7 +1018,7 @@
             </div>
             <div style="flex:1; overflow:auto">
                 <table class="slide-table" id="table-cohort">
-                    <thead><tr><th>Acquisition Cohort</th><th>Cohort Size</th><th>Month 0</th><th>Month 1</th><th>Month 2</th><th>Month 3</th></tr></thead>
+                    <thead><tr><th>Acquisition Cohort</th><th>Cohort Size</th><th>Month 0</th><th>Month 1</th><th>Month 2</th><th>Month 3</th><th>Month 4</th><th>Month 5</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -1634,10 +1634,10 @@
             const cohortTbody = document.querySelector('#table-cohort tbody');
             const cohortMatrix = data.cohort_matrix || [];
             if (cohortMatrix.length === 0) {
-                cohortTbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--gray)">No cohort history yet — this builds up automatically as monthly syncs accumulate order history over time.</td></tr>`;
+                cohortTbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--gray)">No cohort history yet — this builds up automatically as monthly syncs accumulate order history over time.</td></tr>`;
             } else {
                 cohortTbody.innerHTML = cohortMatrix.map(row => {
-                    const cells = [0, 1, 2, 3].map(i => {
+                    const cells = [0, 1, 2, 3, 4, 5].map(i => {
                         const v = row.months ? row.months[i] : null;
                         return `<td style="font-weight:700">${v === null || v === undefined ? '—' : v + '%'}</td>`;
                     }).join('');
@@ -2344,8 +2344,8 @@
                         { text: cohortMatrix.length ? 'See the retention matrix for month-over-month repeat-purchase decay by acquisition cohort.' : 'No cohort history yet — this builds up automatically as monthly syncs accumulate order history over time.', options: { color: CLR.mid, fontSize: 10, breakLine: true } }
                     ]);
                     if (cohortMatrix.length) {
-                        renderTable(s14, 6.3, 1.2, 6.63, ['Cohort', 'Size', 'Mo 0', 'Mo 1', 'Mo 2', 'Mo 3'],
-                            cohortMatrix.map(row => [row.cohort_month, row.cohort_size.toLocaleString(), ...[0, 1, 2, 3].map(i => { const v = row.months ? row.months[i] : null; return (v === null || v === undefined) ? '—' : v + '%'; })]));
+                        renderTable(s14, 6.3, 1.2, 6.63, ['Cohort', 'Size', 'Mo 0', 'Mo 1', 'Mo 2', 'Mo 3', 'Mo 4', 'Mo 5'],
+                            cohortMatrix.map(row => [row.cohort_month, row.cohort_size.toLocaleString(), ...[0, 1, 2, 3, 4, 5].map(i => { const v = row.months ? row.months[i] : null; return (v === null || v === undefined) ? '—' : v + '%'; })]));
                     }
 
                     // Slide 15: Retention & Broadcast

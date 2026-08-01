@@ -484,11 +484,12 @@ if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !emp
     // ── BACKFILL THE COHORT LEDGER WITH A TRAILING HISTORICAL WINDOW ──
     // The ledger otherwise only grows from orders inside each report's own date range, so the
     // cohort matrix would only reach real multi-month depth after several months of syncing.
-    // Pull an extra ~4 months of order history (customer id + date + value only, via `fields=`
+    // Pull an extra ~6 months of order history (customer id + date + value only, via `fields=`
     // to keep the payload light) purely to seed the ledger, before computing the matrix below —
-    // this doesn't touch $shopifyDaily/day-level revenue, only the ledger table.
+    // this doesn't touch $shopifyDaily/day-level revenue, only the ledger table. Matches the
+    // 6-month cohort depth (rows and Month-0..5 columns) computed below.
     try {
-        $backfillStart = date('Y-m-01', strtotime($startDate . ' -4 months'));
+        $backfillStart = date('Y-m-01', strtotime($startDate . ' -6 months'));
         $backfillEnd = date('Y-m-d', strtotime($startDate . ' -1 day'));
         if (strtotime($backfillStart) < strtotime($backfillEnd)) {
             $bfUrl = "https://{$sub}.myshopify.com/admin/api/2025-01/orders.json?status=any&fields=id,customer,created_at,subtotal_price,cancelled_at&created_at_min={$backfillStart}T00:00:00%2B05:30&created_at_max={$backfillEnd}T23:59:59%2B05:30&limit=250";
@@ -540,13 +541,13 @@ if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !emp
         }
         ksort($cohorts);
         $reportMonth = substr($endDate, 0, 7);
-        $recentCohortMonths = array_slice(array_keys($cohorts), -4);
+        $recentCohortMonths = array_slice(array_keys($cohorts), -6);
 
         foreach ($recentCohortMonths as $cohortMonth) {
             $custIds = $cohorts[$cohortMonth];
             $cohortSize = count($custIds);
             $row = ['cohort_month' => $cohortMonth, 'cohort_size' => $cohortSize, 'months' => []];
-            for ($offset = 0; $offset <= 3; $offset++) {
+            for ($offset = 0; $offset <= 5; $offset++) {
                 $targetMonth = date('Y-m', strtotime($cohortMonth . '-01 +' . $offset . ' months'));
                 if ($targetMonth > $reportMonth) {
                     $row['months'][$offset] = null; // hasn't happened yet, don't fabricate a value
