@@ -1054,7 +1054,7 @@
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="grid-3" id="initiatives-grid" style="flex:1; align-content:start"></div>
+            <div class="grid-3" id="initiatives-grid" style="flex:1; align-content:center; row-gap:28px"></div>
             <div class="slide-footer">
                 <div>AI-Drafted from Reported Metrics</div>
                 <div>Slide 16 of 21</div>
@@ -1071,7 +1071,7 @@
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
             <div class="narrative-box" id="strategy-deepdive-title" style="margin-bottom:14px; font-weight:800; font-size:13px; color:var(--text-dark); flex:none"></div>
-            <div class="grid-2" id="strategy-deepdive-steps" style="flex:1; align-content:start"></div>
+            <div class="grid-2" id="strategy-deepdive-steps" style="flex:1; align-content:center; row-gap:32px"></div>
             <div class="slide-footer">
                 <div>AI-Drafted from Reported Metrics</div>
                 <div>Slide 17 of 21</div>
@@ -1087,7 +1087,7 @@
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="grid-2" id="inferences-grid" style="flex:1; align-content:start"></div>
+            <div class="grid-2" id="inferences-grid" style="flex:1; align-content:center; row-gap:32px"></div>
             <div class="slide-footer">
                 <div>AI-Generated Insights</div>
                 <div>Slide 18 of 21</div>
@@ -1103,7 +1103,7 @@
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="grid-2" id="recommendations-grid" style="flex:1; align-content:start"></div>
+            <div class="grid-2" id="recommendations-grid" style="flex:1; align-content:center; row-gap:32px"></div>
             <div class="slide-footer">
                 <div>AI-Generated Recommendations</div>
                 <div>Slide 19 of 21</div>
@@ -1568,16 +1568,34 @@
             }).join('');
 
             // ── SLIDE 11: ORGANIC & NON-PAID TRAFFIC (3 cards) ──
+            // .media-card (icon + justify-content:space-between), same treatment as the
+            // Retention & Broadcast cards — .metric-card's justify-content:center left a big
+            // gap above AND below the three stat lines once stretched to fill the grid row.
             const organicBox = document.getElementById('organic-cards');
-            const organicLabels = ['SEO / Search', 'Direct', 'Social Organic'];
-            organicBox.innerHTML = organicLabels.map(lbl => {
+            const organicChannels = [
+                ['SEO / Search', '🔍', '#dbeafe'],
+                ['Direct', '🔗', '#ede9fe'],
+                ['Social Organic', '📱', '#d1fae5']
+            ];
+            organicBox.innerHTML = organicChannels.map(([lbl, icon, bg]) => {
                 const m = ga4Chs[lbl] || { sessions: 0, convRate: '0.00', revenue: 0 };
-                return `<div class="metric-card" style="text-align:left">
-                    <div class="metric-label">${lbl}</div>
-                    <div style="font-size:11px;color:var(--gray);margin-top:8px">Sessions</div>
-                    <div style="font-weight:800;font-size:16px;color:var(--text-dark)">${(m.sessions || 0).toLocaleString()}</div>
-                    <div style="font-size:11px;color:var(--gray);margin-top:6px">Conv. Rate / Revenue</div>
-                    <div style="font-weight:700;font-size:12px;color:var(--text-dark)">${m.convRate}% &nbsp;/&nbsp; ${curr(m.revenue)}</div>
+                return `<div class="media-card">
+                    <div>
+                        <div class="media-card-icon" style="background:${bg}">${icon}</div>
+                        <div class="media-card-title">${lbl}</div>
+                    </div>
+                    <div>
+                        <div class="media-card-stat-label">Sessions</div>
+                        <div class="media-card-stat-value">${(m.sessions || 0).toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <div class="media-card-stat-label">Conv. Rate</div>
+                        <div class="media-card-stat-value">${m.convRate}%</div>
+                    </div>
+                    <div>
+                        <div class="media-card-stat-label">Revenue</div>
+                        <div class="media-card-stat-value" style="color:var(--green)">${curr(m.revenue)}</div>
+                    </div>
                 </div>`;
             }).join('');
 
@@ -1695,11 +1713,11 @@
             initiativesBox.innerHTML = initiatives.length === 0
                 ? `<div style="grid-column:span 3;text-align:center;color:var(--gray);padding:40px 0">No initiatives generated for this period.</div>`
                 : initiatives.map(it => `
-                    <div class="narrative-box" style="display:flex;flex-direction:column;gap:8px">
-                        <div style="font-weight:800;font-size:13px;color:var(--text-dark)">${it.name || 'Initiative'}</div>
-                        <div><span style="color:var(--blue);font-weight:700;font-size:10.5px">GOAL:</span> ${it.goal || '—'}</div>
-                        <div><span style="color:var(--purple);font-weight:700;font-size:10.5px">EXECUTION:</span> ${it.execution || '—'}</div>
-                        <div><span style="color:var(--green);font-weight:700;font-size:10.5px">RESULT:</span> ${it.result || '—'}</div>
+                    <div class="narrative-box" style="display:flex;flex-direction:column;gap:12px;padding:28px 24px;font-size:12px;line-height:1.6">
+                        <div style="font-weight:800;font-size:14.5px;color:var(--text-dark)">${it.name || 'Initiative'}</div>
+                        <div><span style="color:var(--blue);font-weight:700;font-size:11px">GOAL:</span> ${it.goal || '—'}</div>
+                        <div><span style="color:var(--purple);font-weight:700;font-size:11px">EXECUTION:</span> ${it.execution || '—'}</div>
+                        <div><span style="color:var(--green);font-weight:700;font-size:11px">RESULT:</span> ${it.result || '—'}</div>
                     </div>
                 `).join('');
 
@@ -1713,9 +1731,9 @@
                 ['4', 'Outcome Measurement', sdd.outcome]
             ];
             document.getElementById('strategy-deepdive-steps').innerHTML = sddSteps.map(([n, title, detail]) => `
-                <div class="narrative-box" style="display:flex;gap:12px">
-                    <div style="width:26px;height:26px;border-radius:7px;background:var(--blue-gradient);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0">${n}</div>
-                    <div><div style="font-weight:800;font-size:12.5px;color:var(--text-dark);margin-bottom:4px">${title}</div><div style="color:var(--text-body)">${detail || '—'}</div></div>
+                <div class="narrative-box" style="display:flex;align-items:center;gap:16px;padding:28px 24px">
+                    <div style="width:36px;height:36px;border-radius:9px;background:var(--blue-gradient);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;flex-shrink:0;box-shadow:0 2px 5px rgba(59,130,246,0.35)">${n}</div>
+                    <div><div style="font-weight:800;font-size:13.5px;color:var(--text-dark);margin-bottom:5px">${title}</div><div style="color:var(--text-body);font-size:12px;line-height:1.6">${detail || '—'}</div></div>
                 </div>
             `).join('');
 
@@ -1725,9 +1743,9 @@
             inferencesBox.innerHTML = inferences.length === 0
                 ? `<div style="grid-column:span 2;text-align:center;color:var(--gray);padding:40px 0">No inferences generated for this period.</div>`
                 : inferences.map((inf, i) => `
-                    <div class="narrative-box" style="display:flex;gap:12px">
-                        <div style="width:26px;height:26px;border-radius:7px;background:var(--blue-gradient);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0">${i + 1}</div>
-                        <div><div style="font-weight:800;font-size:12.5px;color:var(--text-dark);margin-bottom:4px">${inf.title || ''}</div><div style="color:var(--text-body)">${inf.detail || ''}</div></div>
+                    <div class="narrative-box" style="display:flex;align-items:center;gap:16px;padding:28px 24px">
+                        <div style="width:36px;height:36px;border-radius:9px;background:var(--blue-gradient);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;flex-shrink:0;box-shadow:0 2px 5px rgba(59,130,246,0.35)">${i + 1}</div>
+                        <div><div style="font-weight:800;font-size:13.5px;color:var(--text-dark);margin-bottom:5px">${inf.title || ''}</div><div style="color:var(--text-body);font-size:12px;line-height:1.6">${inf.detail || ''}</div></div>
                     </div>
                 `).join('');
 
@@ -1737,9 +1755,9 @@
             recommendationsBox.innerHTML = recommendations.length === 0
                 ? `<div style="grid-column:span 2;text-align:center;color:var(--gray);padding:40px 0">No recommendations generated for this period.</div>`
                 : recommendations.map((rec, i) => `
-                    <div class="narrative-box" style="display:flex;gap:12px">
-                        <div style="width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0">${i + 1}</div>
-                        <div><div style="font-weight:800;font-size:12.5px;color:var(--text-dark);margin-bottom:4px">${rec.title || ''}</div><div style="color:var(--text-body)">${rec.detail || ''}</div></div>
+                    <div class="narrative-box" style="display:flex;align-items:center;gap:16px;padding:28px 24px">
+                        <div style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;flex-shrink:0;box-shadow:0 2px 5px rgba(16,185,129,0.35)">${i + 1}</div>
+                        <div><div style="font-weight:800;font-size:13.5px;color:var(--text-dark);margin-bottom:5px">${rec.title || ''}</div><div style="color:var(--text-body);font-size:12px;line-height:1.6">${rec.detail || ''}</div></div>
                     </div>
                 `).join('');
 
