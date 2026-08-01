@@ -24,6 +24,11 @@
             --gray: #64748b;
             --font: 'Plus Jakarta Sans', sans-serif;
             --font-hd: 'Outfit', sans-serif;
+            /* Shared "lifted card" depth — a soft two-layer shadow (tight+dark near the edge,
+               wide+faint further out) reused on every card so the deck reads as one system
+               rather than flat bordered boxes. */
+            --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 24px -10px rgba(15, 23, 42, 0.12);
+            --card-shadow-hover: 0 4px 8px rgba(15, 23, 42, 0.06), 0 16px 32px -12px rgba(15, 23, 42, 0.16);
         }
 
         * {
@@ -213,12 +218,14 @@
             justify-content: center;
             position: relative;
             overflow: hidden;
-            transition: transform 0.2s;
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .metric-card:hover {
             transform: translateY(-2px);
             border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: var(--card-shadow-hover);
         }
 
         /* Owned-media summary cards (Email/WhatsApp/Push) — a dedicated variant rather than
@@ -235,6 +242,7 @@
             flex-direction: column;
             justify-content: space-between;
             text-align: left;
+            box-shadow: var(--card-shadow);
         }
         .media-card-icon {
             width: 46px;
@@ -245,6 +253,7 @@
             justify-content: center;
             font-size: 21px;
             margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08);
         }
         .media-card-title {
             font-weight: 800;
@@ -384,6 +393,7 @@
             font-size: 11.5px;
             color: var(--text-body);
             line-height: 1.6;
+            box-shadow: var(--card-shadow);
         }
 
         .callout-box {
@@ -406,8 +416,13 @@
             border: 1.5px solid var(--text-dark);
             border-radius: 10px;
             padding: 20px 22px;
-            height: 100%;
+            /* Sized to its own (short) content rather than stretched to match the funnel
+               visual's height — the funnel genuinely needs the room, three lines of
+               diagnostic text don't, and stretching it just left dead space at the bottom. */
+            align-self: flex-start;
+            max-height: 100%;
             overflow-y: auto;
+            box-shadow: var(--card-shadow);
         }
         .funnel-diag-title {
             font-size: 11px;
@@ -502,11 +517,14 @@
             font-weight: 600;
         }
 
-        /* Ad structure audit — placeholder box for a pasted-in top-ad screenshot */
+        /* Ad structure audit — placeholder box for a pasted-in top-ad screenshot. flex:1 lets
+           it grow and absorb whatever room its stretched parent card has, rather than sitting
+           at a fixed min-height with dead space collecting elsewhere in the card. */
         .ad-snip-box {
             border: 1.5px dashed var(--border-dark);
             border-radius: 10px;
             background: #f8fafc;
+            flex: 1;
             min-height: 120px;
             display: flex;
             flex-direction: column;
@@ -547,6 +565,7 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
+            box-shadow: var(--card-shadow);
         }
         .ad-mock-header {
             display: flex;
@@ -565,6 +584,7 @@
             font-weight: 900;
             color: #fff;
             flex-shrink: 0;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
         }
         .ad-mock-brand {
             font-size: 11.5px;
@@ -617,6 +637,7 @@
             padding: 5px 10px;
             border-radius: 6px;
             white-space: nowrap;
+            box-shadow: 0 2px 5px rgba(59, 130, 246, 0.35);
         }
         .ad-mock-stats {
             display: flex;
@@ -1033,7 +1054,7 @@
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="grid-3" id="initiatives-grid" style="flex:1"></div>
+            <div class="grid-3" id="initiatives-grid" style="flex:1; align-content:start"></div>
             <div class="slide-footer">
                 <div>AI-Drafted from Reported Metrics</div>
                 <div>Slide 16 of 21</div>
@@ -1050,7 +1071,7 @@
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
             <div class="narrative-box" id="strategy-deepdive-title" style="margin-bottom:14px; font-weight:800; font-size:13px; color:var(--text-dark); flex:none"></div>
-            <div class="grid-2" id="strategy-deepdive-steps" style="flex:1"></div>
+            <div class="grid-2" id="strategy-deepdive-steps" style="flex:1; align-content:start"></div>
             <div class="slide-footer">
                 <div>AI-Drafted from Reported Metrics</div>
                 <div>Slide 17 of 21</div>
@@ -1066,7 +1087,7 @@
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="grid-2" id="inferences-grid" style="flex:1"></div>
+            <div class="grid-2" id="inferences-grid" style="flex:1; align-content:start"></div>
             <div class="slide-footer">
                 <div>AI-Generated Insights</div>
                 <div>Slide 18 of 21</div>
@@ -1082,7 +1103,7 @@
                 </div>
                 <div class="slide-logo">Digifyce<span>.</span></div>
             </div>
-            <div class="grid-2" id="recommendations-grid" style="flex:1"></div>
+            <div class="grid-2" id="recommendations-grid" style="flex:1; align-content:start"></div>
             <div class="slide-footer">
                 <div>AI-Generated Recommendations</div>
                 <div>Slide 19 of 21</div>
@@ -1767,7 +1788,7 @@
                     pptx.title = `${report.brand_name || 'Brand'} — Monthly Performance Report`;
 
                     const CLR = {
-                        primary: '2563EB', cyan: '0EA5E9', teal: '0D9488', orange: 'EA580C',
+                        primary: '2563EB', cyan: '0EA5E9', teal: '0D9488', orange: 'EA580C', purple: 'A855F7',
                         dark: '0F172A', mid: '64748B', border: 'E2E8F0', bg: 'F8FAFC', white: 'FFFFFF',
                         green: '16A34A', greenBg: 'DCFCE7', red: 'DC2626', redBg: 'FEE2E2', blue: '2563EB', blueBg: 'DBEAFE'
                     };
@@ -1893,13 +1914,17 @@
                         s.addText(runs, { x: x + 0.25, y: y + 0.6, w: w - 0.5, h: h - 0.85, fontFace: FONT, valign: 'top', lineSpacingMultiple: 1.3 });
                     }
 
-                    // cards: [{label, accent, rows:[[k,v],...], note}]
+                    // cards: [{label, accent, rows:[[k,v],...], note}] — card height is derived
+                    // from the actual row count (+ room for a note, if any) instead of a fixed
+                    // constant, so a typical 3-stat card isn't left with acres of empty border.
                     function metricCardsSlide(pageNum, group, title, cards, calloutText) {
                         const s = baseSlide(pageNum, group, title);
                         const n = cards.length;
                         const gap = 0.3, startX = 0.4, startY = 1.2;
                         const cardW = (12.53 - gap * (n - 1)) / n;
-                        const cardH = calloutText ? 4.9 : 5.4;
+                        const maxRows = Math.max(1, ...cards.map(c => (c.rows || []).length));
+                        const hasNote = cards.some(c => c.note);
+                        const cardH = 0.75 + maxRows * 0.62 + 0.3 + (hasNote ? 1.1 : 0);
                         cards.forEach((c, i) => {
                             const x = startX + i * (cardW + gap);
                             accentBox(s, x, startY, cardW, cardH, c.accent || CLR.primary, 'full');
@@ -1942,7 +1967,10 @@
                                 titleW = cardW - 0.36 - badgeSize - 0.15;
                             }
                             s.addText(c.title || '', { x: titleX, y: y + 0.14, w: titleW, h: 0.4, fontSize: 11.5, bold: true, color: CLR.dark, fontFace: FONT, valign: 'middle' });
-                            s.addText(c.body || '', { x: x + 0.18, y: y + 0.62, w: cardW - 0.36, h: cardH - 0.78, fontSize: 9.5, color: CLR.mid, fontFace: FONT, valign: 'top' });
+                            // Vertically centered rather than top-anchored: AI-generated body
+                            // text varies in length, and centering avoids a slab of dead space
+                            // under short paragraphs without needing to guess an exact height.
+                            s.addText(c.body || '', { x: x + 0.18, y: y + 0.62, w: cardW - 0.36, h: cardH - 0.78, fontSize: 9.5, color: CLR.mid, fontFace: FONT, valign: 'middle' });
                         });
                         return s;
                     }
@@ -2017,6 +2045,82 @@
                         const cardW = (12.53 - gap * (n - 1)) / n;
                         const brandInitials = initialsOf(report.brand_name), brandName = report.brand_name || 'Brand';
                         cards.forEach((c, i) => creativeCard(s, startX + i * (cardW + gap), startY, cardW, cardH, Object.assign({ brandInitials, brandName }, c)));
+                        return s;
+                    }
+
+                    // An audit card (Meta/Google "ad structure" panels): title, a handful of
+                    // label/value facts, and a dashed snip-placeholder pane that absorbs
+                    // whatever height the facts don't need — same bottom-up sizing idea as
+                    // creativeCard's media pane, so short fact lists never leave a dead gap.
+                    // facts: [[label, value], ...]
+                    function auditCard(s, x, y, w, h, title, snipLabel, facts) {
+                        accentBox(s, x, y, w, h, CLR.dark, 'full');
+                        const pad = 0.25, ix = x + pad, iw = w - pad * 2;
+                        let cy = y + pad;
+                        s.addText(title, { x: ix, y: cy, w: iw, h: 0.28, fontSize: 10.5, bold: true, color: CLR.dark, fontFace: FONT });
+                        cy += 0.42;
+
+                        const rowH = 0.4;
+                        const factsH = facts.length * rowH;
+                        const snipY = cy, snipH = (y + h - pad) - cy - factsH - 0.12;
+                        if (snipH > 0.3) {
+                            s.addShape('rect', { x: ix, y: snipY, w: iw, h: snipH, fill: { color: CLR.bg }, line: { color: CLR.border, width: 1, dashType: 'dash' } });
+                            s.addText(snipLabel || '[ Snip of Top Ad ]', { x: ix, y: snipY, w: iw, h: snipH, align: 'center', valign: 'middle', fontSize: 10, italic: true, color: CLR.mid, fontFace: FONT });
+                        }
+
+                        let fy = y + h - pad - factsH;
+                        facts.forEach(([label, value]) => {
+                            s.addText(label, { x: ix, y: fy, w: 1.9, h: rowH, fontSize: 9.5, color: CLR.mid, fontFace: FONT, valign: 'middle' });
+                            s.addText(value, { x: ix + 1.9, y: fy, w: iw - 1.9, h: rowH, fontSize: 9.5, bold: true, color: CLR.dark, fontFace: FONT, valign: 'middle' });
+                            fy += rowH;
+                        });
+                    }
+
+                    // A Google search-ad mockup card: rank tag, headline/description copy, a
+                    // dashed snip-placeholder pane, and a Clicks/ROAS footer — the search-ad
+                    // equivalent of creativeCard, laid out fixed 3-across like it.
+                    // c: { rankLabel, headline, description, clicks, roas, isShoppingCard, placeholder }
+                    function searchAdCard(s, x, y, w, h, c) {
+                        accentBox(s, x, y, w, h, CLR.border, 'plain');
+                        const pad = 0.22, ix = x + pad, iw = w - pad * 2;
+                        let cy = y + pad;
+
+                        s.addText(c.rankLabel, { x: ix, y: cy, w: iw, h: 0.2, fontSize: 9.5, bold: true, color: CLR.purple, fontFace: FONT });
+                        cy += 0.26;
+
+                        if (c.placeholder) {
+                            s.addText(c.headline, { x: ix, y: cy, w: iw, h: (y + h - pad) - cy, align: 'center', valign: 'middle', fontSize: 10.5, italic: true, color: CLR.mid, fontFace: FONT });
+                            return;
+                        }
+
+                        s.addText('Ad · Sponsored', { x: ix, y: cy, w: iw, h: 0.2, fontSize: 8.5, bold: true, color: CLR.green, fontFace: FONT });
+                        cy += 0.26;
+                        s.addText(c.headline, { x: ix, y: cy, w: iw, h: 0.4, fontSize: 12, bold: true, color: CLR.primary, fontFace: FONT, valign: 'top' });
+                        cy += 0.46;
+                        s.addText(c.description, { x: ix, y: cy, w: iw, h: 0.5, fontSize: 9, color: CLR.mid, fontFace: FONT, valign: 'top', lineSpacingMultiple: 1.25 });
+                        cy += 0.56;
+
+                        const footH = 0.3;
+                        const footY = y + h - pad - footH;
+                        s.addText([
+                            { text: 'Clicks: ', options: { color: CLR.mid, fontSize: 9.5 } },
+                            { text: `${c.clicks}   `, options: { bold: true, color: CLR.dark, fontSize: 9.5 } },
+                            { text: 'ROAS: ', options: { color: CLR.mid, fontSize: 9.5 } },
+                            { text: c.roas, options: { bold: true, color: CLR.dark, fontSize: 9.5 } }
+                        ], { x: ix, y: footY, w: iw, h: footH, valign: 'middle', fontFace: FONT });
+
+                        const snipH = footY - 0.15 - cy;
+                        if (snipH > 0.3) {
+                            s.addShape('rect', { x: ix, y: cy, w: iw, h: snipH, fill: { color: CLR.bg }, line: { color: CLR.border, width: 1, dashType: 'dash' } });
+                            s.addText(c.isShoppingCard ? '[ Shopping Card Image ]' : '[ Snip of Top Ad ]', { x: ix, y: cy, w: iw, h: snipH, align: 'center', valign: 'middle', fontSize: 9.5, italic: true, color: CLR.mid, fontFace: FONT });
+                        }
+                    }
+
+                    function searchAdCardsSlide(pageNum, group, title, cards) {
+                        const s = baseSlide(pageNum, group, title);
+                        const n = cards.length, gap = 0.3, startX = 0.4, startY = 1.2, cardH = 5.55;
+                        const cardW = (12.53 - gap * (n - 1)) / n;
+                        cards.forEach((c, i) => searchAdCard(s, startX + i * (cardW + gap), startY, cardW, cardH, c));
                         return s;
                     }
 
@@ -2147,13 +2251,10 @@
 
                     // Slide 7: Meta Campaigns Deep-Dive
                     const s7 = baseSlide(7, 'Meta Ads Manager Structure & Placement Performance', 'Paid Ads: Meta Campaigns Deep-Dive');
-                    diagnosticsCard(s7, 0.4, 1.2, 5.6, 5.5, 'AD STRUCTURE AUDIT', [
-                        { text: 'No. of Angles Tested: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
-                        { text: `${metaAudit.angles_tested ? metaAudit.angles_tested + ' unique creatives' : '—'}\n\n`, options: { color: CLR.mid, fontSize: 10, breakLine: true } },
-                        { text: 'Winning Placement: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
-                        { text: `${metaAudit.winning_placement ? `${metaAudit.winning_placement} (${(metaAudit.winning_placement_roas || 0).toFixed(2)}x ROAS)` : '—'}\n\n`, options: { color: CLR.mid, fontSize: 10, breakLine: true } },
-                        { text: 'Winning Angle: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
-                        { text: metaAudit.winning_angle || '—', options: { color: CLR.mid, fontSize: 10, breakLine: true } }
+                    auditCard(s7, 0.4, 1.2, 5.6, 5.5, 'AD STRUCTURE AUDIT', '[ Snip of Top Ad ]', [
+                        ['Creatives Tested', metaAudit.angles_tested ? metaAudit.angles_tested + ' unique creatives' : '—'],
+                        ['Winning Placement', metaAudit.winning_placement ? `${metaAudit.winning_placement} (${(metaAudit.winning_placement_roas || 0).toFixed(2)}x ROAS)` : '—'],
+                        ['Winning Angle', metaAudit.winning_angle || '—']
                     ]);
                     if (mcTop.length) renderTable(s7, 6.3, 1.2, 6.63, ['Campaign', 'Spend', 'Orders', 'Sales', 'ROAS'], mcTop.map(c => [c.name, curr(c.spent), c.orders, curr(c.sales), c.roas]), (ri, ci, v) => ci === 4 ? roasCellStyle(v) : null);
                     else s7.addText('No Meta campaign data synced for this month.', { x: 6.3, y: 1.5, w: 6.63, h: 0.5, fontSize: 11, color: CLR.mid, fontFace: FONT, italic: true });
@@ -2170,27 +2271,30 @@
 
                     // Slide 9: Google Campaigns Deep-Dive
                     const s9 = baseSlide(9, 'Google Ads Manager Structure & Placement Performance', 'Paid Ads: Google Campaigns Deep-Dive');
-                    diagnosticsCard(s9, 0.4, 1.2, 5.6, 5.5, 'SEARCH & SHOPPING AUDIT', [
-                        { text: 'No. of Angles Tested: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
-                        { text: `${googleAudit.networks_tested || '—'}\n\n`, options: { color: CLR.mid, fontSize: 10, breakLine: true } },
-                        { text: 'Winning Placement: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
-                        { text: `${googleAudit.winning_network ? `${googleAudit.winning_network} (${(googleAudit.winning_network_roas || 0).toFixed(2)}x ROAS)` : '—'}`, options: { color: CLR.mid, fontSize: 10, breakLine: true } }
+                    auditCard(s9, 0.4, 1.2, 5.6, 5.5, 'SEARCH & SHOPPING AUDIT', '[ Snip of Top Ad ]', [
+                        ['Networks Tested', googleAudit.networks_tested || '—'],
+                        ['Winning Network', googleAudit.winning_network ? `${googleAudit.winning_network} (${(googleAudit.winning_network_roas || 0).toFixed(2)}x ROAS)` : '—']
                     ]);
                     // gcTop is always populated (real top-4+total, or an "XX" placeholder
                     // template) — see the matching note in bindReportData's slide 9 section.
                     renderTable(s9, 6.3, 1.2, 6.63, ['Campaign', 'Spend', 'Orders', 'Sales', 'ROAS'], gcTop.map(c => [c.name, c.placeholder ? '₹' + c.spent : curr(c.spent), c.orders, c.placeholder ? '₹' + c.sales : curr(c.sales), c.roas]), (ri, ci, v) => ci === 4 && !gcTop[ri]?.placeholder ? roasCellStyle(v) : null);
 
-                    // Slide 10: Google Search Ad Creatives — always 3 slots (real data or an
-                    // "XX" placeholder template), matching the Meta creatives slide.
+                    // Slide 10: Google Search Ad Creatives — always 3 slots, matching the Meta
+                    // creatives slide (slide 8): real data or a plain "no data" placeholder card.
                     const gsAdsTagsPptx = ['TOP PERFORMER (SEARCH)', 'RUNNER UP (PMAX)', 'RISING STAR (BRAND)'];
-                    narrativeCardsSlide(10, 'Creative Search Text Copy & Shopping Card Previews', 'Best Performing Creatives (Google Ads)',
+                    searchAdCardsSlide(10, 'Creative Search Text Copy & Shopping Card Previews', 'Best Performing Creatives (Google Ads)',
                         [0, 1, 2].map(i => {
                             const a = gsAds[i];
-                            const headline = a ? a.headline : 'Headline Copy XX | Placeholder';
-                            const description = a ? a.description : 'Placeholder description copy — replace with the real Google Ads text once connected.';
-                            const clicks = a ? (a.clicks || 0).toLocaleString() : 'XX';
-                            const roas = a ? (a.roas || 0).toFixed(2) + 'x' : 'X.Xx';
-                            return { title: `#${i + 1}  ${gsAdsTagsPptx[i]}`, body: `${headline}\n${description}\n\nClicks: ${clicks}   ROAS: ${roas}` };
+                            const rankLabel = `#${i + 1} ${gsAdsTagsPptx[i]}`;
+                            if (!a) return { rankLabel, headline: 'No additional search ad had click data this period.', placeholder: true };
+                            return {
+                                rankLabel,
+                                headline: a.headline,
+                                description: a.description,
+                                clicks: (a.clicks || 0).toLocaleString(),
+                                roas: (a.roas || 0).toFixed(2) + 'x',
+                                isShoppingCard: i === 1
+                            };
                         }));
 
                     // Slide 11: Organic & Non-Paid Traffic
@@ -2215,7 +2319,7 @@
 
                     // Slide 14: Retention & Cohort Matrix
                     const s14 = baseSlide(14, 'Cohort Purchase Curve & Lifetime Value Diagnostics', 'Customer Retention & Loyalty Performance');
-                    diagnosticsCard(s14, 0.4, 1.2, 5.6, 5.5, 'CUSTOMER LOYALTY DIAGNOSTICS', [
+                    diagnosticsCard(s14, 0.4, 1.2, 5.6, 2.0, 'CUSTOMER LOYALTY DIAGNOSTICS', [
                         { text: 'Returning Revenue: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
                         { text: `Drove ${repRate} of total sales (${curr(repeatRev)}) at a repeat AOV of ${curr(shopifyAov)}.\n\n`, options: { color: CLR.mid, fontSize: 10, breakLine: true } },
                         { text: 'Cohort Trend: ', options: { bold: true, color: CLR.dark, fontSize: 10 } },
