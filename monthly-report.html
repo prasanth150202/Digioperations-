@@ -2317,7 +2317,7 @@
 
                     // Slide 11: Organic & Non-Paid Traffic
                     metricCardsSlide(11, 'Earned Channels Session Performance', 'Organic & Non-Paid Traffic Channels Breakdown',
-                        organicLabels.map((lbl, i) => {
+                        organicChannels.map(([lbl], i) => {
                             const m = ga4Chs[lbl] || { sessions: 0, convRate: '0.00', revenue: 0 };
                             return { label: lbl.toUpperCase(), accent: [CLR.dark, CLR.dark, CLR.cyan][i] || CLR.primary, rows: [['Sessions', (m.sessions || 0).toLocaleString()], ['Conv. Rate', m.convRate + '%'], ['Gross Revenue', curr(m.revenue)]] };
                         }),
