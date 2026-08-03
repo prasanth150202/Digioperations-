@@ -135,16 +135,22 @@ if ($action === 'test_connections') {
         $handles['shopify'] = $ch;
     }
 
-    // 2. Meta
+    // 2. Meta — test EVERY configured account, not just the first. A token can easily be valid
+    // for an account that's been connected a while but not yet granted access to one just added,
+    // and that was previously invisible here since only $accts[0] ever got checked.
     $accts = array_filter(array_map('trim', explode(',', $int['meta_ad_account_ids'] ?? '')));
+    $metaAcctByKey = [];
     if (!empty($accts) && !empty($metaTok)) {
-        $testAcct = $accts[0];
-        if (!str_starts_with($testAcct, 'act_')) $testAcct = 'act_' . $testAcct;
-        $ch = curl_init("https://graph.facebook.com/v21.0/{$testAcct}?fields=id,name&access_token=" . urlencode($metaTok));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-        $handles['meta'] = $ch;
+        foreach (array_values($accts) as $i => $testAcct) {
+            if (!str_starts_with($testAcct, 'act_')) $testAcct = 'act_' . $testAcct;
+            $key = "meta_{$i}";
+            $metaAcctByKey[$key] = $testAcct;
+            $ch = curl_init("https://graph.facebook.com/v21.0/{$testAcct}?fields=id,name&access_token=" . urlencode($metaTok));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+            $handles[$key] = $ch;
+        }
     }
 
     // 3. Google family (Ads / GA4 / GSC) — share one OAuth token, itself now timeout-bounded
@@ -255,6 +261,21 @@ if ($action === 'test_connections') {
     }
     curl_multi_close($mh);
 
+    // Collapse the per-account meta_0/meta_1/... results (added above so every configured
+    // account actually gets tested) back into the single `meta` field the settings UI reads —
+    // "Connected" only if every account passed, otherwise name which account(s) failed instead
+    // of just reporting on whichever one happened to be first.
+    if (!empty($metaAcctByKey)) {
+        $failedAccts = [];
+        foreach ($metaAcctByKey as $key => $acctId) {
+            if (($res[$key] ?? '') !== 'Connected') $failedAccts[] = "{$acctId}: " . ($res[$key] ?? 'unknown error');
+            unset($res[$key]);
+        }
+        $res['meta'] = empty($failedAccts)
+            ? 'Connected'
+            : 'Failed (' . count($failedAccts) . ' of ' . count($metaAcctByKey) . ' accounts — ' . implode('; ', array_slice($failedAccts, 0, 3)) . ')';
+    }
+
     json_out(array_merge(['ok' => true], $res));
 }
 
@@ -281,6 +302,17 @@ if ($metaToken === str_repeat('·', 8)) {
 
 // 1. Google OAuth Client Access
 $gAccessToken = getGoogleAccessToken();
+
+// Google Ads, GA4, and Search Console all share this ONE org-wide OAuth token — connected
+// separately by a superadmin via the "Google Global Keys" panel, NOT the per-brand
+// Integrations modal (which only has plain fields like a property ID or customer ID, no
+// "enabled"/OAuth-status indicator). If a brand has any of those three configured but the
+// shared token is missing or expired, all three quietly return zero data below with nothing
+// in the sync output to explain why — surface it explicitly instead.
+$syncWarnings = [];
+if (!$gAccessToken && (!empty($int['google_ads_enabled']) || !empty($int['ga4_property_id']) || !empty($int['gsc_site_url']))) {
+    $syncWarnings[] = 'Google Ads / GA4 / Search Console data was not pulled: the shared Google account is not connected (or its access has expired). This is a separate, org-wide connection from the per-brand integration fields — ask a superadmin to reconnect it under Admin → Google Global Keys.';
+}
 
 // Create datetime periods array
 $dates = [];
@@ -566,6 +598,34 @@ if (!empty($int['shopify_enabled']) && !empty($int['shopify_subdomain']) && !emp
     $syncShopifyCount = count($orders);
 }
 
+// Fetches one Meta Graph API insights URL with a bounded timeout, and records any curl-level
+// or Graph-API-level error into $errors (keyed by ad account) instead of silently degrading to
+// an empty result. Without this, a problem specific to one account — e.g. the token not yet
+// having been granted access to a newly-added account, or a rate limit now that syncing 2+
+// accounts multiplies the request count — was indistinguishable from "this account genuinely
+// has no data for the period," which is exactly what made a broken second account invisible.
+function fetchMetaInsights(string $url, string $acct, array &$errors): array {
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 25);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    $resp = curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr = curl_error($ch);
+    curl_close($ch);
+
+    if ($resp === false) {
+        $errors[$acct][] = "Request failed: {$curlErr}";
+        return [];
+    }
+    $data = json_decode($resp, true);
+    if ($status !== 200 || isset($data['error'])) {
+        $errors[$acct][] = $data['error']['message'] ?? "HTTP {$status}";
+        return [];
+    }
+    return $data['data'] ?? [];
+}
+
 // B. Meta Ads insights
 if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
     $accts = array_filter(array_map('trim', explode(',', $int['meta_ad_account_ids'])));
@@ -574,22 +634,17 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
     $metaDaily = [];
     $metaAnglesTested = 0;
     $metaPlacementAgg = [];
+    $metaSyncErrors = [];
 
     foreach ($accts as $acct) {
         // Auto-add act_ prefix if not present (Meta Graph API requires it)
         if (!str_starts_with($acct, 'act_')) $acct = 'act_' . $acct;
-        
+
         // 1. Campaign Breakdown
         $cf = urlencode("campaign_name,spend,impressions,clicks,actions,action_values");
         $curlUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$cf}&level=campaign&time_range=" . urlencode($timeRange) . "&limit=100&access_token=" . urlencode($metaToken);
-        
-        $ch = curl_init($curlUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $resp = curl_exec($ch);
-        curl_close($ch);
-        
-        $campaignData = json_decode($resp, true);
-        foreach ($campaignData['data'] ?? [] as $row) {
+
+        foreach (fetchMetaInsights($curlUrl, $acct, $metaSyncErrors) as $row) {
             $spend = (float)($row['spend'] ?? 0.0);
             $revenue = 0.0;
             $orders = 0;
@@ -614,16 +669,11 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
         $adf = urlencode("ad_id,ad_name,spend,ctr,actions,action_values");
         $adUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$adf}&level=ad&limit=50&time_range=" . urlencode($timeRange) . "&access_token=" . urlencode($metaToken);
 
-        $chAd = curl_init($adUrl);
-        curl_setopt($chAd, CURLOPT_RETURNTRANSFER, true);
-        $respAd = curl_exec($chAd);
-        curl_close($chAd);
-
-        $adData = json_decode($respAd, true);
+        $adRows = fetchMetaInsights($adUrl, $acct, $metaSyncErrors);
         // "Angles tested" = distinct ads that actually spent budget this period.
-        $metaAnglesTested += count(array_filter($adData['data'] ?? [], fn($ad) => (float)($ad['spend'] ?? 0) > 0));
+        $metaAnglesTested += count(array_filter($adRows, fn($ad) => (float)($ad['spend'] ?? 0) > 0));
 
-        foreach ($adData['data'] ?? [] as $ad) {
+        foreach ($adRows as $ad) {
             $adOrders = 0;
             $adRevenue = 0.0;
             $adSpend = (float)($ad['spend'] ?? 0.0);
@@ -649,13 +699,8 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
         // 3. Placement breakdown — which surface (Reels/Stories/Feed) actually won
         $pf = urlencode("spend,actions,action_values");
         $placementUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$pf}&level=account&breakdowns=publisher_platform,platform_position&time_range=" . urlencode($timeRange) . "&limit=50&access_token=" . urlencode($metaToken);
-        $chPl = curl_init($placementUrl);
-        curl_setopt($chPl, CURLOPT_RETURNTRANSFER, true);
-        $respPl = curl_exec($chPl);
-        curl_close($chPl);
 
-        $placementData = json_decode($respPl, true);
-        foreach ($placementData['data'] ?? [] as $row) {
+        foreach (fetchMetaInsights($placementUrl, $acct, $metaSyncErrors) as $row) {
             $platform = ucwords(str_replace('_', ' ', $row['publisher_platform'] ?? 'unknown'));
             $position = ucwords(str_replace('_', ' ', $row['platform_position'] ?? ''));
             $label = $position ? "{$platform} {$position}" : $platform;
@@ -672,14 +717,8 @@ if (!empty($int['meta_ad_account_ids']) && !empty($metaToken)) {
         // 4. Daily Breakdown logs
         $df = urlencode("date_start,spend,impressions,clicks,actions,action_values");
         $dailyUrl = "https://graph.facebook.com/v21.0/{$acct}/insights?fields={$df}&level=account&time_increment=1&time_range=" . urlencode($timeRange) . "&limit=100&access_token=" . urlencode($metaToken);
-        
-        $chD = curl_init($dailyUrl);
-        curl_setopt($chD, CURLOPT_RETURNTRANSFER, true);
-        $respD = curl_exec($chD);
-        curl_close($chD);
-        
-        $dailyData = json_decode($respD, true);
-        foreach ($dailyData['data'] ?? [] as $d) {
+
+        foreach (fetchMetaInsights($dailyUrl, $acct, $metaSyncErrors) as $d) {
             $day = $d['date_start'];
             if (!isset($metaDaily[$day])) {
                 $metaDaily[$day] = ['spend' => 0, 'sales' => 0, 'orders' => 0, 'clicks' => 0, 'impressions' => 0];
@@ -1149,8 +1188,19 @@ foreach ($dates as $date) {
 }
 
 // ── COMPILE METADATA PACKAGE FOR MONTHLY REPORTS CREATOR ──
+// Surface anything that silently degraded to empty/partial data instead of leaving the caller
+// to guess why a source came back thin: the shared-Google-OAuth gate (set earlier), plus any
+// per-Meta-account fetch failures collected during the sync above.
+$warnings = $syncWarnings ?? [];
+foreach (($metaSyncErrors ?? []) as $acct => $msgs) {
+    foreach ($msgs as $msg) {
+        $warnings[] = "Meta account {$acct}: {$msg}";
+    }
+}
+
 $outData = [
     'ok' => true,
+    'warnings' => $warnings,
     'sync_shopify' => $syncShopifyCount,
     'sync_meta' => $syncMetaCount,
     'sync_google_ads' => $syncGoogleAdsCount,

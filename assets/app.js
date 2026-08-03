@@ -7161,8 +7161,17 @@ async function triggerMonthlySync() {
     const r = await api(`/api/sync.php?brand_id=${activeBrand.id}&start_date=${start}&end_date=${end}`);
     if (r && r.ok) {
       syncedMonthlyData = r;
-      statusEl.textContent = `Sync completed successfully! Shopify items: ${r.sync_shopify}, Meta: ${r.sync_meta}, Google Ads: ${r.sync_google_ads}, GA4: ${r.sync_ga4}, GSC: ${r.sync_gsc}.`;
-      statusEl.style.color = '#10B981';
+      let msg = `Sync completed! Shopify items: ${r.sync_shopify}, Meta: ${r.sync_meta}, Google Ads: ${r.sync_google_ads}, GA4: ${r.sync_ga4}, GSC: ${r.sync_gsc}.`;
+      // Sources that silently returned partial/no data (a Meta account the token can't reach,
+      // or Google Ads/GA4/GSC all riding on a disconnected shared OAuth token) now report why
+      // instead of just showing up as a quietly-empty section in the generated deck.
+      if (r.warnings && r.warnings.length) {
+        msg += ' ⚠️ ' + r.warnings.join(' ');
+        statusEl.style.color = '#d97706';
+      } else {
+        statusEl.style.color = '#10B981';
+      }
+      statusEl.textContent = msg;
     } else {
       syncedMonthlyData = null;
       statusEl.textContent = 'Sync encountered errors: ' + (r?.error || 'unreachable');
