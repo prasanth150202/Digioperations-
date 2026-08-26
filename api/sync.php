@@ -157,22 +157,27 @@ if ($action === 'test_connections') {
     $gAccessToken = getGoogleAccessToken();
     if ($gAccessToken) {
         if (!empty($int['google_ads_enabled']) && !empty($int['google_ads_customer_id'])) {
-            $cust = str_replace('-', '', $int['google_ads_customer_id']);
-            $devTok = getSetting('google_developer_token');
-            $mcc = !empty($int['google_ads_mcc_id']) ? str_replace('-', '', $int['google_ads_mcc_id']) : $cust;
-            $ch = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Authorization: Bearer {$gAccessToken}",
-                "developer-token: {$devTok}",
-                "login-customer-id: {$mcc}",
-                "Content-Type: application/json"
-            ]);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['query' => "SELECT campaign.id FROM campaign LIMIT 1"]));
-            $handles['google_ads'] = $ch;
+            $cust = preg_replace('/[^0-9]/', '', $int['google_ads_customer_id']);
+            if (!empty($cust)) {
+                $devTok = getSetting('google_developer_token');
+                $mccRaw = !empty($int['google_ads_mcc_id']) ? preg_replace('/[^0-9]/', '', $int['google_ads_mcc_id']) : '';
+                $mcc = !empty($mccRaw) ? $mccRaw : $cust;
+                $ch = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    "Authorization: Bearer {$gAccessToken}",
+                    "developer-token: {$devTok}",
+                    "login-customer-id: {$mcc}",
+                    "Content-Type: application/json"
+                ]);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['query' => "SELECT campaign.id FROM campaign LIMIT 1"]));
+                $handles['google_ads'] = $ch;
+            } else {
+                $res['google_ads'] = 'Failed (Invalid or missing Google Ads Customer ID)';
+            }
         }
 
         if (!empty($int['ga4_property_id'])) {
