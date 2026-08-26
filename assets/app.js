@@ -151,7 +151,7 @@ async function doLogout() {
 
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
 function showPage(id) {
-  if ((id === 'admin' || id === 'activity') && CU.role !== 'superadmin') {
+  if ((id === 'admin' || id === 'activity') && CU.role !== 'superadmin' && CU.role !== 'manager') {
     id = 'dashboard';
   }
   curPage = id;
@@ -197,7 +197,7 @@ function toggleSidebar() {
 function renderSidebar() {
   let html = '';
   NAV.forEach(g => {
-    if (g.adminOnly && CU.role !== 'superadmin') return;
+    if (g.adminOnly && CU.role !== 'superadmin' && CU.role !== 'manager') return;
     const items = g.items.filter(i => {
       if (CU.role === 'superadmin') return true;
       if (i.id === 'poa') return true;
