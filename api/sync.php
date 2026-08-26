@@ -1081,14 +1081,8 @@ foreach ($dates as $date) {
     // 1. Get or create budget day row
     $dayRow = dbGet('SELECT id, channels_json, entered_by FROM budget_days WHERE month_id=? AND day_date=?', [$monthId, $date]);
 
-    // A day someone has saved through the manual "Enter Day Data" portal (api/budget.php's
-    // `PUT .../days/{n}` and api/reports.php's `save_missing` both stamp entered_by with the
-    // user's name; sync never does) is authoritative — leave it alone completely rather than
-    // overwriting channels_json with freshly-pulled API numbers. This is the only signal that
-    // exists to distinguish manual vs. synced days, so it doubles as the lock.
-    if ($dayRow && !empty($dayRow['entered_by'])) {
-        continue;
-    }
+    // When sync runs, refresh API-connected channels (shopify, meta, google) in $existingChannels,
+    // while preserving any manual channels (email_marketing, whatsapp, marketplace, retention) intact.
 
     $existingChannels = [];
     if ($dayRow && !empty($dayRow['channels_json'])) {

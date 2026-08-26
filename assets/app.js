@@ -5086,9 +5086,15 @@ async function submitGenerateReport() {
   
   const generateBtn = document.getElementById('btn-generate-report');
   generateBtn.disabled = true;
-  generateBtn.textContent = 'Generating…';
+  generateBtn.textContent = 'Syncing APIs & Generating…';
   
   try {
+    // Autopilot Live API Sync: Auto-pull live data from Shopify, Meta Ads, Google Ads, GA4, GSC
+    try {
+      await api(`/api/sync.php?brand_id=${activeBrand.id}&start_date=${start}&end_date=${end}`);
+    } catch (syncErr) {
+      console.warn('Background API sync notice:', syncErr);
+    }
     // 0. Force check missing data if not rendered
     const rCheck = await api(`/api/reports?action=check_missing&brand_id=${activeBrand.id}&start_date=${start}&end_date=${end}`);
     if (rCheck && rCheck.missing && rCheck.missing.length > 0) {

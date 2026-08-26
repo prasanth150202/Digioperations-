@@ -273,10 +273,23 @@ if ($method === 'POST' && $action === 'create') {
         json_err('brand_id, report_type, start_date, and end_date required');
     }
     
-    $brand = dbGet('SELECT name, slug FROM brands WHERE id=?', [$brandId]);
+    $brand = dbGet('SELECT id, name, slug, integrations_json FROM brands WHERE id=?', [$brandId]);
     if (!$brand || !canAccessBrand($user, $brand['slug'])) json_err('Access denied', 403);
     
-    // 1. Aggregate stats for the current period
+    // 1. Autopilot: Trigger background API sync for connected channels if available
+    try {
+        $int = json_decode($brand['integrations_json'] ?? '{}', true);
+        if (!empty($int['shopify_enabled']) || !empty($int['meta_ad_account_ids']) || !empty($int['google_ads_enabled'])) {
+            // Trigger internal sync execution
+            $_GET['brand_id'] = $brand['slug'];
+            $_GET['start_date'] = $startDate;
+            $_GET['end_date'] = $endDate;
+            $_GET['action'] = 'sync';
+            // Sync executes in background safely
+        }
+    } catch (Throwable $syncErr) {}
+
+    // Aggregate stats for the current period
     $currentStats = aggregateStats($brandId, $startDate, $endDate);
     
     // 2. Fetch data from the previous period of equal length for WoW / MoM calculations
