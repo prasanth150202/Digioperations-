@@ -84,7 +84,16 @@ if ($code) {
     
     // Save refresh_token
     dbRun("UPDATE settings SET value=? WHERE `key`='google_refresh_token'", [$data['refresh_token']]);
-    
+
+    // Surface which scopes Google actually granted. The consent screen lets the user
+    // untick individual permissions, so a token can be saved "successfully" yet be
+    // missing the Google Ads (adwords) scope — which then shows up downstream only as
+    // an opaque 403 "The caller does not have permission" on the Ads connection test.
+    $grantedScopes = $data['scope'] ?? '';
+    $hasAdwords = strpos($grantedScopes, 'adwords') !== false;
+    $hasAnalytics = strpos($grantedScopes, 'analytics') !== false;
+    $hasWebmasters = strpos($grantedScopes, 'webmasters') !== false;
+
     // Render success message
     ?>
     <!DOCTYPE html>
@@ -101,13 +110,24 @@ if ($code) {
             p { font-size: 14px; color: #64748b; line-height: 1.5; margin: 0 0 24px 0; }
             .btn { background: #2B4EFF; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700; display: inline-block; transition: background 0.2s; }
             .btn:hover { background: #1A3CD6; }
+            .scopes { text-align: left; font-size: 12px; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin: 0 0 24px 0; line-height: 1.9; }
+            .scopes .row { display: flex; justify-content: space-between; }
+            .warn { color: #b45309; font-weight: 700; font-size: 13px; margin: 0 0 24px 0; }
         </style>
     </head>
     <body>
         <div class="card">
             <div class="icon">✅</div>
             <h2>Google Access Authorized</h2>
-            <p>The persistent refresh token was obtained and saved successfully. You can now configure brand connections and sync performance metrics.</p>
+            <p>The persistent refresh token was obtained and saved successfully.</p>
+            <div class="scopes">
+                <div class="row"><span>Google Ads (adwords)</span><span><?= $hasAdwords ? '✅ granted' : '❌ NOT granted' ?></span></div>
+                <div class="row"><span>Google Analytics (GA4)</span><span><?= $hasAnalytics ? '✅ granted' : '❌ NOT granted' ?></span></div>
+                <div class="row"><span>Search Console</span><span><?= $hasWebmasters ? '✅ granted' : '❌ NOT granted' ?></span></div>
+            </div>
+            <?php if (!$hasAdwords): ?>
+            <p class="warn">The Google Ads permission was not granted. Click "Authorize Google" again and make sure every checkbox on Google's consent screen stays ticked — otherwise the Google Ads connection test will fail with a 403.</p>
+            <?php endif; ?>
             <a href="/app.html#admin" class="btn">Return to Dashboard</a>
         </div>
     </body>
