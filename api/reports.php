@@ -396,19 +396,52 @@ if ($method === 'POST' && $action === 'create') {
         'aov' => $pctChange($currentStats['totals']['aov'], $prevStats['totals']['aov']),
     ];
 
-    // ── CORRECTED GROSS REVENUE ──
-    // $currentStats['totals']['revenue'] sums every channel's own revenue figure, but Meta/Google/
-    // Email/WhatsApp "revenue" is each platform's *self-attributed* credit for orders that already
-    // happened on Shopify — it is not incremental money. Only Shopify (the storefront) and
-    // Marketplace (a separate checkout entirely) are genuinely non-overlapping revenue pools, so
-    // "Gross Revenue" and "Blended ROAS" for the deck are computed from those two alone, matching
-    // how the reference report defines them (Gross Revenue = Shopify + Marketplace).
-    $grossRevenue = ($currentStats['channels']['shopify']['revenue'] ?? 0) + ($currentStats['channels']['marketplace']['revenue'] ?? 0);
-    $grossRoas = $currentStats['totals']['spend'] > 0 ? round($grossRevenue / $currentStats['totals']['spend'], 2) : 0.0;
-    $prevGrossRevenue = ($prevStats['channels']['shopify']['revenue'] ?? 0) + ($prevStats['channels']['marketplace']['revenue'] ?? 0);
-    $prevGrossRoas = $prevStats['totals']['spend'] > 0 ? round($prevGrossRevenue / $prevStats['totals']['spend'], 2) : 0.0;
+    // ── CORRECTED GROSS / BLENDED HEADLINE ──
+    // $currentStats['totals']['revenue'] and ['conversions'] SUM every channel's own figure, but
+    // Meta / Google / ZingBot / Email / WhatsApp "sales" and "orders" are each platform's
+    // *self-attributed* credit for checkouts that already happened on Shopify — not incremental
+    // money. Summing them inflates the headline 2–4x. Only Shopify (the storefront) and Marketplace
+    // (a separate checkout) are non-overlapping revenue pools, so the headline Sales / Orders are
+    // those two alone. Spend is the opposite: it never overlaps, so the blended denominator is the
+    // sum of EVERY channel's spend (Meta + Google + ZingBot + marketplace ads + …), which
+    // $currentStats['totals']['spend'] already is.
+    //   Blended tROAS = (Shopify + Marketplace revenue) / (total spend across all channels)
+    $grossFrom = function(array $stats): array {
+        $rev  = ($stats['channels']['shopify']['revenue'] ?? 0) + ($stats['channels']['marketplace']['revenue'] ?? 0);
+        $ord  = ($stats['channels']['shopify']['conversions'] ?? 0) + ($stats['channels']['marketplace']['conversions'] ?? 0);
+        $cust = ($stats['channels']['shopify']['customers_acquired'] ?? 0) + ($stats['channels']['marketplace']['customers_acquired'] ?? 0);
+        $spend = $stats['totals']['spend'] ?? 0;
+        $cpaDen = $cust > 0 ? $cust : $ord;
+        return [
+            'spend'       => $spend,
+            'revenue'     => $rev,
+            'conversions' => $ord,
+            'customers_acquired' => $cust,
+            'roas'        => $spend > 0 ? round($rev / $spend, 2) : 0.0,
+            'aov'         => $ord > 0 ? round($rev / $ord, 2) : 0.0,
+            'cpa'         => $cpaDen > 0 ? round($spend / $cpaDen, 2) : 0.0,
+        ];
+    };
+    $headline = $grossFrom($currentStats);
+    $prevHeadline = $grossFrom($prevStats);
+
+    // Names kept for the monthly deck / report_data consumers that already reference them.
+    $grossRevenue = $headline['revenue'];
+    $grossRoas = $headline['roas'];
+    $prevGrossRevenue = $prevHeadline['revenue'];
+    $prevGrossRoas = $prevHeadline['roas'];
     $comparisons['gross_revenue'] = $pctChange($grossRevenue, $prevGrossRevenue);
     $comparisons['gross_roas'] = $pctChange($grossRoas, $prevGrossRoas);
+
+    // Weekly reports render straight off the scalar reports.* columns and comps.{revenue,roas,…}
+    // (see report.html KPI tiles). Point those at the de-duplicated headline so the weekly deck
+    // stops showing inflated Sales / ROAS / Orders. The monthly deck reads report_data.gross_*
+    // explicitly and keeps comps.{cpa,aov} meaning the genuinely-blended CPA/AOV, so leave it be.
+    if ($reportType === 'weekly') {
+        foreach (['revenue', 'conversions', 'roas', 'aov', 'cpa'] as $k) {
+            $comparisons[$k] = $pctChange($headline[$k], $prevHeadline[$k]);
+        }
+    }
 
     // 3. AI narrative generation happens further below, once $reportData (meta/google/shopify/
     // GSC/cohort data) has been assembled — the monthly deck's narratives need that context.
@@ -435,6 +468,7 @@ if ($method === 'POST' && $action === 'create') {
         'period_end' => $endDate,
         'channels' => $currentStats['channels'],
         'totals' => $currentStats['totals'],
+        'headline' => $headline,
         'gross_revenue' => $grossRevenue,
         'gross_roas' => $grossRoas,
         'comparisons' => $comparisons,
@@ -443,6 +477,7 @@ if ($method === 'POST' && $action === 'create') {
             'end' => $prevEndDateStr,
             'totals' => $prevStats['totals'],
             'channels' => $prevStats['channels'],
+            'headline' => $prevHeadline,
             'gross_revenue' => $prevGrossRevenue,
             'gross_roas' => $prevGrossRoas
         ]
@@ -559,30 +594,33 @@ if ($method === 'POST' && $action === 'create') {
                 if (isset($aiResult[$k])) $aiMonthly[$k] = $aiResult[$k];
             }
         } catch (Throwable $e) {
-            $aiHighlights['highlights'] = "• Campaign generated total revenue of ₹" . number_format($totals['revenue']) . " with a blended ROAS of {$totals['roas']}x.<br>• Ad spend was managed at ₹" . number_format($totals['spend']) . ".";
+            $aiHighlights['highlights'] = "• Campaign generated gross revenue of ₹" . number_format($headline['revenue']) . " with a blended ROAS of {$headline['roas']}x.<br>• Ad spend was managed at ₹" . number_format($headline['spend']) . ".";
             $aiHighlights['blockers'] = "• AI narrative generation failed for this report (" . htmlspecialchars($e->getMessage()) . ") — showing raw metrics only.";
-            $aiHighlights['next_steps'] = "• Monitor blended CPA (currently ₹{$totals['cpa']}) to optimize audience targets.<br>• Adjust high-performing channel budgets.";
-            $aiMonthly['executive_summary'] = "Revenue reached ₹" . number_format($totals['revenue']) . " on ₹" . number_format($totals['spend']) . " of spend ({$totals['roas']}x blended ROAS). AI-generated narrative sections could not be produced for this report.";
+            $aiHighlights['next_steps'] = "• Monitor blended CPA (currently ₹{$headline['cpa']}) to optimize audience targets.<br>• Adjust high-performing channel budgets.";
+            $aiMonthly['executive_summary'] = "Gross revenue reached ₹" . number_format($headline['revenue']) . " on ₹" . number_format($headline['spend']) . " of spend ({$headline['roas']}x blended ROAS). AI-generated narrative sections could not be produced for this report.";
         }
         $reportData['ai'] = $aiMonthly;
     } else {
         // Weekly reports keep the original lightweight summary-only call.
         try {
-            $systemMsg = "You are a professional performance marketing dashboard. Analyze the data and generate short summary notes. Respond ONLY in valid JSON format matching this schema: {\"highlights\": \"HTML bullet points of what went well\", \"blockers\": \"HTML bullet points of performance blockers or concerns\", \"next_steps\": \"HTML bullet points of next actions\"}. Do not write any markdown fences or surrounding text, just the raw JSON.";
-            $userMsg = "Brand: {$brand['name']}\nReport Type: Weekly\nPeriod: {$startDate} to {$endDate}\n\n";
-            $userMsg .= "Current Period Stats:\n- Total Spend: ₹" . number_format($totals['spend']) . " (WoW: " . ($comparisons['spend'] ?? '—') . "%)\n";
-            $userMsg .= "- Total Revenue: ₹" . number_format($totals['revenue']) . " (WoW: " . ($comparisons['revenue'] ?? '—') . "%)\n";
-            $userMsg .= "- Blended ROAS: {$totals['roas']}x (WoW: " . ($comparisons['roas'] ?? '—') . "%)\n\n";
-            $userMsg .= "Channel Metrics:\n" . implode("\n", $channelSummaryLines);
+            $systemMsg = "You are a professional performance marketing dashboard. Analyze the data and generate short summary notes explaining what happened this week and why, grounded in the numbers given (cite the actual figures and the week-over-week moves). Respond ONLY in valid JSON format matching this schema: {\"highlights\": \"HTML bullet points of what went well\", \"blockers\": \"HTML bullet points of performance blockers or concerns\", \"next_steps\": \"HTML bullet points of next actions\"}. Do not write any markdown fences or surrounding text, just the raw JSON.";
+            $userMsg = "Brand: {$brand['name']}\nReport Type: Weekly\nPeriod: {$startDate} to {$endDate}\nPrevious week: {$prevStartDateStr} to {$prevEndDateStr}\n\n";
+            $userMsg .= "Headline (de-duplicated — Gross Sales counts the Shopify storefront + Marketplace only; the per-channel figures below overlap and must not be summed):\n";
+            $userMsg .= "- Total Blended Spend (Meta + Google + ZingBot + every other channel): ₹" . number_format($headline['spend']) . " (WoW: " . ($comparisons['spend'] ?? '—') . "%)\n";
+            $userMsg .= "- Gross Sales (Shopify + Marketplace): ₹" . number_format($headline['revenue']) . " (WoW: " . ($comparisons['revenue'] ?? '—') . "%)\n";
+            $userMsg .= "- Blended tROAS (Gross Sales / Total Blended Spend): {$headline['roas']}x (WoW: " . ($comparisons['roas'] ?? '—') . "%)\n";
+            $userMsg .= "- Orders: " . number_format($headline['conversions']) . " (WoW: " . ($comparisons['conversions'] ?? '—') . "%)\n";
+            $userMsg .= "- Blended CPA: ₹" . number_format($headline['cpa']) . " (WoW: " . ($comparisons['cpa'] ?? '—') . "%) | Blended AOV: ₹" . number_format($headline['aov']) . " (WoW: " . ($comparisons['aov'] ?? '—') . "%)\n\n";
+            $userMsg .= "Per-channel breakdown (self-reported by each platform — for diagnosing which channel drove the moves, NOT for totalling):\n" . implode("\n", $channelSummaryLines);
 
             $aiResult = callJSON($systemMsg, $userMsg);
             if (isset($aiResult['highlights'])) $aiHighlights['highlights'] = $aiResult['highlights'];
             if (isset($aiResult['blockers'])) $aiHighlights['blockers'] = $aiResult['blockers'];
             if (isset($aiResult['next_steps'])) $aiHighlights['next_steps'] = $aiResult['next_steps'];
         } catch (Throwable $e) {
-            $aiHighlights['highlights'] = "• Campaign generated total revenue of ₹" . number_format($totals['revenue']) . " with a blended ROAS of {$totals['roas']}x.<br>• Ad spend was managed at ₹" . number_format($totals['spend']) . ".";
+            $aiHighlights['highlights'] = "• Campaign generated gross sales of ₹" . number_format($headline['revenue']) . " with a blended tROAS of {$headline['roas']}x.<br>• Blended ad spend across all channels was ₹" . number_format($headline['spend']) . ".";
             $aiHighlights['blockers'] = "• No significant blockers identified in the automated scan.";
-            $aiHighlights['next_steps'] = "• Monitor blended CPA (currently ₹{$totals['cpa']}) to optimize audience targets.<br>• Adjust high-performing channel budgets.";
+            $aiHighlights['next_steps'] = "• Monitor blended CPA (currently ₹{$headline['cpa']}) to optimize audience targets.<br>• Adjust high-performing channel budgets.";
         }
     }
 
@@ -595,12 +633,12 @@ if ($method === 'POST' && $action === 'create') {
         $reportId = $existing['id'];
         dbRun('UPDATE reports SET total_spend=?, total_conversions=?, total_revenue=?, overall_cpa=?, overall_roas=?, overall_aov=?, report_data=?, shared_link=?, highlights=?, blockers=?, next_steps=? WHERE id=?',
             [
-                $currentStats['totals']['spend'],
-                $currentStats['totals']['conversions'],
-                $currentStats['totals']['revenue'],
-                $currentStats['totals']['cpa'],
-                $currentStats['totals']['roas'],
-                $currentStats['totals']['aov'],
+                $headline['spend'],
+                $headline['conversions'],
+                $headline['revenue'],
+                $headline['cpa'],
+                $headline['roas'],
+                $headline['aov'],
                 json_encode($reportData),
                 $sharedLink,
                 $aiHighlights['highlights'],
@@ -625,12 +663,12 @@ if ($method === 'POST' && $action === 'create') {
                 $reportType,
                 $startDate,
                 $endDate,
-                $currentStats['totals']['spend'],
-                $currentStats['totals']['conversions'],
-                $currentStats['totals']['revenue'],
-                $currentStats['totals']['cpa'],
-                $currentStats['totals']['roas'],
-                $currentStats['totals']['aov'],
+                $headline['spend'],
+                $headline['conversions'],
+                $headline['revenue'],
+                $headline['cpa'],
+                $headline['roas'],
+                $headline['aov'],
                 json_encode($reportData),
                 $sharedLink,
                 $aiHighlights['highlights'],
@@ -684,8 +722,10 @@ if ($method === 'POST' && $action === 'update_data') {
     $reportData['channels'] = $channelsInput;
     $reportData['totals'] = $totalsInput;
     
-    // Recalculate WoW / MoM Comparisons based on new totals and previous period totals
-    $prevTotals = $reportData['prev_period']['totals'] ?? [];
+    // Recalculate WoW / MoM Comparisons based on new totals and the previous period. The editor
+    // works off the de-duplicated headline (Gross Sales / blended tROAS), so compare against the
+    // previous period's headline when it was stored, not the raw channel-summed totals.
+    $prevTotals = $reportData['prev_period']['headline'] ?? $reportData['prev_period']['totals'] ?? [];
     
     $pctChange = function($curr, $prev) {
         if ($prev <= 0) return null;
