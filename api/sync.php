@@ -3,6 +3,11 @@ require_once __DIR__ . '/config.php';
 ini_set('memory_limit', '512M');
 set_time_limit(240);
 
+// Google Ads API version. Google now ships monthly and sunsets each major ~1 year
+// after launch, at which point requests to the old version path return a bare HTML
+// 404 (not a JSON API error). Bump this one constant when that happens.
+define('GOOGLE_ADS_API_VERSION', 'v25');
+
 // CLI vs Web authentication helper
 $user = null;
 if (php_sapi_name() === 'cli') {
@@ -162,7 +167,7 @@ if ($action === 'test_connections') {
                 $devTok = getSetting('google_developer_token');
                 $mccRaw = !empty($int['google_ads_mcc_id']) ? preg_replace('/[^0-9]/', '', $int['google_ads_mcc_id']) : '';
                 $mcc = !empty($mccRaw) ? $mccRaw : $cust;
-                $ch = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+                $ch = curl_init("https://googleads.googleapis.com/" . GOOGLE_ADS_API_VERSION . "/customers/{$cust}/googleAds:search");
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_TIMEOUT, 10);
                 curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
@@ -797,7 +802,7 @@ if ($gAccessToken && !empty($int['google_ads_enabled']) && !empty($int['google_a
     // 1. Fetch campaigns details (including network/channel type, for the ad-structure audit)
     $q = "SELECT campaign.name, campaign.advertising_channel_type, metrics.cost_micros, metrics.conversions, metrics.conversions_value, metrics.impressions, metrics.clicks FROM campaign WHERE segments.date BETWEEN '{$startDate}' AND '{$endDate}' AND campaign.status = 'ENABLED' ORDER BY metrics.cost_micros DESC LIMIT 50";
 
-    $ch = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+    $ch = curl_init("https://googleads.googleapis.com/" . GOOGLE_ADS_API_VERSION . "/customers/{$cust}/googleAds:search");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -844,7 +849,7 @@ if ($gAccessToken && !empty($int['google_ads_enabled']) && !empty($int['google_a
     // 1b. Fetch top responsive search ad copy (for the creative preview slide)
     $googleSearchAds = [];
     $qAds = "SELECT ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions, metrics.clicks, metrics.conversions_value, metrics.cost_micros FROM ad_group_ad WHERE segments.date BETWEEN '{$startDate}' AND '{$endDate}' AND ad_group_ad.status = 'ENABLED' AND campaign.advertising_channel_type = 'SEARCH' ORDER BY metrics.conversions_value DESC LIMIT 3";
-    $chAds = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+    $chAds = curl_init("https://googleads.googleapis.com/" . GOOGLE_ADS_API_VERSION . "/customers/{$cust}/googleAds:search");
     curl_setopt($chAds, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($chAds, CURLOPT_POST, true);
     curl_setopt($chAds, CURLOPT_TIMEOUT, 15);
@@ -875,7 +880,7 @@ if ($gAccessToken && !empty($int['google_ads_enabled']) && !empty($int['google_a
 
     // 2. Fetch daily logs
     $qDaily = "SELECT segments.date, metrics.cost_micros, metrics.conversions, metrics.conversions_value, metrics.impressions, metrics.clicks FROM campaign WHERE segments.date BETWEEN '{$startDate}' AND '{$endDate}'";
-    $chD = curl_init("https://googleads.googleapis.com/v19/customers/{$cust}/googleAds:search");
+    $chD = curl_init("https://googleads.googleapis.com/" . GOOGLE_ADS_API_VERSION . "/customers/{$cust}/googleAds:search");
     curl_setopt($chD, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($chD, CURLOPT_POST, true);
     curl_setopt($chD, CURLOPT_HTTPHEADER, [
