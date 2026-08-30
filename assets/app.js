@@ -4985,19 +4985,33 @@ function openClientReport() {
   }
 }
 
-function openCreateReport() {
+function openCreateReport(prefill) {
   if (!activeBrand) return alert('Please select a brand first.');
   document.getElementById('reports-list-view').style.display = 'none';
+  document.getElementById('reports-detail-view').style.display = 'none';
   document.getElementById('reports-create-view').style.display = 'block';
   document.getElementById('reports-create-brand-meta').textContent = `${activeBrand.name} · Report Creator`;
-  
+
   // Set default dates
   const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
   document.getElementById('rep-start-date').value = firstDay.toISOString().split('T')[0];
   document.getElementById('rep-end-date').value = today.toISOString().split('T')[0];
-  
-  handleReportTypeChange();
+
+  handleReportTypeChange(); // sets the weekly Mon–Sun defaults
+
+  // Regenerating an existing report — restore its exact period so the upsert overwrites it.
+  if (prefill && prefill.period_start && prefill.period_end) {
+    document.getElementById('rep-start-date').value = String(prefill.period_start).split('T')[0];
+    document.getElementById('rep-end-date').value = String(prefill.period_end).split('T')[0];
+  }
+
+  const manualPrefill = prefill && prefill.report_data ? prefill.report_data.manual_input : null;
+  renderWeeklyManualBuilder(manualPrefill);
+  updateWeeklyManualLabels();
+
+  const genBtn = document.getElementById('btn-generate-report');
+  if (genBtn) { genBtn.disabled = false; genBtn.textContent = prefill ? 'Regenerate Report' : 'Generate Report'; }
 }
 
 function backToReportsList() {
@@ -5027,8 +5041,20 @@ function handleReportTypeChange() {
     startEl.value = firstDayLastMonth.toISOString().split('T')[0];
     endEl.value = lastDayLastMonth.toISOString().split('T')[0];
   }
-  
-  checkReportMissingData();
+
+  const manualSection = document.getElementById('weekly-manual-section');
+  const missingAlert = document.getElementById('reports-missing-alert');
+  const missingForms = document.getElementById('reports-missing-forms');
+  if (type === 'weekly') {
+    // Manual entry is the weekly flow now — hide the legacy API-sync missing-day forms.
+    if (manualSection) manualSection.style.display = 'block';
+    if (missingAlert) missingAlert.style.display = 'none';
+    if (missingForms) missingForms.innerHTML = '';
+    updateWeeklyManualLabels();
+  } else {
+    if (manualSection) manualSection.style.display = 'none';
+    checkReportMissingData();
+  }
 }
 
 async function checkReportMissingData() {
@@ -5077,75 +5103,158 @@ async function checkReportMissingData() {
   }
 }
 
+// Field list for the weekly manual builder. Keys match what statsFromManualChannels() reads.
+const WEEKLY_MANUAL_FIELDS = [
+  ['spend', 'Spend (₹)'],
+  ['revenue', 'Revenue (₹)'],
+  ['conversions', 'Orders'],
+  ['customers_acquired', 'Customers'],
+  ['clicks', 'Clicks'],
+  ['impressions', 'Sessions'],
+];
+
+function weeklyManualChannelList() {
+  let cfg = activeBrand ? activeBrand.channels_config : null;
+  if (typeof cfg === 'string') { try { cfg = JSON.parse(cfg); } catch (e) { cfg = cfg.split(',').map(s => s.trim()); } }
+  if (!Array.isArray(cfg) || cfg.length === 0) cfg = ['meta', 'google'];
+  const list = [];
+  const seen = new Set();
+  ['shopify'].concat(cfg).forEach(c => {
+    const k = String(c || '').trim().toLowerCase();
+    if (k && !seen.has(k)) { seen.add(k); list.push(k); }
+  });
+  return list;
+}
+
+function weeklyManualRowHtml(side, chName, vals) {
+  vals = vals || {};
+  const val = (k) => {
+    let v = vals[k];
+    if (v == null && k === 'revenue') v = vals.sales;
+    if (v == null && k === 'impressions') v = vals.sessions;
+    if (v == null && k === 'conversions') v = vals.orders;
+    return (v == null || v === '') ? '' : v;
+  };
+  const fields = WEEKLY_MANUAL_FIELDS.map(([key, label]) => `
+    <div class="field" style="margin-bottom:0">
+      <label style="font-size:9px;margin-bottom:2px">${label}</label>
+      <input type="number" min="0" step="any" class="wk-f" data-k="${key}" value="${val(key)}" placeholder="0" style="padding:4px;height:28px;font-size:11px">
+    </div>`).join('');
+  return `
+    <div class="wk-manual-row" data-side="${side}" data-channel="${chName}" style="background:var(--off);padding:10px;border-radius:8px;border:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-weight:700;text-transform:capitalize;font-size:11px;color:var(--dark)">${chName}</span>
+        <button type="button" class="btn sm danger" onclick="this.closest('.wk-manual-row').remove()" style="padding:1px 6px;font-size:10px">Remove</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:6px">${fields}</div>
+    </div>`;
+}
+
+function renderWeeklyManualBuilder(prefill) {
+  const sides = { current: document.getElementById('wk-current-channels'), previous: document.getElementById('wk-previous-channels') };
+  if (!sides.current || !sides.previous) return;
+  const baseList = weeklyManualChannelList();
+  ['current', 'previous'].forEach(side => {
+    const pf = (prefill && prefill[side]) ? prefill[side] : null;
+    const names = [];
+    const seen = new Set();
+    (pf ? Object.keys(pf) : []).concat(baseList).forEach(n => {
+      const k = String(n || '').trim().toLowerCase();
+      if (k && !seen.has(k)) { seen.add(k); names.push(k); }
+    });
+    sides[side].innerHTML = names.map(n => weeklyManualRowHtml(side, n, pf ? pf[n] : null)).join('');
+  });
+}
+
+function addWeeklyManualChannel(side) {
+  const raw = prompt('Channel name (e.g. marketplace, zingbot, amazon, email):');
+  if (!raw) return;
+  const chName = raw.trim().toLowerCase();
+  if (!chName) return;
+  const container = document.getElementById(side === 'previous' ? 'wk-previous-channels' : 'wk-current-channels');
+  if (container.querySelector(`.wk-manual-row[data-channel="${chName}"]`)) return alert('That channel is already listed.');
+  container.insertAdjacentHTML('beforeend', weeklyManualRowHtml(side === 'previous' ? 'previous' : 'current', chName, null));
+}
+
+function fmtRangeLabel(startStr, endStr) {
+  if (!startStr || !endStr) return '';
+  const o = { day: 'numeric', month: 'short' };
+  return `${new Date(startStr).toLocaleDateString('en-IN', o)} – ${new Date(endStr).toLocaleDateString('en-IN', o)}`;
+}
+
+function updateWeeklyManualLabels() {
+  const s = document.getElementById('rep-start-date') ? document.getElementById('rep-start-date').value : '';
+  const e = document.getElementById('rep-end-date') ? document.getElementById('rep-end-date').value : '';
+  const curEl = document.getElementById('wk-cur-title');
+  const prevEl = document.getElementById('wk-prev-title');
+  if (curEl) curEl.textContent = (s && e) ? `This Week · ${fmtRangeLabel(s, e)}` : 'This Week';
+  if (!prevEl) return;
+  if (s && e) {
+    const sd = new Date(s), ed = new Date(e);
+    const days = Math.round((ed - sd) / 86400000) + 1;
+    const pe = new Date(sd); pe.setDate(pe.getDate() - 1);
+    const ps = new Date(pe); ps.setDate(ps.getDate() - (days - 1));
+    prevEl.textContent = `Previous Week · ${fmtRangeLabel(ps.toISOString().split('T')[0], pe.toISOString().split('T')[0])}`;
+  } else {
+    prevEl.textContent = 'Previous Week';
+  }
+}
+
+function collectWeeklyManualSide(side) {
+  const container = document.getElementById(side === 'previous' ? 'wk-previous-channels' : 'wk-current-channels');
+  const out = {};
+  if (!container) return out;
+  container.querySelectorAll('.wk-manual-row').forEach(row => {
+    const ch = row.dataset.channel;
+    const rec = {};
+    let any = false;
+    row.querySelectorAll('.wk-f').forEach(inp => {
+      const v = parseFloat(inp.value) || 0;
+      rec[inp.dataset.k] = v;
+      if (v) any = true;
+    });
+    if (ch && any) out[ch] = rec;
+  });
+  return out;
+}
+
+function collectWeeklyManual() {
+  return { current: collectWeeklyManualSide('current'), previous: collectWeeklyManualSide('previous') };
+}
+
+function reopenWeeklyBuilder() {
+  if (!activeReportId) return;
+  api(`/api/reports?action=view&id=${activeReportId}`)
+    .then(r => { if (r) openCreateReport(r); })
+    .catch(e => alert('Could not load report inputs: ' + e.message));
+}
+
 async function submitGenerateReport() {
   const type = document.querySelector('input[name="rep-type"]:checked').value;
   const start = document.getElementById('rep-start-date').value;
   const end = document.getElementById('rep-end-date').value;
-  
+
   if (!start || !end) return alert('Please enter start and end dates.');
-  
+
   const generateBtn = document.getElementById('btn-generate-report');
+
+  // Weekly is now a pure manual-entry flow: the user types this week + last week for every
+  // channel and we build straight off that (no API sync round-trip). Monthly keeps its own
+  // separate creator; this branch is only a safety net if the radio is ever set to monthly.
+  const manual = collectWeeklyManual();
+  if (type === 'weekly' && Object.keys(manual.current).length === 0) {
+    return alert('Enter at least one channel’s numbers for this week before generating.');
+  }
+
   generateBtn.disabled = true;
-  generateBtn.textContent = 'Syncing APIs & Generating…';
-  
+  generateBtn.textContent = 'Generating…';
+
   try {
-    // Autopilot Live API Sync: Auto-pull live data from Shopify, Meta Ads, Google Ads, GA4, GSC
-    try {
-      await api(`/api/sync.php?brand_id=${activeBrand.id}&start_date=${start}&end_date=${end}`);
-    } catch (syncErr) {
-      console.warn('Background API sync notice:', syncErr);
-    }
-    // 0. Force check missing data if not rendered
-    const rCheck = await api(`/api/reports?action=check_missing&brand_id=${activeBrand.id}&start_date=${start}&end_date=${end}`);
-    if (rCheck && rCheck.missing && rCheck.missing.length > 0) {
-      const cards = document.querySelectorAll('.reports-missing-day-card');
-      if (cards.length === 0) {
-        await checkReportMissingData();
-        generateBtn.disabled = false;
-        generateBtn.textContent = 'Generate Report';
-        return alert('Missing data detected! Please fill in the highlighted fields or click Generate again to proceed with 0s.');
-      }
-    }
-    
-    // 1. Gather and save missing data if forms exist
-    const cards = document.querySelectorAll('.reports-missing-day-card');
-    if (cards.length > 0) {
-      const missingData = [];
-      cards.forEach(card => {
-        const date = card.dataset.date;
-        const channels = {};
-        let hasAnyData = false;
+    const payload = { brand_id: activeBrand.id, report_type: type, start_date: start, end_date: end };
+    if (type === 'weekly') payload.manual_weekly = manual;
 
-        card.querySelectorAll('[data-channel]').forEach(chDiv => {
-          const ch = chDiv.dataset.channel;
-          const spend = parseFloat(chDiv.querySelector('.ch-sp')?.value) || 0;
-          const sales = parseFloat(chDiv.querySelector('.ch-rev')?.value) || 0;
-          const orders = parseInt(chDiv.querySelector('.ch-ord')?.value) || 0;
-          const custAcq = parseInt(chDiv.querySelector('.ch-cust')?.value) || 0;
-          const clicks = parseInt(chDiv.querySelector('.ch-clk')?.value) || 0;
-          const impressions = parseInt(chDiv.querySelector('.ch-imp')?.value) || 0;
-          channels[ch] = { spend, sales, conversions: orders, customers_acquired: custAcq, clicks, impressions };
-          if (spend > 0 || sales > 0 || orders > 0) hasAnyData = true;
-        });
+    const r = await api('/api/reports?action=create', 'POST', payload);
 
-        if (hasAnyData) {
-          missingData.push({ date, channels });
-        }
-      });
-      
-      if (missingData.length > 0) {
-        await api('/api/reports?action=save_missing', 'POST', { brand_id: activeBrand.id, missing_data: missingData });
-      }
-    }
-    
-    // 2. Request report generation (which runs AI summaries dynamically)
-    const r = await api('/api/reports?action=create', 'POST', {
-      brand_id: activeBrand.id,
-      report_type: type,
-      start_date: start,
-      end_date: end
-    });
-    
     if (r && r.report_id) {
       loadReportDetails(r.report_id);
     } else {
@@ -5154,7 +5263,7 @@ async function submitGenerateReport() {
       generateBtn.textContent = 'Generate Report';
     }
   } catch (e) {
-    alert('Error generating report: ' . e.message);
+    alert('Error generating report: ' + e.message);
     generateBtn.disabled = false;
     generateBtn.textContent = 'Generate Report';
   }
@@ -5177,6 +5286,9 @@ async function loadReportDetails(reportId) {
     const endStr = new Date(r.period_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     document.getElementById('rep-detail-title').textContent = `${r.report_type.toUpperCase()} Performance Report`;
     document.getElementById('rep-detail-meta').textContent = `${r.brand_name} · ${startStr} - ${endStr}`;
+
+    const reopenBtn = document.getElementById('btn-reopen-weekly-builder');
+    if (reopenBtn) reopenBtn.style.display = (r.report_type === 'weekly') ? 'inline-flex' : 'none';
     
     // Setup KPIs
     document.getElementById('rep-kpi-spend').textContent = `₹${parseFloat(r.total_spend).toLocaleString('en-IN')}`;

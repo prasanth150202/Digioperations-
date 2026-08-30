@@ -262,6 +262,59 @@ function aggregateStats(string $brandId, string $start, string $end): array {
     ];
 }
 
+// Build the exact same {channels, totals} shape aggregateStats() returns, but straight from a
+// manually-entered channel map instead of the budget_days table. Used by the weekly report
+// builder, which now asks the user for the whole week's numbers up front (current + previous)
+// rather than depending on the API sync landing cleanly for every source.
+//   $chIn = { "shopify": {spend,sales|revenue,conversions,customers_acquired,clicks,impressions}, "meta": {...}, ... }
+function statsFromManualChannels(array $chIn): array {
+    $channels = [];
+    $totals = ['spend' => 0.0, 'revenue' => 0.0, 'conversions' => 0, 'customers_acquired' => 0, 'clicks' => 0, 'impressions' => 0];
+
+    foreach ($chIn as $chName => $data) {
+        if (!is_array($data)) continue;
+        $chName = strtolower(trim((string)$chName));
+        if ($chName === '' || $chName === 'followers' || $chName === 'posts') continue;
+
+        $sp   = (float)($data['spend'] ?? 0);
+        $rev  = (float)($data['revenue'] ?? $data['sales'] ?? 0);
+        $conv = (int)($data['conversions'] ?? $data['orders'] ?? 0);
+        $cust = (int)($data['customers_acquired'] ?? 0);
+        $clk  = (int)($data['clicks'] ?? 0);
+        $imp  = (int)($data['impressions'] ?? $data['sessions'] ?? 0);
+
+        // Nothing entered for this row — skip it so it doesn't show as a dead channel in the deck.
+        if ($sp == 0 && $rev == 0 && $conv == 0 && $cust == 0 && $clk == 0 && $imp == 0) continue;
+
+        $channels[$chName] = [
+            'spend' => $sp, 'revenue' => $rev, 'conversions' => $conv,
+            'customers_acquired' => $cust, 'clicks' => $clk, 'impressions' => $imp,
+        ];
+        $totals['spend'] += $sp;
+        $totals['revenue'] += $rev;
+        $totals['conversions'] += $conv;
+        $totals['customers_acquired'] += $cust;
+        $totals['clicks'] += $clk;
+        $totals['impressions'] += $imp;
+    }
+
+    foreach ($channels as &$m) {
+        $m['roas'] = $m['spend'] > 0 ? round($m['revenue'] / $m['spend'], 2) : 0.0;
+        $den = $m['customers_acquired'] > 0 ? $m['customers_acquired'] : $m['conversions'];
+        $m['cpa'] = $den > 0 ? round($m['spend'] / $den, 2) : 0.0;
+        $m['ctr'] = $m['impressions'] > 0 ? round(($m['clicks'] / $m['impressions']) * 100, 2) : 0.0;
+    }
+    unset($m);
+
+    $totals['roas'] = $totals['spend'] > 0 ? round($totals['revenue'] / $totals['spend'], 2) : 0.0;
+    $denT = $totals['customers_acquired'] > 0 ? $totals['customers_acquired'] : $totals['conversions'];
+    $totals['cpa'] = $denT > 0 ? round($totals['spend'] / $denT, 2) : 0.0;
+    $totals['aov'] = $totals['conversions'] > 0 ? round($totals['revenue'] / $totals['conversions'], 2) : 0.0;
+    $totals['ctr'] = $totals['impressions'] > 0 ? round(($totals['clicks'] / $totals['impressions']) * 100, 2) : 0.0;
+
+    return ['channels' => $channels, 'totals' => $totals, 'days_count' => 0];
+}
+
 // POST create a report with AI highlights
 if ($method === 'POST' && $action === 'create') {
     $brandId = bodyGet('brand_id', '');
@@ -276,35 +329,48 @@ if ($method === 'POST' && $action === 'create') {
     $brand = dbGet('SELECT id, name, slug, integrations_json FROM brands WHERE id=?', [$brandId]);
     if (!$brand || !canAccessBrand($user, $brand['slug'])) json_err('Access denied', 403);
     
-    // 1. Autopilot: Trigger background API sync for connected channels if available
-    try {
-        $int = json_decode($brand['integrations_json'] ?? '{}', true);
-        if (!empty($int['shopify_enabled']) || !empty($int['meta_ad_account_ids']) || !empty($int['google_ads_enabled'])) {
-            // Trigger internal sync execution
-            $_GET['brand_id'] = $brand['slug'];
-            $_GET['start_date'] = $startDate;
-            $_GET['end_date'] = $endDate;
-            $_GET['action'] = 'sync';
-            // Sync executes in background safely
-        }
-    } catch (Throwable $syncErr) {}
+    // Weekly reports are now built from numbers the user types in for the whole week (this week +
+    // last week), because the live API sync needs too many retries to be depended on at report
+    // time. When that payload is present we skip the sync + budget_days aggregation entirely and
+    // feed the manual figures straight through the same pipeline. Monthly and the old
+    // sync-then-aggregate weekly path are unchanged and still run when no manual payload is sent.
+    $manualWeekly = bodyGet('manual_weekly', []);
+    $useManualWeekly = $reportType === 'weekly' && is_array($manualWeekly)
+        && !empty($manualWeekly['current']) && is_array($manualWeekly['current']);
 
-    // Aggregate stats for the current period
-    $currentStats = aggregateStats($brandId, $startDate, $endDate);
-    
-    // 2. Fetch data from the previous period of equal length for WoW / MoM calculations
+    // 2. Previous period of equal length, for WoW comparisons (dates always needed for report_data)
     $startDt = new DateTime($startDate);
     $endDt = new DateTime($endDate);
     $diffDays = (int)$startDt->diff($endDt)->days + 1;
-    
+
     $prevEndDt = clone $startDt;
     $prevEndDt->modify('-1 day');
     $prevStartDt = clone $prevEndDt;
     $prevStartDt->modify('-' . ($diffDays - 1) . ' days');
-    
+
     $prevStartDateStr = $prevStartDt->format('Y-m-d');
     $prevEndDateStr = $prevEndDt->format('Y-m-d');
-    $prevStats = aggregateStats($brandId, $prevStartDateStr, $prevEndDateStr);
+
+    if ($useManualWeekly) {
+        $currentStats = statsFromManualChannels($manualWeekly['current'] ?? []);
+        $prevStats    = statsFromManualChannels($manualWeekly['previous'] ?? []);
+    } else {
+        // 1. Autopilot: Trigger background API sync for connected channels if available
+        try {
+            $int = json_decode($brand['integrations_json'] ?? '{}', true);
+            if (!empty($int['shopify_enabled']) || !empty($int['meta_ad_account_ids']) || !empty($int['google_ads_enabled'])) {
+                // Trigger internal sync execution
+                $_GET['brand_id'] = $brand['slug'];
+                $_GET['start_date'] = $startDate;
+                $_GET['end_date'] = $endDate;
+                $_GET['action'] = 'sync';
+                // Sync executes in background safely
+            }
+        } catch (Throwable $syncErr) {}
+
+        $currentStats = aggregateStats($brandId, $startDate, $endDate);
+        $prevStats = aggregateStats($brandId, $prevStartDateStr, $prevEndDateStr);
+    }
 
     // If monthly report, parse manual Owned Media inputs
     if ($reportType === 'monthly') {
@@ -482,7 +548,16 @@ if ($method === 'POST' && $action === 'create') {
             'gross_roas' => $prevGrossRoas
         ]
     ];
-    
+
+    // Keep the raw weekly inputs so re-opening the builder for this period pre-fills every field
+    // instead of starting blank.
+    if ($useManualWeekly) {
+        $reportData['manual_input'] = [
+            'current' => $manualWeekly['current'] ?? [],
+            'previous' => $manualWeekly['previous'] ?? [],
+        ];
+    }
+
     if ($reportType === 'monthly') {
         $reportData['owned_media'] = bodyGet('owned_media', []);
         $apiSyncData = bodyGet('api_sync_data', []);
