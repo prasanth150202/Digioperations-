@@ -5563,16 +5563,67 @@ async function deleteReport(reportId) {
 
 let currentEditReportData = null;
 
+// key -> [label, DB column on the report row, step for the input]
+const HEADLINE_KPIS = [
+  ['spend',       'Spend (₹)',       'total_spend',       'any'],
+  ['revenue',     'Total Sales (₹)', 'total_revenue',     'any'],
+  ['conversions', 'Orders',          'total_conversions', '1'],
+  ['roas',        'ROAS (x)',        'overall_roas',      '0.01'],
+  ['cpa',         'CPA (₹)',         'overall_cpa',       'any'],
+  ['aov',         'AOV (₹)',         'overall_aov',       'any'],
+];
+
+function renderEditHeadlineGrid(r) {
+  const grid = document.getElementById('edit-report-headline-grid');
+  if (!grid) return;
+  const comps = (r.report_data && r.report_data.comparisons) || {};
+  grid.innerHTML = HEADLINE_KPIS.map(([key, label, col, step]) => {
+    const val = (r[col] != null && r[col] !== '') ? r[col] : 0;
+    const pct = (comps[key] != null && comps[key] !== '') ? comps[key] : '';
+    return `
+      <div style="background:var(--off);border:1px solid var(--border);border-radius:8px;padding:8px">
+        <div style="font-size:9px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:4px">${label}</div>
+        <input type="number" step="${step}" class="hl-kpi-val" data-k="${key}" value="${val}" style="width:100%;padding:4px;height:28px;font-size:12px;margin-bottom:4px">
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:9px;color:var(--mid)">WoW %</span>
+          <input type="number" step="any" class="hl-kpi-pct" data-k="${key}" value="${pct}" placeholder="auto" style="flex:1;padding:3px 4px;height:24px;font-size:11px">
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function recalcHeadlineFromChannels() {
+  let s = 0, rev = 0, ord = 0, cust = 0;
+  document.querySelectorAll('.edit-channel-card').forEach(card => {
+    s   += parseFloat(card.querySelector('.ch-edit-spend').value) || 0;
+    rev += parseFloat(card.querySelector('.ch-edit-revenue').value) || 0;
+    ord += parseInt(card.querySelector('.ch-edit-orders').value) || 0;
+    cust += parseInt(card.querySelector('.ch-edit-customers').value) || 0;
+  });
+  const den = cust > 0 ? cust : ord;
+  const vals = {
+    spend: Math.round(s), revenue: Math.round(rev), conversions: ord,
+    roas: s > 0 ? +(rev / s).toFixed(2) : 0,
+    cpa: den > 0 ? Math.round(s / den) : 0,
+    aov: ord > 0 ? Math.round(rev / ord) : 0,
+  };
+  document.querySelectorAll('.hl-kpi-val').forEach(inp => {
+    if (vals[inp.dataset.k] != null) inp.value = vals[inp.dataset.k];
+  });
+}
+
 async function openEditReportDataModal() {
   if (!activeReportId) return;
   try {
     const r = await api(`/api/reports?action=view&id=${activeReportId}`);
     if (!r) return;
-    
+
     currentEditReportData = r;
     const data = r.report_data;
     const channels = data.channels || {};
-    
+
+    renderEditHeadlineGrid(r);
+
     const container = document.getElementById('edit-report-channels-container');
     container.innerHTML = '';
     
@@ -5738,25 +5789,40 @@ async function submitEditReportData() {
     }
   });
 
+  // Headline KPIs come from the editable grid at the top of the modal, NOT the channel sum, so the
+  // user has direct control. Fall back to the channel sum for any field left blank.
+  const hlVal = {};
+  document.querySelectorAll('.hl-kpi-val').forEach(inp => {
+    const raw = inp.value.trim();
+    hlVal[inp.dataset.k] = raw === '' ? null : (parseFloat(raw) || 0);
+  });
   const totalCpaDenom = totalCustomers > 0 ? totalCustomers : totalConversions;
   const updatedTotals = {
-    spend: totalSpend,
-    revenue: totalRevenue,
-    conversions: totalConversions,
+    spend: hlVal.spend != null ? hlVal.spend : totalSpend,
+    revenue: hlVal.revenue != null ? hlVal.revenue : totalRevenue,
+    conversions: hlVal.conversions != null ? hlVal.conversions : totalConversions,
     customers_acquired: totalCustomers,
     clicks: totalClicks,
     impressions: totalImpressions,
-    roas: totalSpend > 0 ? parseFloat((totalRevenue / totalSpend).toFixed(2)) : 0.0,
-    cpa: totalCpaDenom > 0 ? parseFloat((totalSpend / totalCpaDenom).toFixed(2)) : 0.0,
-    aov: totalConversions > 0 ? parseFloat((totalRevenue / totalConversions).toFixed(2)) : 0.0,
+    roas: hlVal.roas != null ? hlVal.roas : (totalSpend > 0 ? parseFloat((totalRevenue / totalSpend).toFixed(2)) : 0.0),
+    cpa: hlVal.cpa != null ? hlVal.cpa : (totalCpaDenom > 0 ? parseFloat((totalSpend / totalCpaDenom).toFixed(2)) : 0.0),
+    aov: hlVal.aov != null ? hlVal.aov : (totalConversions > 0 ? parseFloat((totalRevenue / totalConversions).toFixed(2)) : 0.0),
     ctr: totalImpressions > 0 ? parseFloat(((totalClicks / totalImpressions) * 100).toFixed(2)) : 0.0
   };
-  
+
+  // WoW % overrides — blank means "auto-calculate from the previous period" (sent as null).
+  const comparisons = {};
+  document.querySelectorAll('.hl-kpi-pct').forEach(inp => {
+    const raw = inp.value.trim();
+    comparisons[inp.dataset.k] = raw === '' ? null : (parseFloat(raw) || 0);
+  });
+
   try {
     const r = await api('/api/reports?action=update_data', 'POST', {
       report_id: activeReportId,
       channels: updatedChannels,
-      totals: updatedTotals
+      totals: updatedTotals,
+      comparisons: comparisons
     });
     
     if (r && r.ok) {

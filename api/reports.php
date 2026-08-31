@@ -798,36 +798,50 @@ if ($method === 'POST' && $action === 'update_data') {
     $totalsInput = bodyGet('totals', []);
     
     if (!$reportId) json_err('Report ID required');
-    if (empty($channelsInput) || empty($totalsInput)) json_err('Channels and Totals data required');
-    
+    if (empty($totalsInput)) json_err('Totals data required');
+    if (!is_array($channelsInput)) $channelsInput = [];
+
     // Retrieve report and verify access
     $report = dbGet('SELECT r.*, b.slug, b.name as brand_name FROM reports r JOIN brands b ON b.id = r.brand_id WHERE r.id=?', [$reportId]);
     if (!$report || !canAccessBrand($user, $report['slug'])) json_err('Access denied', 403);
-    
+
     $reportData = json_decode($report['report_data'] ?? '{}', true);
-    
+
     // Update channels and totals in the report JSON
-    $reportData['channels'] = $channelsInput;
+    if (!empty($channelsInput)) $reportData['channels'] = $channelsInput;
     $reportData['totals'] = $totalsInput;
-    
-    // Recalculate WoW / MoM Comparisons based on new totals and the previous period. The editor
-    // works off the de-duplicated headline (Gross Sales / blended tROAS), so compare against the
-    // previous period's headline when it was stored, not the raw channel-summed totals.
+    $reportData['headline'] = $totalsInput; // the edited headline is what the KPI tiles render from
+
+    // WoW / MoM comparisons: honour any value the editor typed in by hand, and auto-calculate the
+    // rest from the new totals vs the previous period's headline. $comparisonsInput values are
+    // percentages already (e.g. -41.5); an explicit null/'' means "auto".
+    $comparisonsInput = bodyGet('comparisons', []);
+    if (!is_array($comparisonsInput)) $comparisonsInput = [];
     $prevTotals = $reportData['prev_period']['headline'] ?? $reportData['prev_period']['totals'] ?? [];
-    
+
     $pctChange = function($curr, $prev) {
         if ($prev <= 0) return null;
         return round((($curr - $prev) / $prev) * 100, 1);
     };
+    $resolveCmp = function($key, $curr, $prev) use ($comparisonsInput, $pctChange) {
+        // A numeric value is an explicit hand-typed override; null / '' / missing means auto.
+        if (array_key_exists($key, $comparisonsInput) && is_numeric($comparisonsInput[$key])) {
+            return round((float)$comparisonsInput[$key], 1);
+        }
+        return $pctChange($curr, $prev);
+    };
 
     $comparisons = [
-        'spend' => $pctChange($totalsInput['spend'] ?? 0, $prevTotals['spend'] ?? 0),
-        'revenue' => $pctChange($totalsInput['revenue'] ?? 0, $prevTotals['revenue'] ?? 0),
-        'conversions' => $pctChange($totalsInput['conversions'] ?? 0, $prevTotals['conversions'] ?? 0),
-        'roas' => $pctChange($totalsInput['roas'] ?? 0, $prevTotals['roas'] ?? 0),
-        'cpa' => $pctChange($totalsInput['cpa'] ?? 0, $prevTotals['cpa'] ?? 0),
-        'aov' => $pctChange($totalsInput['aov'] ?? 0, $prevTotals['aov'] ?? 0),
+        'spend' => $resolveCmp('spend', $totalsInput['spend'] ?? 0, $prevTotals['spend'] ?? 0),
+        'revenue' => $resolveCmp('revenue', $totalsInput['revenue'] ?? 0, $prevTotals['revenue'] ?? 0),
+        'conversions' => $resolveCmp('conversions', $totalsInput['conversions'] ?? 0, $prevTotals['conversions'] ?? 0),
+        'roas' => $resolveCmp('roas', $totalsInput['roas'] ?? 0, $prevTotals['roas'] ?? 0),
+        'cpa' => $resolveCmp('cpa', $totalsInput['cpa'] ?? 0, $prevTotals['cpa'] ?? 0),
+        'aov' => $resolveCmp('aov', $totalsInput['aov'] ?? 0, $prevTotals['aov'] ?? 0),
     ];
+    // Keep the gross_* aliases the monthly deck reads in sync with the headline edits.
+    $comparisons['gross_revenue'] = $comparisons['revenue'];
+    $comparisons['gross_roas'] = $comparisons['roas'];
     $reportData['comparisons'] = $comparisons;
     
     $reportDataJson = json_encode($reportData);

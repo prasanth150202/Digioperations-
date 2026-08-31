@@ -2105,9 +2105,15 @@
 <div class="modal-overlay" id="mo-edit-report-data" style="display:none"><div class="modal" style="width:100%; max-width:min(750px, 95vw); max-height:85vh; display:flex; flex-direction:column; overflow:hidden;">
   <div class="modal-title" style="flex-shrink:0;">&#9998; Edit Report Performance Data</div>
   <div style="font-size:12px;color:var(--mid);margin-bottom:14px;line-height:1.5;flex-shrink:0;">
-    Edit channel-level metrics directly. Changes will reflect in both your view and the client-facing report link immediately.
+    Edit the headline KPI values and their week-over-week % directly, and/or the channel-level metrics below. Changes reflect in both your view and the client-facing report link immediately.
   </div>
-  <div id="edit-report-channels-container" style="flex:1 1 0;min-height:0;overflow-y:auto;padding-right:4px"></div>
+  <div style="flex:1 1 0;min-height:0;overflow-y:auto;padding-right:4px">
+    <div style="font-weight:800;font-size:12px;color:var(--dark);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Headline KPIs &amp; WoW %</div>
+    <div id="edit-report-headline-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:8px"></div>
+    <div style="font-size:11px;color:var(--mid);margin-bottom:18px">Leave a WoW % blank to auto-calculate it from the previous period. <button type="button" class="btn sm" style="padding:1px 6px;font-size:10px" onclick="recalcHeadlineFromChannels()">&#8635; Fill KPIs from channel sum</button></div>
+    <div style="font-weight:800;font-size:12px;color:var(--dark);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Channel breakdown</div>
+    <div id="edit-report-channels-container"></div>
+  </div>
   <div style="margin-top:12px;display:flex;gap:8px;flex-shrink:0;">
     <button class="btn sm" onclick="addChannelToEditModal()">+ Add Channel</button>
   </div>
