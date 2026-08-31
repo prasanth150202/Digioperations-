@@ -462,21 +462,34 @@ if ($method === 'POST' && $action === 'create') {
         'aov' => $pctChange($currentStats['totals']['aov'], $prevStats['totals']['aov']),
     ];
 
-    // ── CORRECTED GROSS / BLENDED HEADLINE ──
-    // $currentStats['totals']['revenue'] and ['conversions'] SUM every channel's own figure, but
-    // Meta / Google / ZingBot / Email / WhatsApp "sales" and "orders" are each platform's
-    // *self-attributed* credit for checkouts that already happened on Shopify — not incremental
-    // money. Summing them inflates the headline 2–4x. Only Shopify (the storefront) and Marketplace
-    // (a separate checkout) are non-overlapping revenue pools, so the headline Sales / Orders are
-    // those two alone. Spend is the opposite: it never overlaps, so the blended denominator is the
-    // sum of EVERY channel's spend (Meta + Google + ZingBot + marketplace ads + …), which
-    // $currentStats['totals']['spend'] already is.
-    //   Blended tROAS = (Shopify + Marketplace revenue) / (total spend across all channels)
-    $grossFrom = function(array $stats): array {
-        $rev  = ($stats['channels']['shopify']['revenue'] ?? 0) + ($stats['channels']['marketplace']['revenue'] ?? 0);
-        $ord  = ($stats['channels']['shopify']['conversions'] ?? 0) + ($stats['channels']['marketplace']['conversions'] ?? 0);
-        $cust = ($stats['channels']['shopify']['customers_acquired'] ?? 0) + ($stats['channels']['marketplace']['customers_acquired'] ?? 0);
-        $spend = $stats['totals']['spend'] ?? 0;
+    // ── HEADLINE (Total Sales / Blended tROAS / Orders …) ──
+    // The per-channel "revenue" and "orders" from an API pull overlap: Meta / Google / ZingBot /
+    // Email each self-attribute credit for checkouts that already happened on Shopify, so summing
+    // them inflates the headline 2–4x. There the headline Sales / Orders come from Shopify + the
+    // Marketplace (a separate checkout) alone.
+    //   But in the manual weekly builder the user curates exactly what goes in. If they entered a
+    // Shopify (or Marketplace) storefront total we still de-dup to that. If they didn't — they're
+    // tracking revenue per acquisition channel and there is nothing to de-dup against — the
+    // headline is simply the sum of what they typed, so the deck reflects the entered numbers.
+    // Spend never overlaps, so the blended denominator is always every channel's spend summed.
+    $manualHasStorefront = $useManualWeekly && (
+        ($currentStats['channels']['shopify']['revenue'] ?? 0) > 0
+        || ($currentStats['channels']['marketplace']['revenue'] ?? 0) > 0
+    );
+    $useChannelSum = $useManualWeekly && !$manualHasStorefront;
+
+    $headlineFrom = function(array $stats) use ($useChannelSum): array {
+        $ch = $stats['channels']; $t = $stats['totals'];
+        if ($useChannelSum) {
+            $rev  = $t['revenue'] ?? 0;
+            $ord  = $t['conversions'] ?? 0;
+            $cust = $t['customers_acquired'] ?? 0;
+        } else {
+            $rev  = ($ch['shopify']['revenue'] ?? 0) + ($ch['marketplace']['revenue'] ?? 0);
+            $ord  = ($ch['shopify']['conversions'] ?? 0) + ($ch['marketplace']['conversions'] ?? 0);
+            $cust = ($ch['shopify']['customers_acquired'] ?? 0) + ($ch['marketplace']['customers_acquired'] ?? 0);
+        }
+        $spend = $t['spend'] ?? 0;
         $cpaDen = $cust > 0 ? $cust : $ord;
         return [
             'spend'       => $spend,
@@ -488,8 +501,8 @@ if ($method === 'POST' && $action === 'create') {
             'cpa'         => $cpaDen > 0 ? round($spend / $cpaDen, 2) : 0.0,
         ];
     };
-    $headline = $grossFrom($currentStats);
-    $prevHeadline = $grossFrom($prevStats);
+    $headline = $headlineFrom($currentStats);
+    $prevHeadline = $headlineFrom($prevStats);
 
     // Names kept for the monthly deck / report_data consumers that already reference them.
     $grossRevenue = $headline['revenue'];
